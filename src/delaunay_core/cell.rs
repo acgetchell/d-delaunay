@@ -32,6 +32,7 @@ mod tests {
     use crate::delaunay_core::point::Point;
 
     use super::*;
+
     #[test]
     fn make_cell() {
         let vertex1 = Vertex::new(Point::new(1.0, 2.0, 3.0), 3);

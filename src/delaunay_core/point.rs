@@ -12,3 +12,18 @@ impl<T> Point<T> {
         Self { x, y, z }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn make_point() {
+        let point = Point::new(1.0, 2.0, 3.0);
+        println!("{:?}", point);
+        assert_eq!(point.x, 1.0);
+        assert_eq!(point.y, 2.0);
+        assert_eq!(point.z, 3.0);
+    }
+}
