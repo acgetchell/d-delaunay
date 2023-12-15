@@ -1,6 +1,8 @@
 mod delaunay_core {
     pub mod cell;
+    pub mod point;
     pub mod triangulation_data_structure;
+    pub mod utilities;
     pub mod vertex;
 }
 

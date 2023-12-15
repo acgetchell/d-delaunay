@@ -1,49 +1,35 @@
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct Point<T> {
-    pub x: T,
-    pub y: T,
-    pub z: T,
-}
+use uuid::Uuid;
 
-#[allow(dead_code)]
-impl<T> Point<T> {
-    pub fn new(x: T, y: T, z: T) -> Self {
-        Self { x, y, z }
-    }
-}
+use super::{point::Point, utilities::make_uuid};
 
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Vertex<T, U> {
     pub point: Point<T>,
-    pub index: usize,
+    pub uuid: Uuid,
     pub data: U,
 }
 
 #[allow(dead_code)]
 impl<T, U> Vertex<T, U> {
-    pub fn new(point: Point<T>, index: usize, data: U) -> Self {
-        Self { point, index, data }
+    pub fn new(point: Point<T>, data: U) -> Self {
+        let uuid = make_uuid();
+        Self { point, uuid, data }
     }
 }
-
+#[cfg(test)]
 mod tests {
+
+    use super::*;
 
     #[test]
     fn make_vertex() {
-        use crate::delaunay_core::vertex::Vertex;
-
-        let vertex = Vertex::new(
-            crate::delaunay_core::vertex::Point::new(1.0, 2.0, 3.0),
-            0,
-            3,
-        );
+        let vertex = Vertex::new(Point::new(1.0, 2.0, 3.0), 3);
         println!("{:?}", vertex);
         assert_eq!(vertex.point.x, 1.0);
         assert_eq!(vertex.point.y, 2.0);
         assert_eq!(vertex.point.z, 3.0);
-        assert_eq!(vertex.index, 0);
+        assert_ne!(vertex.uuid, make_uuid());
         assert_eq!(vertex.data, 3);
     }
 }
