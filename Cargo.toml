@@ -10,3 +10,5 @@ uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 
 [lints.rust]
 unsafe_code = "forbid"
+dead_code = "allow"
+#missing_docs = "warn"
