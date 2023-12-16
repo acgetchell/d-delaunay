@@ -51,7 +51,7 @@ mod tests {
     fn make_cell_with_data() {
         let vertex1 = Vertex::new_with_data(Point::new(1.0, 2.0, 3.0), 3);
         let cell = Cell::new_with_data(vec![vertex1], 10);
-        println!("{:?}", cell);
+
         assert_eq!(cell.vertices[0].point.x, 1.0);
         assert_eq!(cell.vertices[0].point.y, 2.0);
         assert_eq!(cell.vertices[0].point.z, 3.0);
@@ -60,13 +60,16 @@ mod tests {
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_some());
         assert_eq!(cell.data.unwrap(), 10);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
     }
 
     #[test]
     fn make_cell_without_data() {
         let vertex1 = Vertex::new_with_data(Point::new(1.0, 2.0, 3.0), 3);
         let cell: Cell<f64, i32, Option<()>> = Cell::new(vec![vertex1]);
-        println!("{:?}", cell);
+
         assert_eq!(cell.vertices[0].point.x, 1.0);
         assert_eq!(cell.vertices[0].point.y, 2.0);
         assert_eq!(cell.vertices[0].point.z, 3.0);
@@ -74,5 +77,8 @@ mod tests {
         assert_eq!(cell.number_of_vertices(), 1);
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
     }
 }

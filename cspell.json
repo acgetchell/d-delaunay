@@ -8,6 +8,7 @@
         "CGAL",
         "clippy",
         "codecov",
+        "nocapture",
         "Voronoi"
     ],
     "ignoreWords": [],
