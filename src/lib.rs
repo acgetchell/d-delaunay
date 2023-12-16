@@ -8,11 +8,11 @@ mod delaunay_core {
 
 #[cfg(test)]
 mod tests {
-    use crate::delaunay_core::triangulation_data_structure::tds;
+    use crate::delaunay_core::triangulation_data_structure::hello;
 
     #[test]
     fn it_works() {
-        let result = tds();
+        let result = hello();
         assert_eq!(result, 1);
     }
 }
