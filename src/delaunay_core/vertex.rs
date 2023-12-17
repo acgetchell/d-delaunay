@@ -4,7 +4,7 @@ use std::option::Option;
 
 use super::{point::Point, utilities::make_uuid};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Vertex<T, U, const D: usize> {
     pub point: Point<T, D>,
     pub uuid: Uuid,
@@ -62,7 +62,7 @@ mod tests {
         assert_eq!(vertex.point.coords[1], 2.0);
         assert_eq!(vertex.point.coords[2], 3.0);
         assert_eq!(vertex.point.coords[3], 4.0);
-        assert_eq!(vertex.point.dim(), 4);
+        assert_eq!(vertex.dim(), 4);
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_some());
         assert_eq!(vertex.data.unwrap(), "4D");
@@ -75,6 +75,7 @@ mod tests {
         assert_eq!(vertex.point.coords[0], 1.0);
         assert_eq!(vertex.point.coords[1], 2.0);
         assert_eq!(vertex.point.coords[2], 3.0);
+        assert_eq!(vertex.dim(), 3);
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -92,12 +93,15 @@ mod tests {
         assert_eq!(vertices[0].point.coords[0], 1.0);
         assert_eq!(vertices[0].point.coords[1], 2.0);
         assert_eq!(vertices[0].point.coords[2], 3.0);
+        assert_eq!(vertices[0].dim(), 3);
         assert_eq!(vertices[1].point.coords[0], 4.0);
         assert_eq!(vertices[1].point.coords[1], 5.0);
         assert_eq!(vertices[1].point.coords[2], 6.0);
+        assert_eq!(vertices[1].dim(), 3);
         assert_eq!(vertices[2].point.coords[0], 7.0);
         assert_eq!(vertices[2].point.coords[1], 8.0);
         assert_eq!(vertices[2].point.coords[2], 9.0);
+        assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", vertices);

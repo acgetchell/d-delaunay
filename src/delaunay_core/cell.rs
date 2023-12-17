@@ -40,7 +40,7 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     }
 
     pub fn dim(&self) -> usize {
-        D
+        self.number_of_vertices() - 1
     }
 }
 
@@ -53,18 +53,25 @@ mod tests {
 
     #[test]
     fn make_cell_with_data() {
-        let vertex1 = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0]), "3D");
-        let cell = Cell::new_with_data(vec![vertex1], 10);
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell");
 
-        assert_eq!(cell.vertices[0].point.coords[0], 1.0);
-        assert_eq!(cell.vertices[0].point.coords[1], 2.0);
-        assert_eq!(cell.vertices[0].point.coords[2], 3.0);
-        assert_eq!(cell.vertices[0].data.unwrap(), "3D");
+        assert_eq!(cell.vertices[0], vertex1);
+        assert_eq!(cell.vertices[1], vertex2);
+        assert_eq!(cell.vertices[2], vertex3);
+        assert_eq!(cell.vertices[3], vertex4);
+        assert_eq!(cell.vertices[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices[3].data.unwrap(), 2);
         assert_eq!(cell.dim(), 3);
-        assert_eq!(cell.number_of_vertices(), 1);
+        assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_some());
-        assert_eq!(cell.data.unwrap(), 10);
+        assert_eq!(cell.data.unwrap(), "three-one cell");
 
         // Human readable output for cargo test -- --nocapture
         println!("Cell: {:?}", cell);
@@ -72,15 +79,23 @@ mod tests {
 
     #[test]
     fn make_cell_without_data() {
-        let vertex1 = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0]), "3D");
-        let cell: Cell<f64, &str, Option<()>, 3> = Cell::new(vec![vertex1]);
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]);
 
-        assert_eq!(cell.vertices[0].point.coords[0], 1.0);
-        assert_eq!(cell.vertices[0].point.coords[1], 2.0);
-        assert_eq!(cell.vertices[0].point.coords[2], 3.0);
-        assert_eq!(cell.vertices[0].data.unwrap(), "3D");
+        assert_eq!(cell.vertices[0], vertex1);
+        assert_eq!(cell.vertices[1], vertex2);
+        assert_eq!(cell.vertices[2], vertex3);
+        assert_eq!(cell.vertices[3], vertex4);
+        assert_eq!(cell.vertices[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices[3].data.unwrap(), 2);
         assert_eq!(cell.dim(), 3);
-        assert_eq!(cell.number_of_vertices(), 1);
+        assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
 
