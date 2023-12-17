@@ -3,40 +3,39 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Debug)]
-pub struct Tds<T, U, V> {
-    pub vertices: HashMap<Uuid, Vertex<U, V>>,
-    pub cells: HashMap<Uuid, Cell<T, U, V>>,
+pub struct Tds<T, U, V, const D: usize> {
+    pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
+    pub cells: HashMap<Uuid, Cell<T, U, V, D>>,
 }
 
-impl<T, U, V> Tds<T, U, V> {
-    pub fn new(points: Vec<Point<U>>) -> Self {
+impl<T, U, V, const D: usize> Tds<T, U, V, D> {
+    pub fn new(points: Vec<Point<T, D>>) -> Self {
         let vertices = Vertex::into_hashmap(Vertex::from_points(points));
         let cells = HashMap::new();
         Self { vertices, cells }
     }
 }
 
-pub fn hello() -> i32 {
-    println!("Hello, world!");
+pub fn start() -> i32 {
+    println!("Starting ...");
     1
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::delaunay_core::triangulation_data_structure;
-
     use super::*;
 
     #[test]
     fn make_tds() {
         let points = vec![
-            Point::new(1.0, 2.0, 3.0),
-            Point::new(4.0, 5.0, 6.0),
-            Point::new(7.0, 8.0, 9.0),
-            Point::new(10.0, 11.0, 12.0),
+            Point::new([1.0, 2.0, 3.0]),
+            Point::new([4.0, 5.0, 6.0]),
+            Point::new([7.0, 8.0, 9.0]),
+            Point::new([10.0, 11.0, 12.0]),
         ];
-        let tds: triangulation_data_structure::Tds<usize, f64, usize> = Tds::new(points);
+
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
 
         assert_eq!(tds.vertices.len(), 4);
         assert_eq!(tds.cells.len(), 0);

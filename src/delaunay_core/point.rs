@@ -1,13 +1,15 @@
 #[derive(Debug, PartialEq, Clone)]
-pub struct Point<T> {
-    pub x: T,
-    pub y: T,
-    pub z: T,
+pub struct Point<T, const D: usize> {
+    pub coords: [T; D],
 }
 
-impl<T> Point<T> {
-    pub fn new(x: T, y: T, z: T) -> Self {
-        Self { x, y, z }
+impl<T: Clone, const D: usize> Point<T, D> {
+    pub fn new(coords: [T; D]) -> Self {
+        Self { coords }
+    }
+
+    pub fn dim(&self) -> usize {
+        D
     }
 }
 
@@ -18,13 +20,13 @@ mod tests {
 
     #[test]
     fn make_point() {
-        let point = Point::new(1.0, 2.0, 3.0);
-
-        assert_eq!(point.x, 1.0);
-        assert_eq!(point.y, 2.0);
-        assert_eq!(point.z, 3.0);
+        let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(point.coords[0], 1.0);
+        assert_eq!(point.coords[1], 2.0);
+        assert_eq!(point.coords[2], 3.0);
+        assert_eq!(point.dim(), 4);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Point: {:?}", point);
+        println!("Point: {:?} is {}-D", point, point.dim());
     }
 }
