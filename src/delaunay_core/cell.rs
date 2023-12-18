@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use super::{utilities::make_uuid, vertex::Vertex};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Cell<T, U, V, const D: usize> {
     pub vertices: Vec<Vertex<T, U, D>>,
     pub uuid: Uuid,
