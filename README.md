@@ -3,6 +3,7 @@
 [![CI](https://github.com/acgetchell/d-delaunay/actions/workflows/ci.yml/badge.svg)](https://github.com/acgetchell/d-delaunay/actions/workflows/ci.yml)
 [![rust-clippy analyze](https://github.com/acgetchell/d-delaunay/actions/workflows/rust-clippy.yml/badge.svg)](https://github.com/acgetchell/d-delaunay/actions/workflows/rust-clippy.yml)
 [![codecov](https://codecov.io/gh/acgetchell/d-delaunay/graph/badge.svg?token=WT7qZGT9bO)](https://codecov.io/gh/acgetchell/d-delaunay)
+[![Security audit](https://github.com/acgetchell/d-delaunay/actions/workflows/audit-check.yml/badge.svg)](https://github.com/acgetchell/d-delaunay/actions/workflows/audit-check.yml)
 
 D-dimensional Delaunay triangulations in [Rust], inspired by [CGAL].
 
