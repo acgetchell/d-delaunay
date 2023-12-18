@@ -1,5 +1,13 @@
+//! Utility functions
+
 use uuid::Uuid;
 
+/// The function `make_uuid` generates a version 4 UUID in Rust.
+///
+/// # Returns:
+///
+/// a randomly generated UUID (Universally Unique Identifier) using the `new_v4` method from the `Uuid`
+/// struct.
 pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }

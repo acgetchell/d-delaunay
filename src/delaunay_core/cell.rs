@@ -1,16 +1,48 @@
+//! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
+
 use uuid::Uuid;
 
 use super::{utilities::make_uuid, vertex::Vertex};
 
 #[derive(Debug, Clone)]
+/// The `Cell` struct represents a d-dimensional [simplex](https://en.wikipedia.org/wiki/Simplex)
+/// with vertices, a unique identifier, optional neighbors, and optional data.
+///
+/// # Properties:
+///
+/// * `vertices`: A vector of vertices. Each `Vertex`` has a type T, optional data U, and a constant
+/// D representing the number of dimensions.
+/// * `uuid`: The `uuid` property is of type `Uuid` and represents a universally unique identifier for
+/// a `Cell`. It is used to uniquely identify each instance of a `Cell`.
+/// * `neighbors`: The `neighbors` property is an optional vector of `Uuid` values. It represents the
+/// UUIDs of the neighboring cells that are connected to the current cell.
+/// * `data`: The `data` property is an optional field that can hold a value of type `V`. It allows
+/// storage of additional data associated with the `Cell`.
 pub struct Cell<T, U, V, const D: usize> {
+    /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
+    /// The unique identifier of the cell.
     pub uuid: Uuid,
+    /// The neighboring cells connected to the current cell.
     pub neighbors: Option<Vec<Uuid>>,
+    /// The optional data associated with the cell.
     pub data: Option<V>,
 }
 
 impl<T, U, V, const D: usize> Cell<T, U, V, D> {
+    /// The function `new` creates a new `Cell`` object with the given vertices.
+    /// A D-dimensional cell has D + 1 vertices, so the number of vertices must be less than or equal to D + 1.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vertices`: The `vertices` parameter is a vector of `Vertex<T, U, D>` objects.
+    ///
+    /// # Returns:
+    ///
+    /// a `Result` type. If the condition `vertices.len() > D + 1` is true, it returns an `Err` variant
+    /// with the message "Number of vertices must be less than or equal to D + 1". Otherwise, it returns
+    /// an `Ok` variant with a `Cell` containing the provided `vertices`, a generated `uuid`, and
+    /// optional neighbor and data fields. Neighbors will be calculated by the `delaunay_core::triangulation_data_structure::Tds`.
     pub fn new(vertices: Vec<Vertex<T, U, D>>) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
             return Err("Number of vertices must be less than or equal to D + 1");
@@ -26,6 +58,21 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
         })
     }
 
+    /// The function `new_with_data` creates a new `Cell` object with the given vertices and data.
+    /// A D-dimensional cell has D + 1 vertices, so the number of vertices must be less than or equal to D + 1.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vertices`: The `vertices` parameter is a vector of `Vertex<T, U, D>` objects.
+    /// * `data`: The `data` parameter is of type `V`. It represents the data associated with the cell.
+    ///
+    /// # Returns:
+    ///
+    /// a `Result` type. If the condition `vertices.len() > D + 1` is true, it returns an `Err` variant
+    /// with the message "Number of vertices must be less than or equal to D + 1". Otherwise, it returns
+    /// an `Ok` variant with a `Cell` containing the provided `vertices`, a generated `uuid`, the
+    /// provided data, and optional neighbor fields which will be later be calculated by the
+    /// `delaunay_core::triangulation_data_structure::Tds`.
     pub fn new_with_data(vertices: Vec<Vertex<T, U, D>>, data: V) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
             return Err("Number of vertices must be less than or equal to D + 1");
@@ -41,10 +88,21 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
         })
     }
 
+    /// The function returns the number of vertices in the `Cell`.
+    ///
+    /// # Returns:
+    ///
+    /// The number of vertices in the `Cell`.
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
     }
 
+    /// The `dim` function returns the dimensionality of the `Cell`.
+    ///
+    /// # Returns:
+    ///
+    /// The `dim` function returns the dimension, which is calculated by subtracting 1 from
+    /// the number of vertices in the `Cell`.
     pub fn dim(&self) -> usize {
         self.number_of_vertices() - 1
     }

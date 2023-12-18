@@ -1,3 +1,5 @@
+//! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
+
 use uuid::Uuid;
 
 use std::option::Option;
@@ -5,14 +7,54 @@ use std::option::Option;
 use super::{point::Point, utilities::make_uuid};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+/// The `Vertex` struct represents a vertex in a triangulation with a `Point`, a unique
+/// identifier, an optional incident cell identifier, and optional data.
+///
+/// # Properties:
+///
+/// * `point`: A generic type `Point<T, D>` representing the coordinates of the vertex in a
+/// D-dimensional space.
+/// * `uuid`: The `uuid` property is of type `Uuid` and represents a universally unique identifier for
+/// the vertex. This can be used to uniquely identify the vertex in a graph or any other data structure.
+/// * `incident_cell`: The `incident_cell` property is an optional `Uuid` that represents the UUID of
+/// the cell that the vertex is incident to. This is calculated by the `delaunay_core::triangulation_data_structure::Tds`.
+/// * `data`: The `data` property is an optional field that can hold any type `U`. It is used to store
+/// additional data associated with the vertex.
 pub struct Vertex<T, U, const D: usize> {
+    /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
+    /// A universally unique identifier for the vertex.
     pub uuid: Uuid,
+    /// The UUID of the cell that the vertex is incident to.
     pub incident_cell: Option<Uuid>,
+    /// Optional data associated with the vertex.
     pub data: Option<U>,
 }
 
 impl<T, U, const D: usize> Vertex<T, U, D> {
+    /// The function `new_with_data` creates a new instance of a `Vertex` with the given point and data, and
+    /// assigns a unique identifier to it.
+    ///
+    /// # Arguments:
+    ///
+    /// * `point`: A generic type `Point<T, D>` representing a point in a multi-dimensional space, where
+    /// the coordinates are of type `T` and the dimensionality is `D`.
+    /// * `data`: The `data` parameter is of type `U`.
+    ///
+    /// # Returns:
+    ///
+    /// The `new_with_data` function returns an instance of the `Vertex`.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+    /// let vertex = Vertex::new_with_data(point, "4D");
+    /// assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
+    /// assert_eq!(vertex.data.unwrap(), "4D");
+    /// ```
     pub fn new_with_data(point: Point<T, D>, data: U) -> Self {
         let uuid = make_uuid();
         let incident_cell = None;
@@ -25,6 +67,26 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
         }
     }
 
+    /// The function creates a new instance of a `Vertex`.
+    ///
+    /// # Arguments:
+    ///
+    /// * `point`: A generic type `Point<T, D>`, representing a point in a multi-dimensional space, where
+    /// the coordinates are of type `T` and the dimensionality is `D`.
+    ///
+    /// # Returns:
+    ///
+    /// The `new` function returns an instance of the `Vertex`.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+    /// let vertex: Vertex<f64, Option<()>, 4> = Vertex::new(point);
+    /// assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
+    /// ```
     pub fn new(point: Point<T, D>) -> Self {
         let uuid = make_uuid();
         let incident_cell = None;
@@ -37,14 +99,40 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
         }
     }
 
+    /// The function `from_points` takes a vector of points and returns a vector of vertices, using the `new` method.
+    ///
+    /// # Arguments:
+    ///
+    /// * `points`: `points` is a vector of `Point<T, D>` objects.
+    ///
+    /// # Returns:
+    ///
+    /// The function `from_points` returns a `Vec<Vertex<T, U, D>>`, where `T` is the type of the coordinates of the
+    /// `Vertex`, `U` is the type of the optional data associated with the `Vertex`, and `D` is the dimensionality
+    /// of the `Vertex`.
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
         points.into_iter().map(|p| Self::new(p)).collect()
     }
 
+    /// The function `into_hashmap` converts a vector of vertices into a hashmap, using the vectors' UUID
+    /// as the key.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vertices`: `vertices` is a vector of `Vertex<T, U, D>`.
+    ///
+    /// # Returns:
+    ///
+    /// The function `into_hashmap` returns a `std::collections::HashMap<Uuid, Vertex<T, U, D>`.
     pub fn into_hashmap(vertices: Vec<Self>) -> std::collections::HashMap<Uuid, Self> {
         vertices.into_iter().map(|v| (v.uuid, v)).collect()
     }
 
+    /// The `dim` function returns the dimensionality of the `Vertex`.
+    ///
+    /// # Returns:
+    ///
+    /// The `dim` function is returning the value of `D`, which the number of coordinates.
     pub fn dim(&self) -> usize {
         D
     }

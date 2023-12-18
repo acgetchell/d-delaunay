@@ -9,6 +9,8 @@
         "clippy",
         "codecov",
         "nocapture",
+        "simplicial",
+        "spacelike",
         "Voronoi"
     ],
     "ignoreWords": [],
