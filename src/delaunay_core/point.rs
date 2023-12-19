@@ -24,9 +24,9 @@ impl<T: Clone, const D: usize> Point<T, D> {
     /// # Returns:
     ///
     /// The `new` function returns an instance of the `Point`.
-    /// 
-    /// # Examples
-    /// 
+    ///
+    /// # Example
+    ///
     /// ```
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
@@ -42,7 +42,7 @@ impl<T: Clone, const D: usize> Point<T, D> {
     ///
     /// The `dim` function is returning the value of `D`, which the number of coordinates.
     ///
-    /// # Examples
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::point::Point;

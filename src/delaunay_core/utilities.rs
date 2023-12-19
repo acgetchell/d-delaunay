@@ -8,6 +8,14 @@ use uuid::Uuid;
 ///
 /// a randomly generated UUID (Universally Unique Identifier) using the `new_v4` method from the `Uuid`
 /// struct.
+///
+/// # Example
+///
+/// ```
+/// use d_delaunay::delaunay_core::utilities::make_uuid;
+/// let uuid = make_uuid();
+/// assert_eq!(uuid.get_version_num(), 4);
+/// ```
 pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }

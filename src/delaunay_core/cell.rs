@@ -42,7 +42,23 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     /// a `Result` type. If the condition `vertices.len() > D + 1` is true, it returns an `Err` variant
     /// with the message "Number of vertices must be less than or equal to D + 1". Otherwise, it returns
     /// an `Ok` variant with a `Cell` containing the provided `vertices`, a generated `uuid`, and
-    /// optional neighbor and data fields. Neighbors will be calculated by the `delaunay_core::triangulation_data_structure::Tds`.
+    /// optional neighbor and data fields.
+    ///
+    /// Neighbors will be calculated by the `delaunay_core::triangulation_data_structure::Tds`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+    /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+    /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+    /// let vertex4 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+    /// assert!(cell.neighbors.is_none());
+    /// ```
     pub fn new(vertices: Vec<Vertex<T, U, D>>) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
             return Err("Number of vertices must be less than or equal to D + 1");
@@ -73,6 +89,20 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     /// an `Ok` variant with a `Cell` containing the provided `vertices`, a generated `uuid`, the
     /// provided data, and optional neighbor fields which will be later be calculated by the
     /// `delaunay_core::triangulation_data_structure::Tds`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// assert_eq!(cell.data.unwrap(), "three-one cell");
+    /// ```
     pub fn new_with_data(vertices: Vec<Vertex<T, U, D>>, data: V) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
             return Err("Number of vertices must be less than or equal to D + 1");

@@ -1,5 +1,5 @@
 //! Data and operations on d-dimensional triangulation data structures.
-//! 
+//!
 //! Intended to match functionality of [CGAL Triangulations](https://doc.cgal.org/latest/Triangulation/index.html).
 
 use super::{cell::Cell, point::Point, vertex::Vertex};
@@ -68,7 +68,21 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
     ///
     /// # Returns:
     ///
-    /// The function `add` returns a `Result<(), &'static str>`.
+    /// The function `add` returns `Ok(())` if the vertex was successfully added to the hashmap, or
+    /// an error message if the vertex already exists or if there is a uuid collision.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex = Vertex::new(point);
+    /// let result = tds.add(vertex);
+    /// assert!(result.is_ok());
+    /// ```
     pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str>
     where
         T: PartialEq,
@@ -80,9 +94,10 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
             }
         }
 
+        // Hashmap::insert returns the old value if the key already exists and updates it with the new value
         let result = self.vertices.insert(vertex.uuid, vertex);
 
-        // Hashmap::insert returns the old value if the key already exists and updates it with the new value
+        // Return an error if there is a uuid collision
         match result {
             Some(_) => Err("Uuid already exists"),
             None => Ok(()),

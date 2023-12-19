@@ -44,9 +44,9 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
     /// # Returns:
     ///
     /// The `new_with_data` function returns an instance of the `Vertex`.
-    /// 
-    /// # Examples
-    /// 
+    ///
+    /// # Example
+    ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::delaunay_core::point::Point;
@@ -77,9 +77,9 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
     /// # Returns:
     ///
     /// The `new` function returns an instance of the `Vertex`.
-    /// 
-    /// # Examples
-    /// 
+    ///
+    /// # Example
+    ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::delaunay_core::point::Point;
