@@ -134,7 +134,38 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     /// The `dim` function returns the dimension, which is calculated by subtracting 1 from
     /// the number of vertices in the `Cell`.
     pub fn dim(&self) -> usize {
-        self.number_of_vertices() - 1
+        self.vertices.len() - 1
+    }
+
+    /// The function `contains_vertex` checks if a given vertex is present in the Cell.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vertex`: The `vertex` parameter is of type `Vertex<T, U, D>`.
+    ///
+    /// # Returns:
+    ///
+    /// Returns `true` if the given `Vertex` is present in the `Cell`, and `false` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// assert!(cell.contains_vertex(vertex1));
+    /// ```
+    pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool
+    where
+        T: PartialEq,
+        U: PartialEq,
+    {
+        self.vertices.contains(&vertex)
     }
 }
 
