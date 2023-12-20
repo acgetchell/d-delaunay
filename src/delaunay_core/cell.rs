@@ -35,7 +35,7 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     ///
     /// # Arguments:
     ///
-    /// * `vertices`: The `vertices` parameter is a vector of `Vertex<T, U, D>` objects.
+    /// * `vertices`: The vertices of the Cell to be constructed.
     ///
     /// # Returns:
     ///
@@ -79,8 +79,8 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     ///
     /// # Arguments:
     ///
-    /// * `vertices`: The `vertices` parameter is a vector of `Vertex<T, U, D>` objects.
-    /// * `data`: The `data` parameter is of type `V`. It represents the data associated with the cell.
+    /// * `vertices`: The vertices of the Cell to be constructed.
+    /// * `data`: The data associated with the cell.
     ///
     /// # Returns:
     ///
@@ -141,7 +141,7 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
     ///
     /// # Arguments:
     ///
-    /// * `vertex`: The `vertex` parameter is of type `Vertex<T, U, D>`.
+    /// * `vertex`: The vertex to check.
     ///
     /// # Returns:
     ///
@@ -166,6 +166,27 @@ impl<T, U, V, const D: usize> Cell<T, U, V, D> {
         U: PartialEq,
     {
         self.vertices.contains(&vertex)
+    }
+
+    /// The function `circumsphere_contains` checks if a given vertex is contained in the circumsphere of the Cell.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vertex`: vertex to check.
+    ///
+    /// # Returns:
+    ///
+    /// Returns `true` if the given `Vertex` is contained in the circumsphere of the `Cell`, and `false` otherwise.
+    pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> bool
+    where
+        T: PartialEq,
+        U: PartialEq,
+    {
+        todo!("Implement circumsphere_contains")
+    }
+
+    pub fn is_valid(self) -> bool {
+        todo!("Implement is_valid for Cell")
     }
 }
 

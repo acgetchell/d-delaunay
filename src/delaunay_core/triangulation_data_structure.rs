@@ -48,13 +48,19 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
     ///
     /// # Arguments:
     ///
-    /// * `points`: A vector of points.
+    /// * `points`: A vector of points with which to initialize the triangulation.
     ///
     /// # Returns:
     ///
-    /// The `new` function returns a Tds.
+    /// A delaunay triangulation with cells and neighbors aligned, and vertices associated with cells.
     pub fn new(points: Vec<Point<T, D>>) -> Self {
+        // handle case where vertices are constructed with data
         let vertices = Vertex::into_hashmap(Vertex::from_points(points));
+        // let cells_vec = bowyer_watson(vertices);
+        // assign_neighbors(cells_vec);
+        // assign_incident_cells(vertices);
+
+        // Put cells_vec into hashmap
         let cells = HashMap::new();
         Self { vertices, cells }
     }
@@ -132,6 +138,24 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
     /// The number of cells in the Tds.
     pub fn number_of_cells(&self) -> usize {
         self.cells.len()
+    }
+
+    fn bowyer_watson(
+        &mut self,
+        vertices: Vec<Vertex<T, U, D>>,
+    ) -> Result<Vec<Cell<T, U, V, D>>, &'static str> {
+        todo!("Bowyer-Watson algorithm")
+    }
+
+    fn assign_neighbors(&mut self, cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
+        todo!("Assign neighbors")
+    }
+
+    fn assign_incident_cells(
+        &mut self,
+        vertices: Vec<Vertex<T, U, D>>,
+    ) -> Result<(), &'static str> {
+        todo!("Assign incident cells")
     }
 }
 

@@ -136,6 +136,10 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
     pub fn dim(&self) -> usize {
         D
     }
+
+    pub fn is_valid(self) -> bool {
+        todo!("Implement is_valid for Vertex")
+    }
 }
 #[cfg(test)]
 mod tests {
