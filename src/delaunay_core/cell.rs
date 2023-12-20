@@ -262,4 +262,22 @@ mod tests {
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", cell);
     }
+
+    #[test]
+    fn cell_contains_vertex() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+
+        assert!(cell.contains_vertex(vertex1));
+        assert!(cell.contains_vertex(vertex2));
+        assert!(cell.contains_vertex(vertex3));
+        assert!(cell.contains_vertex(vertex4));
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
+    }
 }
