@@ -142,18 +142,18 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
 
     fn bowyer_watson(
         &mut self,
-        vertices: Vec<Vertex<T, U, D>>,
+        _vertices: Vec<Vertex<T, U, D>>,
     ) -> Result<Vec<Cell<T, U, V, D>>, &'static str> {
         todo!("Bowyer-Watson algorithm")
     }
 
-    fn assign_neighbors(&mut self, cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
+    fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
         todo!("Assign neighbors")
     }
 
     fn assign_incident_cells(
         &mut self,
-        vertices: Vec<Vertex<T, U, D>>,
+        _vertices: Vec<Vertex<T, U, D>>,
     ) -> Result<(), &'static str> {
         todo!("Assign incident cells")
     }

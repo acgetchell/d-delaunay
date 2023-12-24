@@ -137,6 +137,12 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
         D
     }
 
+    /// The function is_valid checks if a `Vertex`` is valid.
+    ///
+    /// # Returns:
+    ///
+    /// True if the `Vertex` is valid; the `Point` is correct, the `UUID` is valid and unique, and the
+    /// `incident_cell` contains the `UUID` of a `Cell` that contains the `Vertex`.
     pub fn is_valid(self) -> bool {
         todo!("Implement is_valid for Vertex")
     }

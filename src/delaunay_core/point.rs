@@ -40,7 +40,7 @@ impl<T: Clone, const D: usize> Point<T, D> {
     ///
     /// # Returns:
     ///
-    /// The `dim` function is returning the value of `D`, which the number of coordinates.
+    /// The `dim` function returns the value of `D`, which the number of coordinates.
     ///
     /// # Example
     ///
@@ -51,6 +51,26 @@ impl<T: Clone, const D: usize> Point<T, D> {
     /// ```
     pub fn dim(&self) -> usize {
         D
+    }
+
+    /// The `origin` function returns the origin Point.
+    ///
+    /// # Returns:
+    ///
+    /// The `origin()` function returns a D-dimensional origin point
+    /// in Cartesian coordinates.
+    ///
+    /// # Example
+    /// ```
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point: Point<f64, 4> = Point::origin();
+    /// assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
+    /// ```
+    pub fn origin() -> Self
+    where
+        T: num_traits::Zero + Copy, // Add the Copy trait bound
+    {
+        Self::new([T::zero(); D])
     }
 }
 
@@ -69,5 +89,17 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Point: {:?} is {}-D", point, point.dim());
+    }
+
+    #[test]
+    fn make_origin() {
+        let point: Point<f64, 4> = Point::origin();
+        assert_eq!(point.coords[0], 0.0);
+        assert_eq!(point.coords[1], 0.0);
+        assert_eq!(point.coords[2], 0.0);
+        assert_eq!(point.coords[3], 0.0);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Origin: {:?} is {}-D", point, point.dim());
     }
 }
