@@ -1,6 +1,9 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
-use std::{fmt::Debug, ops::Sub};
+use std::{
+    fmt::Debug,
+    ops::{Div, Sub},
+};
 
 use uuid::Uuid;
 
@@ -44,6 +47,9 @@ impl<
         V,
         const D: usize,
     > Cell<T, U, V, D>
+where
+    for<'a> &'a T: Div<f64>,
+    f64: From<T>,
 {
     /// The function `new` creates a new `Cell`` object with the given vertices.
     /// A D-dimensional cell has D + 1 vertices, so the number of vertices must be less than or equal to D + 1.
@@ -237,49 +243,43 @@ impl<
             }
         }
 
-        let _a_inv = matrix.try_inverse().ok_or("Singular matrix!")?;
+        let a_inv = matrix.try_inverse().ok_or("Singular matrix!")?;
 
         println!("Matrix A: {:?}", matrix);
         for i in 0..dim {
             println!("Row sum of {}-th row is {}", i, matrix.row(i).row_sum());
         }
 
-        // let mut b: na::DVector<<T as ComplexField>::RealField> = na::DVector::zeros(dim);
-        // for i in 0..dim {
-        //     b[i] = na::distance_squared(
-        //         &na::Point::from(self.vertices[i + 1].point.coords),
-        //         &na::Point::from(self.vertices[0].point.coords),
-        //     );
-        // }
-
         let mut b: na::SMatrix<T, D, 1> = na::SMatrix::zeros();
+
         for i in 0..dim {
-            b[i] = self.vertices[i + 1]
-                .point
-                .coords
-                .iter()
-                .map(|x| x.powi(2))
-                .sum::<T>()
-                - self.vertices[0]
-                    .point
-                    .coords
-                    .iter()
-                    .map(|x| x.powi(2))
-                    .sum::<T>();
+            b[i] = na::distance_squared(
+                &na::Point::from(self.vertices[i + 1].point.coords),
+                &na::Point::from(self.vertices[0].point.coords),
+            );
         }
 
         println!("Vector b: {:?}", b);
 
-        // let _solution = a_inv * b;
+        let solution = a_inv * b;
 
-        // let solution_array: [f64; D] = _solution
-        //     .data
-        //     .as_slice()
-        //     .try_into()
-        //     .expect("Failed to convert solution to array");
-        // Ok(Point::new(solution_array))
+        let mut solution_array: [T; D] = solution
+            .data
+            .as_slice()
+            .try_into()
+            .expect("Failed to convert solution to array");
 
-        Ok(Point::<f64, D>::origin())
+        for i in 0..dim {
+            solution_array[i] /= na::convert::<f64, T>(2.0);
+        }
+
+        println!("Solution: {:?}", solution_array);
+
+        let solution_point: Point<f64, D> = Point::<f64, D>::try_from(solution_array)
+            .expect("Failed to convert solution array to Point");
+
+        // let solution_point = Point::<f64, D>::try_from(solution_array);
+        Ok(Point::<f64, D>::new(solution_point.coords))
     }
 
     /// The function `circumsphere_contains` checks if a given vertex is contained in the circumsphere of the Cell.
@@ -437,15 +437,9 @@ mod tests {
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
 
-        // let circumcenter = cell
-        //     .circumcenter_wrong(&[point1, point2, point3, point4])
-        //     .unwrap();
-
-        // assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
-
         let circumcenter = cell.circumcenter().unwrap();
 
-        assert_eq!(circumcenter, Point::origin());
+        assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
 
         // Human readable output for cargo test -- --nocapture
         println!("Circumcenter: {:?}", circumcenter);

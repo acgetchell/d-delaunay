@@ -14,6 +14,18 @@ pub struct Point<T, const D: usize> {
     pub coords: [T; D],
 }
 
+impl<T, const D: usize> From<[T; D]> for Point<f64, D>
+where
+    [T; D]: Sized,
+    [f64; D]: Sized,
+    T: Into<f64>,
+{
+    fn from(coords: [T; D]) -> Self {
+        let coords_f64: [f64; D] = coords.map(|coord| coord.into()).into(); // Convert the `coords` array to `[f64; D]`
+        Self { coords: coords_f64 }
+    }
+}
+
 impl<T: Clone, const D: usize> Point<T, D> {
     /// The function `new` creates a new instance of a `Point` with the given coordinates.
     ///
