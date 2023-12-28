@@ -21,7 +21,7 @@ where
     T: Into<f64>,
 {
     fn from(coords: [T; D]) -> Self {
-        let coords_f64: [f64; D] = coords.map(|coord| coord.into()).into(); // Convert the `coords` array to `[f64; D]`
+        let coords_f64: [f64; D] = coords.map(|coord| coord.into()); // Convert the `coords` array to `[f64; D]`
         Self { coords: coords_f64 }
     }
 }

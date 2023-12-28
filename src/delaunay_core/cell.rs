@@ -1,17 +1,14 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
-use std::{
-    fmt::Debug,
-    ops::{Div, Sub},
-};
+use std::{fmt::Debug, ops::Div};
 
 use uuid::Uuid;
 
 use super::{point::Point, utilities::make_uuid, vertex::Vertex};
 
-extern crate nalgebra as na;
+use nalgebra as na;
 
-use na::ComplexField;
+use na::{Const, OPoint};
 
 use crate::delaunay_core;
 
@@ -206,6 +203,8 @@ where
     ///     (x2-x0) for all coordinates in x2, x0
     ///     ... for all x_n in the cell
     ///
+    /// These are the perpendicular bisectors of the edges of the cell.
+    ///
     /// and B is a vector of the form:
     ///     (x_1^2-x0^2) for all coordinates in x1, x0
     ///     (x_2^2-x0^2) for all coordinates in x2, x0
@@ -219,14 +218,7 @@ where
     /// Point<f64, D> value. If there is an error, it will return an Err variant containing an error message.
     fn circumcenter(&self) -> Result<Point<f64, D>, &'static str>
     where
-        T: Clone
-            + Copy
-            + PartialEq
-            + num_traits::Zero
-            + Debug
-            + Sub<Output = T>
-            + ComplexField
-            + 'static,
+        T: Clone + Copy + PartialEq + Debug + 'static,
     {
         let dim = self.dim();
         if self.vertices[0].dim() != dim {
@@ -245,21 +237,13 @@ where
 
         let a_inv = matrix.try_inverse().ok_or("Singular matrix!")?;
 
-        println!("Matrix A: {:?}", matrix);
-        for i in 0..dim {
-            println!("Row sum of {}-th row is {}", i, matrix.row(i).row_sum());
-        }
-
         let mut b: na::SMatrix<T, D, 1> = na::SMatrix::zeros();
-
         for i in 0..dim {
             b[i] = na::distance_squared(
                 &na::Point::from(self.vertices[i + 1].point.coords),
                 &na::Point::from(self.vertices[0].point.coords),
             );
         }
-
-        println!("Vector b: {:?}", b);
 
         let solution = a_inv * b;
 
@@ -269,17 +253,33 @@ where
             .try_into()
             .expect("Failed to convert solution to array");
 
-        for i in 0..dim {
-            solution_array[i] /= na::convert::<f64, T>(2.0);
+        for value in solution_array.iter_mut() {
+            *value /= na::convert::<f64, T>(2.0);
         }
-
-        println!("Solution: {:?}", solution_array);
 
         let solution_point: Point<f64, D> = Point::<f64, D>::try_from(solution_array)
             .expect("Failed to convert solution array to Point");
 
-        // let solution_point = Point::<f64, D>::try_from(solution_array);
         Ok(Point::<f64, D>::new(solution_point.coords))
+    }
+
+    /// The function `circumradius` returns the circumradius of the cell.
+    /// The circumradius is the distance from the circumcenter to any vertex.
+    ///
+    /// # Returns:
+    /// The circumradius of the cell.
+    fn circumradius(&self) -> Result<T, &'static str>
+    where
+        T: Copy,
+        OPoint<T, Const<D>>: From<[f64; D]>,
+    {
+        let circumcenter = self.circumcenter()?;
+        let vertex = Point::<f64, D>::try_from(self.vertices[0].point.coords)
+            .expect("Failed to convert point to <f64,D>"); // Change the type of vertex to match circumcenter
+        Ok(na::distance(
+            &na::Point::<T, D>::from(circumcenter.coords),
+            &na::Point::<T, D>::from(vertex.coords),
+        ))
     }
 
     /// The function `circumsphere_contains` checks if a given vertex is contained in the circumsphere of the Cell.
@@ -443,5 +443,42 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Circumcenter: {:?}", circumcenter);
+    }
+
+    #[test]
+    fn cell_circumcenter_fail() {
+        let point1 = Point::new([0.0, 0.0, 0.0]);
+        let point2 = Point::new([1.0, 0.0, 0.0]);
+        let point3 = Point::new([0.0, 1.0, 0.0]);
+        let vertex1 = Vertex::new_with_data(point1, 1);
+        let vertex2 = Vertex::new_with_data(point2, 1);
+        let vertex3 = Vertex::new_with_data(point3, 1);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+        let circumcenter = cell.circumcenter();
+        assert!(circumcenter.is_err());
+    }
+
+    #[test]
+    fn cell_circumradius() {
+        let point1 = Point::new([0.0, 0.0, 0.0]);
+        let point2 = Point::new([1.0, 0.0, 0.0]);
+        let point3 = Point::new([0.0, 1.0, 0.0]);
+        let point4 = Point::new([0.0, 0.0, 1.0]);
+        let vertex1 = Vertex::new_with_data(point1, 1);
+        let vertex2 = Vertex::new_with_data(point2, 1);
+        let vertex3 = Vertex::new_with_data(point3, 1);
+        let vertex4 = Vertex::new_with_data(point4, 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+
+        let circumradius = cell.circumradius().unwrap();
+
+        let radius: f64 = 3.0_f64.sqrt() / 2.0;
+
+        assert_eq!(circumradius, radius);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Circumradius: {:?}", circumradius);
     }
 }
