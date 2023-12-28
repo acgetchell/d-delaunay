@@ -226,10 +226,11 @@ where
         }
 
         let mut matrix: na::SMatrix<T, D, D> = na::SMatrix::zeros();
+        // Column-major matrix, so data in debugger will be opposite of the row,col indices
         for i in 0..dim {
-            // rows 0..dim-1
+            // rows
             for j in 0..dim {
-                // cols 0..dim-1
+                // cols
                 matrix[(i, j)] =
                     self.vertices[i + 1].point.coords[j] - self.vertices[0].point.coords[j];
             }
@@ -291,12 +292,36 @@ where
     /// # Returns:
     ///
     /// Returns `true` if the given `Vertex` is contained in the circumsphere of the `Cell`, and `false` otherwise.
-    pub fn circumsphere_contains(&self, _vertex: Vertex<T, U, D>) -> bool
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// assert!(cell.circumsphere_contains(Vertex::new(Point::origin())).unwrap());
+    /// ```
+    pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, &'static str>
     where
-        T: PartialEq,
-        U: PartialEq,
+        T: Copy + PartialOrd, // Add the PartialOrd trait bound
+        OPoint<T, Const<D>>: From<[f64; D]>,
     {
-        todo!("Implement circumsphere_contains")
+        let circumradius = self.circumradius()?;
+        let radius = na::distance(
+            &na::Point::<T, D>::from(self.circumcenter()?.coords),
+            &na::Point::<T, D>::from(
+                Point::<f64, D>::try_from(vertex.point.coords)
+                    .expect("Failed to convert point to <f64,D>")
+                    .coords,
+            ),
+        );
+
+        Ok(circumradius >= radius)
     }
 
     /// The function is_valid checks if a `Cell` is valid.
@@ -480,5 +505,47 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Circumradius: {:?}", circumradius);
+    }
+
+    #[test]
+    fn cell_circumsphere_contains() {
+        let point1 = Point::new([0.0, 0.0, 0.0]);
+        let point2 = Point::new([1.0, 0.0, 0.0]);
+        let point3 = Point::new([0.0, 1.0, 0.0]);
+        let point4 = Point::new([0.0, 0.0, 1.0]);
+        let vertex1 = Vertex::new_with_data(point1, 1);
+        let vertex2 = Vertex::new_with_data(point2, 1);
+        let vertex3 = Vertex::new_with_data(point3, 1);
+        let vertex4 = Vertex::new_with_data(point4, 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+
+        let vertex5 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 3);
+
+        assert!(cell.circumsphere_contains(vertex5).unwrap());
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
+    }
+
+    #[test]
+    fn cell_circumsphere_does_not_contain() {
+        let point1 = Point::new([0.0, 0.0, 0.0]);
+        let point2 = Point::new([1.0, 0.0, 0.0]);
+        let point3 = Point::new([0.0, 1.0, 0.0]);
+        let point4 = Point::new([0.0, 0.0, 1.0]);
+        let vertex1 = Vertex::new_with_data(point1, 1);
+        let vertex2 = Vertex::new_with_data(point2, 1);
+        let vertex3 = Vertex::new_with_data(point3, 1);
+        let vertex4 = Vertex::new_with_data(point4, 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+
+        let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
+
+        assert!(!cell.circumsphere_contains(vertex5).unwrap());
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
     }
 }
