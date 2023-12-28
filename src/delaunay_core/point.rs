@@ -92,11 +92,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn make_point() {
+    fn point_new() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
         assert_eq!(point.coords[0], 1.0);
         assert_eq!(point.coords[1], 2.0);
         assert_eq!(point.coords[2], 3.0);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Point: {:?}", point);
+    }
+
+    #[test]
+    fn point_dim() {
+        let point = Point::new([1.0, 2.0, 3.0, 4.0]);
         assert_eq!(point.dim(), 4);
 
         // Human readable output for cargo test -- --nocapture
@@ -104,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    fn make_origin() {
+    fn point_origin() {
         let point: Point<f64, 4> = Point::origin();
         assert_eq!(point.coords[0], 0.0);
         assert_eq!(point.coords[1], 0.0);

@@ -13,7 +13,7 @@ This library implements d-dimensional Delaunay triangulations in [Rust]. It is i
 implementing 2D Delaunay triangulations, Constrained Delaunay triangulations, and Voronoi diagrams. The eventual goal of this library is to provide a lightweight alternative to [CGAL] for the [Rust]
 ecosystem.
 
-At some point I may merge it into another library, such as [Spade], or [delaunay], but for now I am developing this library without trying to figure out how to fit it into other coding styles and standards.
+At some point I may merge it into another library, such as [Spade], or [delaunay], but for now I am developing this library without trying to figure out how to fit it into other coding styles and with the minimum number of traits to do generic mathematics.
 
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/

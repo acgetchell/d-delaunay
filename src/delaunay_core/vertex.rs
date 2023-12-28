@@ -133,6 +133,15 @@ impl<T, U, const D: usize> Vertex<T, U, D> {
     /// # Returns:
     ///
     /// The `dim` function is returning the value of `D`, which the number of coordinates.
+    ///
+    /// # Example:
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+    /// let vertex: Vertex<f64, Option<()>, 4> = Vertex::new(point);
+    /// assert_eq!(vertex.dim(), 4);
+    /// ```
     pub fn dim(&self) -> usize {
         D
     }
@@ -153,7 +162,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn make_vertex_with_data() {
+    fn vertex_new_with_data() {
         let vertex = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0, 4.0]), "4D");
         println!("{:?}", vertex);
         assert_eq!(vertex.point.coords[0], 1.0);
@@ -167,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn make_vertex_without_data() {
+    fn vertex_new() {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         println!("{:?}", vertex);
         assert_eq!(vertex.point.coords[0], 1.0);
@@ -179,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn make_vertices_from_points() {
+    fn vertex_from_points() {
         let points = vec![
             Point::new([1.0, 2.0, 3.0]),
             Point::new([4.0, 5.0, 6.0]),
@@ -206,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn make_hashmap_from_vec() {
+    fn vertex_into_hashmap() {
         let points = vec![
             Point::new([1.0, 2.0, 3.0]),
             Point::new([4.0, 5.0, 6.0]),
@@ -230,5 +239,11 @@ mod tests {
         // Human readable output for cargo test -- --nocapture
         println!("values = {:?}", values);
         println!("vertices = {:?}", vertices);
+    }
+
+    #[test]
+    fn vertex_dim() {
+        let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        assert_eq!(vertex.dim(), 3);
     }
 }

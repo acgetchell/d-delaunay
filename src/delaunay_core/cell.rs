@@ -141,6 +141,19 @@ where
     /// # Returns:
     ///
     /// The number of vertices in the `Cell`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+    /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+    /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+    /// assert_eq!(cell.number_of_vertices(), 3);
+    /// ```
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
     }
@@ -151,6 +164,19 @@ where
     ///
     /// The `dim` function returns the dimension, which is calculated by subtracting 1 from
     /// the number of vertices in the `Cell`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+    /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+    /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+    /// assert_eq!(cell.dim(), 2);
+    /// ```
     pub fn dim(&self) -> usize {
         self.vertices.len() - 1
     }
@@ -268,7 +294,7 @@ where
     /// The circumradius is the distance from the circumcenter to any vertex.
     ///
     /// # Returns:
-    /// The circumradius of the cell.
+    /// If successful, returns an Ok containing the circumradius of the cell, otherwise returns an Err with an error message.
     fn circumradius(&self) -> Result<T, &'static str>
     where
         T: Copy,
@@ -345,7 +371,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn make_cell_with_data() {
+    fn cell_new_with_data() {
         let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
         let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
         let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
@@ -372,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn make_cell_with_data_with_too_many_vertices() {
+    fn cell_new_with_data_with_too_many_vertices() {
         let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
         let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
         let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
@@ -390,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn make_cell_without_data() {
+    fn cell_new() {
         let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
         let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
         let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
@@ -416,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn make_cell_without_data_with_too_many_vertices() {
+    fn cell_new_with_too_many_vertices() {
         let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
         let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
         let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
@@ -429,6 +455,26 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", cell);
+    }
+
+    #[test]
+    fn cell_number_of_vertices() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+        assert_eq!(cell.number_of_vertices(), 3);
+    }
+
+    #[test]
+    fn cell_dim() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+        assert_eq!(cell.dim(), 2);
     }
 
     #[test]
