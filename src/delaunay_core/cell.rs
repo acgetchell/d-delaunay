@@ -301,8 +301,9 @@ where
         OPoint<T, Const<D>>: From<[f64; D]>,
     {
         let circumcenter = self.circumcenter()?;
+        // Change the type of vertex to match circumcenter
         let vertex = Point::<f64, D>::try_from(self.vertices[0].point.coords)
-            .expect("Failed to convert point to <f64,D>"); // Change the type of vertex to match circumcenter
+            .expect("Failed to convert point to <f64,D>");
         Ok(na::distance(
             &na::Point::<T, D>::from(circumcenter.coords),
             &na::Point::<T, D>::from(vertex.coords),

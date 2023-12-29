@@ -2,9 +2,9 @@
 //!
 //! Intended to match functionality of [CGAL Triangulations](https://doc.cgal.org/latest/Triangulation/index.html).
 
-use super::utilities::find_min_coordinate;
+use super::utilities::find_extreme_coordinate;
 use super::{cell::Cell, point::Point, vertex::Vertex};
-use std::cmp::PartialEq;
+use std::cmp::{Ordering, PartialEq};
 use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
@@ -171,7 +171,8 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
 
         // Create super-cell that contains all vertices
         // First, find the min and max coordinates
-        let _min_coords = find_min_coordinate(self.vertices.clone());
+        let _min_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Less);
+        let _max_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Greater);
 
         Ok(cells)
     }
