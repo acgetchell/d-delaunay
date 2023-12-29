@@ -2,6 +2,7 @@
 //!
 //! Intended to match functionality of [CGAL Triangulations](https://doc.cgal.org/latest/Triangulation/index.html).
 
+use super::utilities::find_min_coordinate;
 use super::{cell::Cell, point::Point, vertex::Vertex};
 use std::cmp::PartialEq;
 use std::{cmp::min, collections::HashMap};
@@ -115,16 +116,37 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
     /// # Returns:
     ///
     /// The number of vertices in the Tds.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let new_vertex1: Vertex<f64, usize, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+    /// let _ = tds.add(new_vertex1);
+    /// assert_eq!(tds.number_of_vertices(), 1);
+    /// ```
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
     }
 
-    /// The `dim` function returns the minimum value between the number of vertices minus one and the
-    /// value of `D` as an `i32`.
+    /// The `dim` function returns the dimensionality of the triangulation data structure.
     ///
     /// # Returns:
     ///
-    /// The `dim` function returns an `i32` value.
+    /// The `dim` function returns the minimum value between the number of vertices minus one and the
+    /// value of `D` as an `i32`.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// assert_eq!(tds.dim(), -1);
+    /// ```
     pub fn dim(&self) -> i32 {
         let len = self.number_of_vertices() as i32;
 
@@ -140,11 +162,18 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
         self.cells.len()
     }
 
-    fn bowyer_watson(
-        &mut self,
-        _vertices: Vec<Vertex<T, U, D>>,
-    ) -> Result<Vec<Cell<T, U, V, D>>, &'static str> {
-        todo!("Bowyer-Watson algorithm")
+    fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, &'static str>
+    where
+        T: Copy + Default + PartialOrd,
+        Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
+    {
+        let cells: Vec<Cell<T, U, V, D>> = Vec::new();
+
+        // Create super-cell that contains all vertices
+        // First, find the min and max coordinates
+        let _min_coords = find_min_coordinate(self.vertices.clone());
+
+        Ok(cells)
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
