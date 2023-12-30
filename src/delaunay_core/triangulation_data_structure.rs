@@ -4,6 +4,7 @@
 
 use super::utilities::find_extreme_coordinate;
 use super::{cell::Cell, point::Point, vertex::Vertex};
+use na::{Const, OPoint};
 use nalgebra as na;
 use std::cmp::{Ordering, PartialEq};
 use std::ops::Div;
@@ -50,8 +51,8 @@ impl<
             + std::ops::AddAssign<f64>
             + std::iter::Sum
             + nalgebra::ComplexField<RealField = T>,
-        U,
-        V,
+        U: Clone,
+        V: Clone,
         const D: usize,
     > Tds<T, U, V, D>
 where
@@ -226,14 +227,51 @@ where
     where
         T: Copy + Default + PartialOrd,
         Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
+        OPoint<T, Const<D>>: From<[f64; D]>,
     {
         let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
 
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-
-        // Add supercell to cells
         cells.push(supercell);
+
+        // Iterate over vertices
+        for vertex in self.vertices.values() {
+            // Find all cells that contain the vertex
+            let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
+            for cell in cells.iter() {
+                if cell.circumsphere_contains(vertex.clone()).unwrap() {
+                    bad_cells.push((*cell).clone());
+                }
+            }
+
+            // // Find the boundary of the polygonal hole
+            // let mut polygonal_hole: Vec<Vertex<T, U, D>> = Vec::new();
+            // for cell in bad_cells.iter() {
+            //     for vertex in cell.vertices.iter() {
+            //         if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
+            //             polygonal_hole.push(vertex.clone());
+            //         }
+            //     }
+            // }
+
+            // // Remove duplicate vertices
+            // polygonal_hole.sort();
+            // polygonal_hole.dedup();
+
+            // // Remove bad cells from the triangulation
+            // for cell in bad_cells.iter() {
+            //     cells.remove(cells.iter().position(|c| c == cell).unwrap());
+            // }
+
+            // // Re-triangulate the polygonal hole
+            // for vertex in polygonal_hole.iter() {
+            //     let mut new_cell = Cell::new(vec![vertex.clone()]);
+            //     new_cell.vertices.push(vertex.clone());
+            //     new_cell.vertices.push(vertex.clone());
+            //     cells.push(new_cell);
+            // }
+        }
 
         Ok(cells)
     }
@@ -366,5 +404,25 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", unwrapped_supercell);
+    }
+
+    #[test]
+    fn tds_bowyer_watson() {
+        let points = vec![
+            Point::new([1.0, 2.0, 3.0]),
+            Point::new([4.0, 5.0, 6.0]),
+            Point::new([7.0, 8.0, 9.0]),
+            Point::new([10.0, 11.0, 12.0]),
+        ];
+
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+
+        let cells = tds.bowyer_watson();
+        let unwrapped_cells = cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}", err));
+
+        assert_eq!(unwrapped_cells.len(), 1);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("{:?}", unwrapped_cells);
     }
 }

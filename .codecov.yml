@@ -1,2 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 90%
+        removed_code_behavior: removals_only
+        threshold: 5%
+        base: auto
+
 ignore:
   - "src/lib.rs"
