@@ -26,6 +26,7 @@
         "rawpointer",
         "simplicial",
         "spacelike",
+        "supercell",
         "typenum",
         "Voronoi",
         "wasi"

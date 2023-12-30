@@ -498,17 +498,14 @@ mod tests {
 
     #[test]
     fn cell_circumcenter() {
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
-        let vertex1 = Vertex::new_with_data(point1, 1);
-        let vertex2 = Vertex::new_with_data(point2, 1);
-        let vertex3 = Vertex::new_with_data(point3, 1);
-        let vertex4 = Vertex::new_with_data(point4, 2);
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(Vertex::from_points(points)).unwrap();
         let circumcenter = cell.circumcenter().unwrap();
 
         assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));

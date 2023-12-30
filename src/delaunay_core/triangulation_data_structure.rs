@@ -4,7 +4,9 @@
 
 use super::utilities::find_extreme_coordinate;
 use super::{cell::Cell, point::Point, vertex::Vertex};
+use nalgebra as na;
 use std::cmp::{Ordering, PartialEq};
+use std::ops::Div;
 use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
@@ -43,7 +45,19 @@ pub struct Tds<T, U, V, const D: usize> {
     pub cells: HashMap<Uuid, Cell<T, U, V, D>>,
 }
 
-impl<T, U, V, const D: usize> Tds<T, U, V, D> {
+impl<
+        T: std::ops::SubAssign<f64>
+            + std::ops::AddAssign<f64>
+            + std::iter::Sum
+            + nalgebra::ComplexField<RealField = T>,
+        U,
+        V,
+        const D: usize,
+    > Tds<T, U, V, D>
+where
+    f64: From<T>,
+    for<'a> &'a T: Div<f64>,
+{
     /// The function creates a new instance of a triangulation data structure with given points, initializing the vertices and
     /// cells.
     ///
@@ -162,17 +176,64 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
         self.cells.len()
     }
 
+    /// The `supercell` function creates a larger cell that contains all the input vertices,
+    /// with some padding added.
+    ///
+    /// # Returns:
+    ///
+    /// A `Cell` that encompasses all vertices in the triangulation.
+    fn supercell(&self) -> Result<Cell<T, U, V, D>, &'static str>
+    where
+        T: Copy + Default + PartialOrd,
+        Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
+    {
+        // First, find the min and max coordinates
+        let mut min_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Less);
+        let mut max_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Greater);
+
+        // Now add padding so the supercell is large enough to contain all vertices
+        for elem in min_coords.iter_mut() {
+            *elem -= 10.0;
+        }
+
+        for elem in max_coords.iter_mut() {
+            *elem += 10.0;
+        }
+        // Add minimum vertex
+        let mut points = vec![Point::new(min_coords)];
+
+        // Stash max coords into a diagonal matrix
+        let max_vector: na::SMatrix<T, D, 1> = na::Matrix::from(max_coords);
+        let max_point_coords: na::SMatrix<T, D, D> = na::Matrix::from_diagonal(&max_vector);
+
+        // Create new maximal vertices for the supercell from slices of the max_point_coords matrix
+        for row in max_point_coords.row_iter() {
+            let mut row_vec: Vec<T> = Vec::new();
+            for elem in row.iter() {
+                row_vec.push(*elem);
+            }
+
+            // Add slice of max_point_coords matrix as a new point
+            let point =
+                Point::<T, D>::new(row_vec.into_boxed_slice().into_vec().try_into().unwrap());
+            points.push(point);
+        }
+
+        Cell::new(Vertex::from_points(points))
+    }
+
     fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, &'static str>
     where
         T: Copy + Default + PartialOrd,
         Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
     {
-        let cells: Vec<Cell<T, U, V, D>> = Vec::new();
+        let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
 
         // Create super-cell that contains all vertices
-        // First, find the min and max coordinates
-        let _min_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Less);
-        let _max_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Greater);
+        let supercell = self.supercell()?;
+
+        // Add supercell to cells
+        cells.push(supercell);
 
         Ok(cells)
     }
@@ -280,5 +341,30 @@ mod tests {
         assert_eq!(tds.dim(), 3);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn tds_supercell() {
+        let points = vec![
+            Point::new([1.0, 2.0, 3.0]),
+            Point::new([4.0, 5.0, 6.0]),
+            Point::new([7.0, 8.0, 9.0]),
+            Point::new([10.0, 11.0, 12.0]),
+        ];
+
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+
+        let supercell = tds.supercell();
+        let unwrapped_supercell =
+            supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}", err));
+
+        assert_eq!(unwrapped_supercell.vertices.len(), 4);
+        assert!(unwrapped_supercell
+            .vertices
+            .iter()
+            .any(|v| { v.point.coords == [-10.0, -10.0, -10.0] }));
+
+        // Human readable output for cargo test -- --nocapture
+        println!("{:?}", unwrapped_supercell);
     }
 }
