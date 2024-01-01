@@ -284,8 +284,7 @@ where
             *value /= na::convert::<f64, T>(2.0);
         }
 
-        let solution_point: Point<f64, D> = Point::<f64, D>::try_from(solution_array)
-            .expect("Failed to convert solution array to Point");
+        let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
 
         Ok(Point::<f64, D>::new(solution_point.coords))
     }
@@ -302,8 +301,7 @@ where
     {
         let circumcenter = self.circumcenter()?;
         // Change the type of vertex to match circumcenter
-        let vertex = Point::<f64, D>::try_from(self.vertices[0].point.coords)
-            .expect("Failed to convert point to <f64,D>");
+        let vertex = Point::<f64, D>::from(self.vertices[0].point.coords);
         Ok(na::distance(
             &na::Point::<T, D>::from(circumcenter.coords),
             &na::Point::<T, D>::from(vertex.coords),
@@ -341,11 +339,7 @@ where
         let circumradius = self.circumradius()?;
         let radius = na::distance(
             &na::Point::<T, D>::from(self.circumcenter()?.coords),
-            &na::Point::<T, D>::from(
-                Point::<f64, D>::try_from(vertex.point.coords)
-                    .expect("Failed to convert point to <f64,D>")
-                    .coords,
-            ),
+            &na::Point::<T, D>::from(Point::<f64, D>::from(vertex.point.coords).coords),
         );
 
         Ok(circumradius >= radius)
