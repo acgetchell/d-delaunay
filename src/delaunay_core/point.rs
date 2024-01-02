@@ -1,6 +1,6 @@
 //! Data and operations on d-dimensional points.
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 /// The `Point` struct represents a point in a D-dimensional space, where the coordinates are of type
 /// `T`.
 ///
@@ -12,6 +12,14 @@
 pub struct Point<T, const D: usize> {
     /// The coordinates of the point.
     pub coords: [T; D],
+}
+
+impl<T: std::default::Default + Copy, const D: usize> Default for Point<T, D> {
+    fn default() -> Self {
+        Self {
+            coords: [Default::default(); D],
+        }
+    }
 }
 
 impl<T, const D: usize> From<[T; D]> for Point<f64, D>
@@ -27,7 +35,7 @@ where
     }
 }
 
-impl<T: Clone, const D: usize> Point<T, D> {
+impl<T: Clone + std::default::Default + Copy, const D: usize> Point<T, D> {
     /// The function `new` creates a new instance of a `Point` with the given coordinates.
     ///
     /// # Arguments:

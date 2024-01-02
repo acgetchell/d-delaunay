@@ -26,7 +26,7 @@ pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }
 
-/// The function `find_extreme_coordinate` takes a hashmap of vertices and returns the minimum or
+/// The function `find_extreme_coordinates` takes a hashmap of vertices and returns the minimum or
 /// maximum coordinates based on the specified ordering.
 ///
 /// # Arguments:
@@ -34,7 +34,7 @@ pub fn make_uuid() -> Uuid {
 /// * `vertices`: A HashMap containing vertices, where the key is a Uuid and the value is a Vertex
 /// struct.
 /// * `ordering`: The `ordering` parameter is of type `Ordering` and is used to specify whether the
-/// function should find the minimum or maximum coordinate. `Ordering` is an enum with three possible
+/// function should find the minimum or maximum coordinates. `Ordering` is an enum with three possible
 /// values: `Less`, `Equal`, and `Greater`.
 ///
 /// # Returns:
@@ -44,7 +44,7 @@ pub fn make_uuid() -> Uuid {
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::utilities::find_extreme_coordinate;
+/// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
 /// use d_delaunay::delaunay_core::point::Point;
 /// use std::collections::HashMap;
@@ -56,10 +56,10 @@ pub fn make_uuid() -> Uuid {
 /// ];
 /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 /// let hashmap = Vertex::into_hashmap(vertices.clone());
-/// let min_coords = find_extreme_coordinate(hashmap, Ordering::Less);
+/// let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
 /// assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
 /// ```
-pub fn find_extreme_coordinate<T, U, const D: usize>(
+pub fn find_extreme_coordinates<T, U, const D: usize>(
     vertices: HashMap<Uuid, Vertex<T, U, D>>,
     ordering: Ordering,
 ) -> [T; D]
@@ -108,7 +108,7 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices.clone());
 
-        let min_coords = find_extreme_coordinate(hashmap, Ordering::Less);
+        let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
 
         assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
 
@@ -126,7 +126,7 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices.clone());
 
-        let max_coords = find_extreme_coordinate(hashmap, Ordering::Greater);
+        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
 
         assert_eq!(max_coords, [7.0, 8.0, 6.0]);
 

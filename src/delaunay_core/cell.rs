@@ -27,7 +27,7 @@ use crate::delaunay_core;
 /// neighbor is opposite the `i-th`` vertex.
 /// * `data`: The `data` property is an optional field that can hold a value of type `V`. It allows
 /// storage of additional data associated with the `Cell`.
-pub struct Cell<T, U, V, const D: usize> {
+pub struct Cell<T: std::default::Default + std::marker::Copy, U, V, const D: usize> {
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
     /// The unique identifier of the cell.
@@ -39,7 +39,10 @@ pub struct Cell<T, U, V, const D: usize> {
 }
 
 impl<
-        T: delaunay_core::cell::na::ComplexField<RealField = T> + std::iter::Sum,
+        T: delaunay_core::cell::na::ComplexField<RealField = T>
+            + std::iter::Sum
+            + std::default::Default
+            + std::marker::Copy,
         U,
         V,
         const D: usize,

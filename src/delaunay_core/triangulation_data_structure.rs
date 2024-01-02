@@ -2,7 +2,7 @@
 //!
 //! Intended to match functionality of [CGAL Triangulations](https://doc.cgal.org/latest/Triangulation/index.html).
 
-use super::utilities::find_extreme_coordinate;
+use super::utilities::find_extreme_coordinates;
 use super::{cell::Cell, point::Point, vertex::Vertex};
 use na::{Const, OPoint};
 use nalgebra as na;
@@ -11,7 +11,7 @@ use std::ops::Div;
 use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 /// The `Tds` struct represents a triangulation data structure with vertices and cells, where the vertices
 /// and cells are identified by UUIDs.
 ///
@@ -34,7 +34,7 @@ use uuid::Uuid;
 /// A similar pattern holds for higher dimensions.
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space, and so the `Tds` is a finite simplicial complex.
-pub struct Tds<T, U, V, const D: usize> {
+pub struct Tds<T: std::default::Default + std::marker::Copy, U, V, const D: usize> {
     /// A HashMap that stores vertices with their corresponding UUIDs as keys.
     /// Each `Vertex` has a `Point` of type T, vertex data of type U, and a constant D representing the dimension.
     pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
@@ -50,7 +50,9 @@ impl<
         T: std::ops::SubAssign<f64>
             + std::ops::AddAssign<f64>
             + std::iter::Sum
-            + nalgebra::ComplexField<RealField = T>,
+            + nalgebra::ComplexField<RealField = T>
+            + std::default::Default
+            + std::marker::Copy,
         U: Clone,
         V: Clone,
         const D: usize,
@@ -189,8 +191,8 @@ where
         Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
     {
         // First, find the min and max coordinates
-        let mut min_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Less);
-        let mut max_coords = find_extreme_coordinate(self.vertices.clone(), Ordering::Greater);
+        let mut min_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Less);
+        let mut max_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Greater);
 
         // Now add padding so the supercell is large enough to contain all vertices
         for elem in min_coords.iter_mut() {

@@ -6,7 +6,7 @@ use std::option::Option;
 
 use super::{point::Point, utilities::make_uuid};
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Default, PartialEq, Copy)]
 /// The `Vertex` struct represents a vertex in a triangulation with a `Point`, a unique
 /// identifier, an optional incident cell identifier, and optional data.
 ///
@@ -20,7 +20,7 @@ use super::{point::Point, utilities::make_uuid};
 /// the cell that the vertex is incident to. This is calculated by the `delaunay_core::triangulation_data_structure::Tds`.
 /// * `data`: The `data` property is an optional field that can hold any type `U`. It is used to store
 /// additional data associated with the vertex.
-pub struct Vertex<T, U, const D: usize> {
+pub struct Vertex<T: Default + std::marker::Copy, U, const D: usize> {
     /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
     /// A universally unique identifier for the vertex.
@@ -31,7 +31,7 @@ pub struct Vertex<T, U, const D: usize> {
     pub data: Option<U>,
 }
 
-impl<T, U, const D: usize> Vertex<T, U, D> {
+impl<T: std::default::Default + std::marker::Copy, U, const D: usize> Vertex<T, U, D> {
     /// The function `new_with_data` creates a new instance of a `Vertex` with the given point and data, and
     /// assigns a unique identifier to it.
     ///
