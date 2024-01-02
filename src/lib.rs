@@ -16,13 +16,24 @@ pub mod delaunay_core {
     pub mod vertex;
 }
 
+/// The function `is_normal` checks that structs implement `auto` traits.
+fn is_normal<T: Sized + Send + Sync + Unpin>() {}
+
 #[cfg(test)]
 mod tests {
-    use crate::delaunay_core::triangulation_data_structure::start;
+    use crate::{
+        delaunay_core::{
+            cell::Cell, point::Point, triangulation_data_structure::Tds, vertex::Vertex,
+        },
+        is_normal,
+    };
 
     #[test]
-    fn it_works() {
-        let result = start();
-        assert_eq!(result, 1);
+    fn normal_types() {
+        is_normal::<Point<f64, 3>>();
+        is_normal::<Point<f32, 3>>();
+        is_normal::<Vertex<f64, Option<()>, 3>>();
+        is_normal::<Cell<f64, Option<()>, Option<()>, 4>>();
+        is_normal::<Tds<f64, Option<()>, Option<()>, 3>>();
     }
 }

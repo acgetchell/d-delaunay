@@ -290,16 +290,6 @@ where
     }
 }
 
-/// The function "start" will eventually return a triangulation data structure.
-///
-/// # Returns:
-///
-/// The function `start()` is returning an `i32` value of `1`.
-pub fn start() -> i32 {
-    println!("Starting ...");
-    1
-}
-
 #[cfg(test)]
 mod tests {
 

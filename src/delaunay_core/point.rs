@@ -131,4 +131,16 @@ mod tests {
         // Human readable output for cargo test -- --nocapture
         println!("Origin: {:?} is {}-D", point, point.dim());
     }
+
+    #[test]
+    fn point_default_trait() {
+        let point: Point<f64, 4> = Default::default();
+        assert_eq!(point.coords[0], 0.0);
+        assert_eq!(point.coords[1], 0.0);
+        assert_eq!(point.coords[2], 0.0);
+        assert_eq!(point.coords[3], 0.0);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Default: {:?} is {}-D", point, point.dim());
+    }
 }
