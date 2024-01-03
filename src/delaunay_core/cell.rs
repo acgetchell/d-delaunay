@@ -1,18 +1,14 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
+use super::{point::Point, utilities::make_uuid, vertex::Vertex};
+use crate::delaunay_core;
+use na::{Const, OPoint};
+use nalgebra as na;
+use serde::Serialize;
 use std::{fmt::Debug, ops::Div};
-
 use uuid::Uuid;
 
-use super::{point::Point, utilities::make_uuid, vertex::Vertex};
-
-use nalgebra as na;
-
-use na::{Const, OPoint};
-
-use crate::delaunay_core;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 /// The `Cell` struct represents a d-dimensional [simplex](https://en.wikipedia.org/wiki/Simplex)
 /// with vertices, a unique identifier, optional neighbors, and optional data.
 ///
@@ -27,7 +23,10 @@ use crate::delaunay_core;
 /// neighbor is opposite the `i-th`` vertex.
 /// * `data`: The `data` property is an optional field that can hold a value of type `V`. It allows
 /// storage of additional data associated with the `Cell`.
-pub struct Cell<T: std::default::Default + std::marker::Copy, U, V, const D: usize> {
+pub struct Cell<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
+where
+    [T; D]: Serialize,
+{
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
     /// The unique identifier of the cell.
@@ -50,6 +49,7 @@ impl<
 where
     for<'a> &'a T: Div<f64>,
     f64: From<T>,
+    [T; D]: Serialize,
 {
     /// The function `new` creates a new `Cell`` object with the given vertices.
     /// A D-dimensional cell has D + 1 vertices, so the number of vertices must be less than or equal to D + 1.
@@ -248,6 +248,8 @@ where
     fn circumcenter(&self) -> Result<Point<f64, D>, &'static str>
     where
         T: Clone + Copy + PartialEq + Debug + 'static,
+        [T; D]: Serialize,
+        [f64; D]: Sized + Serialize,
     {
         let dim = self.dim();
         if self.vertices[0].dim() != dim {
@@ -301,6 +303,7 @@ where
     where
         T: Copy,
         OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Serialize,
     {
         let circumcenter = self.circumcenter()?;
         // Change the type of vertex to match circumcenter
@@ -338,6 +341,7 @@ where
     where
         T: Copy + PartialOrd, // Add the PartialOrd trait bound
         OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Serialize,
     {
         let circumradius = self.circumradius()?;
         let radius = na::distance(
@@ -588,5 +592,21 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Cell: {:?}", cell);
+    }
+
+    #[test]
+    fn cell_serialization() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+
+        let serialized = serde_json::to_string(&cell).unwrap();
+        assert!(serialized.contains("[0.0,0.0,1.0]"));
+        assert!(serialized.contains("[0.0,1.0,0.0]"));
+        assert!(serialized.contains("[1.0,0.0,0.0]"));
+        assert!(serialized.contains("[1.0,1.0,1.0]"));
     }
 }

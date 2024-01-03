@@ -17,7 +17,9 @@ pub mod delaunay_core {
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
-fn is_normal<T: Sized + Send + Sync + Unpin>() {}
+fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
+    true
+}
 
 #[cfg(test)]
 mod tests {
@@ -30,10 +32,10 @@ mod tests {
 
     #[test]
     fn normal_types() {
-        is_normal::<Point<f64, 3>>();
-        is_normal::<Point<f32, 3>>();
-        is_normal::<Vertex<f64, Option<()>, 3>>();
-        is_normal::<Cell<f64, Option<()>, Option<()>, 4>>();
-        is_normal::<Tds<f64, Option<()>, Option<()>, 3>>();
+        assert!(is_normal::<Point<f64, 3>>());
+        assert!(is_normal::<Point<f32, 3>>());
+        assert!(is_normal::<Vertex<f64, Option<()>, 3>>());
+        assert!(is_normal::<Cell<f64, Option<()>, Option<()>, 4>>());
+        assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 3>>());
     }
 }

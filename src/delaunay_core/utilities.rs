@@ -1,12 +1,10 @@
 //! Utility functions
 
-use std::collections::HashMap;
-
-use uuid::Uuid;
-
 use super::vertex::Vertex;
-
+use serde::Serialize;
 use std::cmp::Ordering;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 UUID in Rust.
 ///
@@ -65,6 +63,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize>(
 ) -> [T; D]
 where
     T: Copy + Default + PartialOrd,
+    [T; D]: Sized + Serialize,
 {
     let mut min_coords = [Default::default(); D];
 

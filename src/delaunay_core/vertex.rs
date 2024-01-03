@@ -1,12 +1,11 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
+use super::{point::Point, utilities::make_uuid};
+use serde::Serialize;
+use std::option::Option;
 use uuid::Uuid;
 
-use std::option::Option;
-
-use super::{point::Point, utilities::make_uuid};
-
-#[derive(Debug, Clone, Default, PartialEq, Copy)]
+#[derive(Debug, Clone, Default, PartialEq, Copy, Serialize)]
 /// The `Vertex` struct represents a vertex in a triangulation with a `Point`, a unique
 /// identifier, an optional incident cell identifier, and optional data.
 ///
@@ -20,7 +19,10 @@ use super::{point::Point, utilities::make_uuid};
 /// the cell that the vertex is incident to. This is calculated by the `delaunay_core::triangulation_data_structure::Tds`.
 /// * `data`: The `data` property is an optional field that can hold any type `U`. It is used to store
 /// additional data associated with the vertex.
-pub struct Vertex<T: Default + std::marker::Copy, U, const D: usize> {
+pub struct Vertex<T: Default + std::marker::Copy, U, const D: usize>
+where
+    [T; D]: Serialize,
+{
     /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
     /// A universally unique identifier for the vertex.
@@ -31,7 +33,10 @@ pub struct Vertex<T: Default + std::marker::Copy, U, const D: usize> {
     pub data: Option<U>,
 }
 
-impl<T: std::default::Default + std::marker::Copy, U, const D: usize> Vertex<T, U, D> {
+impl<T: std::default::Default + std::marker::Copy, U, const D: usize> Vertex<T, U, D>
+where
+    [T; D]: Serialize,
+{
     /// The function `new_with_data` creates a new instance of a `Vertex` with the given point and data, and
     /// assigns a unique identifier to it.
     ///
@@ -245,5 +250,13 @@ mod tests {
     fn vertex_dim() {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         assert_eq!(vertex.dim(), 3);
+    }
+
+    #[test]
+    fn vertex_serialization() {
+        let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let serialized = serde_json::to_string(&vertex).unwrap();
+        assert!(serialized.contains("point"));
+        assert!(serialized.contains("[1.0,2.0,3.0]"));
     }
 }

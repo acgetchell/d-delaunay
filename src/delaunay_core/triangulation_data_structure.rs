@@ -6,12 +6,13 @@ use super::utilities::find_extreme_coordinates;
 use super::{cell::Cell, point::Point, vertex::Vertex};
 use na::{Const, OPoint};
 use nalgebra as na;
+use serde::Serialize;
 use std::cmp::{Ordering, PartialEq};
 use std::ops::Div;
 use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices and cells, where the vertices
 /// and cells are identified by UUIDs.
 ///
@@ -34,7 +35,10 @@ use uuid::Uuid;
 /// A similar pattern holds for higher dimensions.
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space, and so the `Tds` is a finite simplicial complex.
-pub struct Tds<T: std::default::Default + std::marker::Copy, U, V, const D: usize> {
+pub struct Tds<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
+where
+    [T; D]: Serialize,
+{
     /// A HashMap that stores vertices with their corresponding UUIDs as keys.
     /// Each `Vertex` has a `Point` of type T, vertex data of type U, and a constant D representing the dimension.
     pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
@@ -60,6 +64,7 @@ impl<
 where
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
+    [T; D]: Serialize,
 {
     /// The function creates a new instance of a triangulation data structure with given points, initializing the vertices and
     /// cells.
@@ -230,6 +235,7 @@ where
         T: Copy + Default + PartialOrd,
         Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
         OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Serialize,
     {
         let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
 
