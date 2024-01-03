@@ -253,15 +253,15 @@ where
                 }
             }
 
-            // // Find the boundary of the polygonal hole
-            // let mut polygonal_hole: Vec<Vertex<T, U, D>> = Vec::new();
-            // for cell in bad_cells.iter() {
-            //     for vertex in cell.vertices.iter() {
-            //         if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
-            //             polygonal_hole.push(vertex.clone());
-            //         }
-            //     }
-            // }
+            // Find the boundary of the polygonal hole
+            let mut polygonal_hole: Vec<Vertex<T, U, D>> = Vec::new();
+            for cell in bad_cells.iter() {
+                // for vertex in cell.vertices.iter() {
+                //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
+                //         polygonal_hole.push(vertex.clone());
+                //     }
+                // }
+            }
 
             // // Remove duplicate vertices
             // polygonal_hole.sort();
@@ -427,21 +427,21 @@ mod tests {
     #[test]
     fn tds_to_and_from_json() {
         let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-            Point::new([7.0, 8.0, 9.0]),
-            Point::new([10.0, 11.0, 12.0]),
+            Point::new([1.0, 2.0, 3.0, 4.0]),
+            Point::new([5.0, 6.0, 7.0, 8.0]),
+            Point::new([9.0, 10.0, 11.0, 12.0]),
+            Point::new([13.0, 14.0, 15.0, 16.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let tds: Tds<f64, usize, usize, 4> = Tds::new(points);
 
         let serialized = serde_json::to_string(&tds).unwrap();
         // assert!(serialized.contains(r#""vertices":{},"cells":{}"#));
-        assert!(serialized.contains("[1.0,2.0,3.0]"));
-        assert!(serialized.contains("[4.0,5.0,6.0]"));
-        assert!(serialized.contains("[7.0,8.0,9.0]"));
-        assert!(serialized.contains("[10.0,11.0,12.0]"));
+        assert!(serialized.contains("[1.0,2.0,3.0,4.0]"));
+        assert!(serialized.contains("[5.0,6.0,7.0,8.0]"));
+        assert!(serialized.contains("[9.0,10.0,11.0,12.0]"));
+        assert!(serialized.contains("[13.0,14.0,15.0,16.0]"));
 
-        let deserialized: Tds<f64, usize, usize, 3> = serde_json::from_str(&serialized).unwrap();
+        let deserialized: Tds<f64, usize, usize, 4> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, tds);
 
         // Human readable output for cargo test -- --nocapture

@@ -1,11 +1,13 @@
 //! # d-delaunay
 //!
-//! This is a library for computing the Delaunay triangulation of a set of n-dimensional points in a [simplicial complex](https://en.wikipedia.org/wiki/Simplicial_complex)
+//! This is a library for computing the Delaunay triangulation of a set of n-dimensional points
+//! in a [simplicial complex](https://en.wikipedia.org/wiki/Simplicial_complex)
 //! inspired by [CGAL](https://www.cgal.org).
 //!
 //! # Features
 //! * d-dimensional Delaunay triangulations
 //! * Arbitrary data types associated with vertices and cells
+//! * Serialization/Deserialization with [serde](https://serde.rs)
 
 /// The main module of the library. This module contains the public interface for the library.
 pub mod delaunay_core {
@@ -23,7 +25,7 @@ fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+mod lib_tests {
     use crate::{
         delaunay_core::{
             cell::Cell, point::Point, triangulation_data_structure::Tds, vertex::Vertex,
@@ -37,6 +39,6 @@ mod tests {
         assert!(is_normal::<Point<f32, 3>>());
         assert!(is_normal::<Vertex<f64, Option<()>, 3>>());
         assert!(is_normal::<Cell<f64, Option<()>, Option<()>, 4>>());
-        assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 3>>());
+        assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 4>>());
     }
 }

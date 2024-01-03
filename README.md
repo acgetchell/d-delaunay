@@ -15,7 +15,15 @@ ecosystem.
 
 At some point I may merge it into another library, such as [Spade], or [delaunay], but for now I am developing this library without trying to figure out how to fit it into other coding styles and with the minimum number of traits to do generic mathematics.
 
+## Features
+
+- [ ] d-dimensional [Delaunay triangulations]
+- [x] Arbitrary data types associated with vertices and cells
+- [x] Serialization/Deserialization with [serde]
+
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/
 [Spade]: https://github.com/Stoeoef/spade
 [delaunay]: https://crates.io/crates/delaunay
+[serde]: https://serde.rs
+[Delaunay triangulations]: https://en.wikipedia.org/wiki/Delaunay_triangulation
