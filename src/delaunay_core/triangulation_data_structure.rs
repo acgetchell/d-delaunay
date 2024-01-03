@@ -254,8 +254,8 @@ where
             }
 
             // Find the boundary of the polygonal hole
-            let mut polygonal_hole: Vec<Vertex<T, U, D>> = Vec::new();
-            for cell in bad_cells.iter() {
+            let mut _polygonal_hole: Vec<Vertex<T, U, D>> = Vec::new();
+            for _cell in bad_cells.iter() {
                 // for vertex in cell.vertices.iter() {
                 //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
                 //         polygonal_hole.push(vertex.clone());
