@@ -17,6 +17,7 @@ pub mod delaunay_core {
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
+/// Traits are checked at compile time, so this function is only used for testing.
 fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true
 }

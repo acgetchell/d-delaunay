@@ -1,11 +1,11 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::{point::Point, utilities::make_uuid};
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::option::Option;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Default, PartialEq, Copy, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
 /// The `Vertex` struct represents a vertex in a triangulation with a `Point`, a unique
 /// identifier, an optional incident cell identifier, and optional data.
 ///
@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// additional data associated with the vertex.
 pub struct Vertex<T: Default + std::marker::Copy, U, const D: usize>
 where
-    [T; D]: Serialize,
+    [T; D]: Serialize + DeserializeOwned + Default,
 {
     /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
@@ -35,7 +35,7 @@ where
 
 impl<T: std::default::Default + std::marker::Copy, U, const D: usize> Vertex<T, U, D>
 where
-    [T; D]: Serialize,
+    [T; D]: Serialize + DeserializeOwned + Default,
 {
     /// The function `new_with_data` creates a new instance of a `Vertex` with the given point and data, and
     /// assigns a unique identifier to it.
@@ -253,10 +253,16 @@ mod tests {
     }
 
     #[test]
-    fn vertex_serialization() {
+    fn vertex_to_and_from_json() {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         let serialized = serde_json::to_string(&vertex).unwrap();
         assert!(serialized.contains("point"));
         assert!(serialized.contains("[1.0,2.0,3.0]"));
+
+        let deserialized: Vertex<f64, Option<()>, 3> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, vertex);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Serialized: {:?}", serialized);
     }
 }

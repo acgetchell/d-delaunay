@@ -6,13 +6,13 @@ use super::utilities::find_extreme_coordinates;
 use super::{cell::Cell, point::Point, vertex::Vertex};
 use na::{Const, OPoint};
 use nalgebra as na;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{Ordering, PartialEq};
 use std::ops::Div;
 use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices and cells, where the vertices
 /// and cells are identified by UUIDs.
 ///
@@ -37,7 +37,7 @@ use uuid::Uuid;
 /// In general, vertices are embedded into D-dimensional Euclidean space, and so the `Tds` is a finite simplicial complex.
 pub struct Tds<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
 where
-    [T; D]: Serialize,
+    [T; D]: Serialize + DeserializeOwned + Default,
 {
     /// A HashMap that stores vertices with their corresponding UUIDs as keys.
     /// Each `Vertex` has a `Point` of type T, vertex data of type U, and a constant D representing the dimension.
@@ -64,7 +64,7 @@ impl<
 where
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
-    [T; D]: Serialize,
+    [T; D]: Serialize + DeserializeOwned + Default,
 {
     /// The function creates a new instance of a triangulation data structure with given points, initializing the vertices and
     /// cells.
@@ -235,7 +235,7 @@ where
         T: Copy + Default + PartialOrd,
         Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
         OPoint<T, Const<D>>: From<[f64; D]>,
-        [f64; D]: Serialize,
+        [f64; D]: Serialize + DeserializeOwned + Default,
     {
         let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
 
@@ -422,5 +422,29 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", unwrapped_cells);
+    }
+
+    #[test]
+    fn tds_to_and_from_json() {
+        let points = vec![
+            Point::new([1.0, 2.0, 3.0]),
+            Point::new([4.0, 5.0, 6.0]),
+            Point::new([7.0, 8.0, 9.0]),
+            Point::new([10.0, 11.0, 12.0]),
+        ];
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+
+        let serialized = serde_json::to_string(&tds).unwrap();
+        // assert!(serialized.contains(r#""vertices":{},"cells":{}"#));
+        assert!(serialized.contains("[1.0,2.0,3.0]"));
+        assert!(serialized.contains("[4.0,5.0,6.0]"));
+        assert!(serialized.contains("[7.0,8.0,9.0]"));
+        assert!(serialized.contains("[10.0,11.0,12.0]"));
+
+        let deserialized: Tds<f64, usize, usize, 3> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, tds);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("serialized = {}", serialized);
     }
 }
