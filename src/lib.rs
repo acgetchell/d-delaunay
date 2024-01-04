@@ -12,6 +12,7 @@
 /// The main module of the library. This module contains the public interface for the library.
 pub mod delaunay_core {
     pub mod cell;
+    pub mod facet;
     pub mod point;
     pub mod triangulation_data_structure;
     pub mod utilities;
@@ -28,7 +29,8 @@ fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
 mod lib_tests {
     use crate::{
         delaunay_core::{
-            cell::Cell, point::Point, triangulation_data_structure::Tds, vertex::Vertex,
+            cell::Cell, facet::Facet, point::Point, triangulation_data_structure::Tds,
+            vertex::Vertex,
         },
         is_normal,
     };
@@ -38,6 +40,7 @@ mod lib_tests {
         assert!(is_normal::<Point<f64, 3>>());
         assert!(is_normal::<Point<f32, 3>>());
         assert!(is_normal::<Vertex<f64, Option<()>, 3>>());
+        assert!(is_normal::<Facet<f64, Option<()>, Option<()>, 3>>());
         assert!(is_normal::<Cell<f64, Option<()>, Option<()>, 4>>());
         assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 4>>());
     }

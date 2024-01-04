@@ -614,6 +614,6 @@ mod tests {
         assert_eq!(deserialized, cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Serialized: {:?}", serialized);
     }
 }

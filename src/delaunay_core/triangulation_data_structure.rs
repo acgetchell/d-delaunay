@@ -445,6 +445,6 @@ mod tests {
         assert_eq!(deserialized, tds);
 
         // Human readable output for cargo test -- --nocapture
-        println!("serialized = {}", serialized);
+        println!("Serialized = {}", serialized);
     }
 }
