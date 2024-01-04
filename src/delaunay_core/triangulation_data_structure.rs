@@ -38,6 +38,8 @@ use uuid::Uuid;
 pub struct Tds<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
 where
     [T; D]: Serialize + DeserializeOwned + Default,
+    U: Clone,
+    V: Clone,
 {
     /// A HashMap that stores vertices with their corresponding UUIDs as keys.
     /// Each `Vertex` has a `Point` of type T, vertex data of type U, and a constant D representing the dimension.

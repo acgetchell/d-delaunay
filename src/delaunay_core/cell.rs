@@ -26,6 +26,8 @@ use uuid::Uuid;
 pub struct Cell<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
 where
     [T; D]: Serialize + DeserializeOwned + Default,
+    U: Clone,
+    V: Clone,
 {
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
@@ -50,6 +52,8 @@ where
     for<'a> &'a T: Div<f64>,
     f64: From<T>,
     [T; D]: Serialize + DeserializeOwned + Default,
+    U: Clone,
+    V: Clone,
 {
     /// The function `new` creates a new `Cell`` object with the given vertices.
     /// A D-dimensional cell has D + 1 vertices, so the number of vertices must be less than or equal to D + 1.

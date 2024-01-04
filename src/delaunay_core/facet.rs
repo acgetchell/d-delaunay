@@ -23,11 +23,13 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct Facet<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
 where
     [T; D]: Serialize + DeserializeOwned + Default,
+    U: Clone,
+    V: Clone,
 {
-    /// The cell that contains this facet.
+    /// The `Cell` that contains this facet.
     pub cell: Cell<T, U, V, D>,
 
-    /// The index of the vertex opposite to this facet.
+    /// The `Vertex` opposite to this facet.
     pub vertex: Vertex<T, U, D>,
 }
 
@@ -35,7 +37,8 @@ impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
     T: std::default::Default + std::marker::Copy + std::cmp::PartialEq,
     [T; D]: Serialize + DeserializeOwned + Default,
-    U: std::cmp::PartialEq,
+    U: std::cmp::PartialEq + Clone,
+    V: Clone,
 {
     /// The `new` function is a constructor for the `Facet` struct. It takes in a `Cell` and a `Vertex`
     /// as arguments and returns a `Result` containing a `Facet` struct or an error message (`&'static
@@ -71,7 +74,20 @@ where
             return Err("The cell does not contain the vertex.");
         }
 
+        if cell.vertices.len() == 1 {
+            return Err("The cell is a 0-simplex with no facet.");
+        }
+
         Ok(Facet { cell, vertex })
+    }
+
+    /// The `vertices` method in the `Facet` struct returns a vector of `Vertices` that are in
+    /// the facet.
+    pub fn vertices(&mut self) -> Vec<Vertex<T, U, D>> {
+        let mut vertices = self.cell.clone().vertices;
+        vertices.retain(|v| *v != self.vertex);
+
+        vertices
     }
 }
 
@@ -108,6 +124,34 @@ mod tests {
         let vertex5 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
 
         assert!(Facet::new(cell.clone(), vertex5).is_err());
+    }
+
+    #[test]
+    fn facet_new_with_1_simplex() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1]).unwrap();
+
+        assert!(Facet::new(cell.clone(), vertex1).is_err());
+    }
+
+    #[test]
+    fn facet_vertices() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let vertex2 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+
+        let vertices = facet.clone().vertices();
+        assert_eq!(vertices.len(), 3);
+        assert_eq!(vertices[0], vertex2);
+        assert_eq!(vertices[1], vertex3);
+        assert_eq!(vertices[2], vertex4);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Facet: {:?}", facet);
     }
 
     #[test]
