@@ -53,7 +53,7 @@ pub fn make_uuid() -> Uuid {
 ///     Point::new([7.0, 8.0, -9.0]),
 /// ];
 /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-/// let hashmap = Vertex::into_hashmap(vertices.clone());
+/// let hashmap = Vertex::into_hashmap(vertices);
 /// let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
 /// assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
 /// ```
@@ -62,8 +62,9 @@ pub fn find_extreme_coordinates<T, U, const D: usize>(
     ordering: Ordering,
 ) -> [T; D]
 where
-    T: Copy + Default + PartialOrd,
-    [T; D]: Sized + Serialize + DeserializeOwned + Default,
+    T: Clone + Copy + Default + PartialOrd,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy,
 {
     let mut min_coords = [Default::default(); D];
 
@@ -105,8 +106,7 @@ mod tests {
             Point::new([7.0, 8.0, -9.0]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices.clone());
-
+        let hashmap = Vertex::into_hashmap(vertices);
         let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
 
         assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
@@ -123,8 +123,7 @@ mod tests {
             Point::new([7.0, 8.0, -9.0]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices.clone());
-
+        let hashmap = Vertex::into_hashmap(vertices);
         let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
 
         assert_eq!(max_coords, [7.0, 8.0, 6.0]);

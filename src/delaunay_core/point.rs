@@ -11,9 +11,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 /// * `coords`: `coords` is a public property of the `Point`. It is an array of type `T` with a
 /// length of `D`. The type `T` is a generic type parameter, which means it can be any type. The length
 /// `D` is a constant unsigned integer, which means it cannot be changed and is known at compile time.
-pub struct Point<T: Default + std::marker::Copy, const D: usize>
+pub struct Point<T: Clone + Copy + Default, const D: usize>
 where
-    [T; D]: Serialize + DeserializeOwned + Default,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
     pub coords: [T; D],
@@ -21,8 +21,8 @@ where
 
 impl<T, const D: usize> From<[T; D]> for Point<f64, D>
 where
-    [T; D]: Sized + Serialize + DeserializeOwned + Default,
-    [f64; D]: Sized + Serialize + DeserializeOwned + Default,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     T: Into<f64>,
 {
     fn from(coords: [T; D]) -> Self {
@@ -32,9 +32,9 @@ where
     }
 }
 
-impl<T: Clone + std::default::Default + Copy, const D: usize> Point<T, D>
+impl<T: Clone + Copy + Default, const D: usize> Point<T, D>
 where
-    [T; D]: Serialize + DeserializeOwned + Default,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new instance of a `Point` with the given coordinates.
     ///
@@ -103,6 +103,7 @@ mod tests {
     #[test]
     fn point_new() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+
         assert_eq!(point.coords[0], 1.0);
         assert_eq!(point.coords[1], 2.0);
         assert_eq!(point.coords[2], 3.0);
@@ -112,8 +113,17 @@ mod tests {
     }
 
     #[test]
+    fn point_copy() {
+        let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+        let point_copy = point;
+
+        assert_eq!(point, point_copy);
+    }
+
+    #[test]
     fn point_dim() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+
         assert_eq!(point.dim(), 4);
 
         // Human readable output for cargo test -- --nocapture
@@ -123,6 +133,7 @@ mod tests {
     #[test]
     fn point_origin() {
         let point: Point<f64, 4> = Point::origin();
+
         assert_eq!(point.coords[0], 0.0);
         assert_eq!(point.coords[1], 0.0);
         assert_eq!(point.coords[2], 0.0);
@@ -135,6 +146,7 @@ mod tests {
     #[test]
     fn point_default_trait() {
         let point: Point<f64, 4> = Default::default();
+
         assert_eq!(point.coords[0], 0.0);
         assert_eq!(point.coords[1], 0.0);
         assert_eq!(point.coords[2], 0.0);
@@ -171,9 +183,11 @@ mod tests {
     fn point_to_and_from_json() {
         let point: Point<f64, 4> = Default::default();
         let serialized = serde_json::to_string(&point).unwrap();
+
         assert_eq!(serialized, "{\"coords\":[0.0,0.0,0.0,0.0]}");
 
         let deserialized: Point<f64, 4> = serde_json::from_str(&serialized).unwrap();
+
         assert_eq!(deserialized, point);
 
         // Human readable output for cargo test -- --nocapture

@@ -4,11 +4,12 @@
 
 use super::utilities::find_extreme_coordinates;
 use super::{cell::Cell, point::Point, vertex::Vertex};
-use na::{Const, OPoint};
+use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{Ordering, PartialEq};
-use std::ops::Div;
+use std::iter::Sum;
+use std::ops::{AddAssign, Div, SubAssign};
 use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
@@ -35,11 +36,11 @@ use uuid::Uuid;
 /// A similar pattern holds for higher dimensions.
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space, and so the `Tds` is a finite simplicial complex.
-pub struct Tds<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
+pub struct Tds<T: Clone + Copy + Default, U, V, const D: usize>
 where
-    [T; D]: Serialize + DeserializeOwned + Default,
-    U: Clone,
-    V: Clone,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy,
+    V: Clone + Copy,
 {
     /// A HashMap that stores vertices with their corresponding UUIDs as keys.
     /// Each `Vertex` has a `Point` of type T, vertex data of type U, and a constant D representing the dimension.
@@ -53,20 +54,23 @@ where
 }
 
 impl<
-        T: std::ops::SubAssign<f64>
-            + std::ops::AddAssign<f64>
-            + std::iter::Sum
-            + nalgebra::ComplexField<RealField = T>
-            + std::default::Default
-            + std::marker::Copy,
-        U: Clone,
-        V: Clone,
+        T: AddAssign<f64>
+            + Clone
+            + Copy
+            + ComplexField<RealField = T>
+            + Default
+            + SubAssign<f64>
+            + Sum,
+        U,
+        V,
         const D: usize,
     > Tds<T, U, V, D>
 where
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
-    [T; D]: Serialize + DeserializeOwned + Default,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy,
+    V: Clone + Copy,
 {
     /// The function creates a new instance of a triangulation data structure with given points, initializing the vertices and
     /// cells.
@@ -250,7 +254,7 @@ where
             // Find all cells that contain the vertex
             let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
             for cell in cells.iter() {
-                if cell.circumsphere_contains(vertex.clone()).unwrap() {
+                if cell.circumsphere_contains(*vertex).unwrap() {
                     bad_cells.push((*cell).clone());
                 }
             }
@@ -334,26 +338,31 @@ mod tests {
 
         let new_vertex1: Vertex<f64, usize, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         let _ = tds.add(new_vertex1);
+
         assert_eq!(tds.number_of_vertices(), 1);
         assert_eq!(tds.dim(), 0);
 
         let new_vertex2: Vertex<f64, usize, 3> = Vertex::new(Point::new([4.0, 5.0, 6.0]));
         let _ = tds.add(new_vertex2);
+
         assert_eq!(tds.number_of_vertices(), 2);
         assert_eq!(tds.dim(), 1);
 
         let new_vertex3: Vertex<f64, usize, 3> = Vertex::new(Point::new([7.0, 8.0, 9.0]));
         let _ = tds.add(new_vertex3);
+
         assert_eq!(tds.number_of_vertices(), 3);
         assert_eq!(tds.dim(), 2);
 
         let new_vertex4: Vertex<f64, usize, 3> = Vertex::new(Point::new([10.0, 11.0, 12.0]));
         let _ = tds.add(new_vertex4);
+
         assert_eq!(tds.number_of_vertices(), 4);
         assert_eq!(tds.dim(), 3);
 
         let new_vertex5: Vertex<f64, usize, 3> = Vertex::new(Point::new([13.0, 14.0, 15.0]));
         let _ = tds.add(new_vertex5);
+
         assert_eq!(tds.number_of_vertices(), 5);
         assert_eq!(tds.dim(), 3);
     }
@@ -366,7 +375,6 @@ mod tests {
             Point::new([7.0, 8.0, 9.0]),
             Point::new([10.0, 11.0, 12.0]),
         ];
-
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
 
         assert_eq!(tds.number_of_vertices(), 4);
@@ -375,9 +383,9 @@ mod tests {
 
         let new_vertex1: Vertex<f64, usize, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         let result = tds.add(new_vertex1);
+
         assert_eq!(tds.number_of_vertices(), 4);
         assert_eq!(tds.dim(), 3);
-
         assert!(result.is_err());
     }
 
@@ -389,9 +397,7 @@ mod tests {
             Point::new([7.0, 8.0, 9.0]),
             Point::new([10.0, 11.0, 12.0]),
         ];
-
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-
         let supercell = tds.supercell();
         let unwrapped_supercell =
             supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}", err));
@@ -414,9 +420,7 @@ mod tests {
             Point::new([7.0, 8.0, 9.0]),
             Point::new([10.0, 11.0, 12.0]),
         ];
-
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-
         let cells = tds.bowyer_watson();
         let unwrapped_cells = cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}", err));
 
@@ -435,8 +439,8 @@ mod tests {
             Point::new([13.0, 14.0, 15.0, 16.0]),
         ];
         let tds: Tds<f64, usize, usize, 4> = Tds::new(points);
-
         let serialized = serde_json::to_string(&tds).unwrap();
+
         // assert!(serialized.contains(r#""vertices":{},"cells":{}"#));
         assert!(serialized.contains("[1.0,2.0,3.0,4.0]"));
         assert!(serialized.contains("[5.0,6.0,7.0,8.0]"));
@@ -444,6 +448,7 @@ mod tests {
         assert!(serialized.contains("[13.0,14.0,15.0,16.0]"));
 
         let deserialized: Tds<f64, usize, usize, 4> = serde_json::from_str(&serialized).unwrap();
+
         assert_eq!(deserialized, tds);
 
         // Human readable output for cargo test -- --nocapture

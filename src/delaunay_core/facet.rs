@@ -20,11 +20,11 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 ///
 /// Note that `D` is the dimensionality of the `Cell` and `Vertex`;
 /// the `Facet` is one dimension less than the `Cell` (co-dimension 1).
-pub struct Facet<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
+pub struct Facet<T: Clone + Copy + Default, U, V, const D: usize>
 where
-    [T; D]: Serialize + DeserializeOwned + Default,
-    U: Clone,
-    V: Clone,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy,
+    V: Clone + Copy,
 {
     /// The `Cell` that contains this facet.
     pub cell: Cell<T, U, V, D>,
@@ -35,10 +35,10 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: std::default::Default + std::marker::Copy + std::cmp::PartialEq,
-    [T; D]: Serialize + DeserializeOwned + Default,
-    U: std::cmp::PartialEq + Clone,
-    V: Clone,
+    T: Copy + Default + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy,
 {
     /// The `new` function is a constructor for the `Facet` struct. It takes in a `Cell` and a `Vertex`
     /// as arguments and returns a `Result` containing a `Facet` struct or an error message (`&'static
@@ -143,8 +143,8 @@ mod tests {
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-
         let vertices = facet.clone().vertices();
+
         assert_eq!(vertices.len(), 3);
         assert_eq!(vertices[0], vertex2);
         assert_eq!(vertices[1], vertex3);
@@ -163,14 +163,15 @@ mod tests {
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-
         let serialized = serde_json::to_string(&facet).unwrap();
+
         assert!(serialized.contains("[1.0,0.0,0.0]"));
         assert!(serialized.contains("[0.0,1.0,0.0]"));
         assert!(serialized.contains("[0.0,0.0,1.0]"));
 
         let deserialized: Facet<f64, Option<()>, Option<()>, 3> =
             serde_json::from_str(&serialized).unwrap();
+
         assert_eq!(deserialized, facet);
 
         // Human readable output for cargo test -- --nocapture

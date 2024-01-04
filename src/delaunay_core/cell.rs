@@ -1,11 +1,10 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
 use super::{point::Point, utilities::make_uuid, vertex::Vertex};
-use crate::delaunay_core;
-use na::{Const, OPoint};
+use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{fmt::Debug, ops::Div};
+use std::{collections::HashMap, fmt::Debug, iter::Sum, ops::Div};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -23,11 +22,11 @@ use uuid::Uuid;
 /// neighbor is opposite the `i-th`` vertex.
 /// * `data`: The `data` property is an optional field that can hold a value of type `V`. It allows
 /// storage of additional data associated with the `Cell`.
-pub struct Cell<T: std::default::Default + std::marker::Copy, U, V, const D: usize>
+pub struct Cell<T: Clone + Copy + Default, U, V, const D: usize>
 where
-    [T; D]: Serialize + DeserializeOwned + Default,
-    U: Clone,
-    V: Clone,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy,
+    V: Clone + Copy,
 {
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
@@ -39,21 +38,14 @@ where
     pub data: Option<V>,
 }
 
-impl<
-        T: delaunay_core::cell::na::ComplexField<RealField = T>
-            + std::iter::Sum
-            + std::default::Default
-            + std::marker::Copy,
-        U,
-        V,
-        const D: usize,
-    > Cell<T, U, V, D>
+impl<T: Clone + ComplexField<RealField = T> + Copy + Default + Sum, U, V, const D: usize>
+    Cell<T, U, V, D>
 where
     for<'a> &'a T: Div<f64>,
     f64: From<T>,
-    [T; D]: Serialize + DeserializeOwned + Default,
-    U: Clone,
-    V: Clone,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy,
+    V: Clone + Copy,
 {
     /// The function `new` creates a new `Cell`` object with the given vertices.
     /// A D-dimensional cell has D + 1 vertices, so the number of vertices must be less than or equal to D + 1.
@@ -143,6 +135,11 @@ where
         })
     }
 
+    /// The function `into_hashmap` converts a vector of cells into a hashmap, using the cells' UUIDs as keys.
+    pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
+        cells.into_iter().map(|c| (c.uuid, c)).collect()
+    }
+
     /// The function returns the number of vertices in the `Cell`.
     ///
     /// # Returns:
@@ -186,6 +183,18 @@ where
     /// ```
     pub fn dim(&self) -> usize {
         self.vertices.len() - 1
+    }
+
+    /// The function is_valid checks if a `Cell` is valid.
+    /// struct.
+    ///
+    /// # Returns:
+    ///
+    /// True if the `Cell` is valid; the `Vertices` are correct, the `UUID` is valid and unique, the
+    /// `neighbors` contains `UUID`s of neighboring `Cell`s, and the `neighbors` are indexed such that
+    /// the index of the `Vertex` opposite the neighboring cell is the same.
+    pub fn is_valid(self) -> bool {
+        todo!("Implement is_valid for Cell")
     }
 
     /// The function `contains_vertex` checks if a given vertex is present in the Cell.
@@ -251,9 +260,9 @@ where
     /// Point<f64, D> value. If there is an error, it will return an Err variant containing an error message.
     fn circumcenter(&self) -> Result<Point<f64, D>, &'static str>
     where
-        T: Clone + Copy + PartialEq + Debug + 'static,
-        [T; D]: Serialize + DeserializeOwned + Default,
-        [f64; D]: Sized + Serialize + DeserializeOwned + Default,
+        T: Clone + Copy + Debug + PartialEq,
+        [T; D]: Default + DeserializeOwned + Serialize + Sized,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let dim = self.dim();
         if self.vertices[0].dim() != dim {
@@ -305,9 +314,9 @@ where
     /// If successful, returns an Ok containing the circumradius of the cell, otherwise returns an Err with an error message.
     fn circumradius(&self) -> Result<T, &'static str>
     where
-        T: Copy,
+        T: Clone + Copy + Default,
         OPoint<T, Const<D>>: From<[f64; D]>,
-        [f64; D]: Serialize + DeserializeOwned + Default,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
         // Change the type of vertex to match circumcenter
@@ -343,9 +352,9 @@ where
     /// ```
     pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, &'static str>
     where
-        T: Copy + PartialOrd, // Add the PartialOrd trait bound
+        T: Clone + Copy + Default + PartialOrd,
         OPoint<T, Const<D>>: From<[f64; D]>,
-        [f64; D]: Serialize + DeserializeOwned + Default,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumradius = self.circumradius()?;
         let radius = na::distance(
@@ -355,18 +364,6 @@ where
 
         Ok(circumradius >= radius)
     }
-
-    /// The function is_valid checks if a `Cell` is valid.
-    /// struct.
-    ///
-    /// # Returns:
-    ///
-    /// True if the `Cell` is valid; the `Vertices` are correct, the `UUID` is valid and unique, the
-    /// `neighbors` contains `UUID`s of neighboring `Cell`s, and the `neighbors` are indexed such that
-    /// the index of the `Vertex` opposite the neighboring cell is the same.
-    pub fn is_valid(self) -> bool {
-        todo!("Implement is_valid for Cell")
-    }
 }
 
 #[cfg(test)]
@@ -375,6 +372,48 @@ mod tests {
     use crate::delaunay_core::point::Point;
 
     use super::*;
+
+    #[test]
+    fn cell_new() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+
+        assert_eq!(cell.vertices[0], vertex1);
+        assert_eq!(cell.vertices[1], vertex2);
+        assert_eq!(cell.vertices[2], vertex3);
+        assert_eq!(cell.vertices[3], vertex4);
+        assert_eq!(cell.vertices[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices[3].data.unwrap(), 2);
+        assert_eq!(cell.dim(), 3);
+        assert_eq!(cell.number_of_vertices(), 4);
+        assert!(cell.neighbors.is_none());
+        assert!(cell.data.is_none());
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
+    }
+
+    #[test]
+    fn cell_new_with_too_many_vertices() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
+        let cell: Result<Cell<f64, i32, Option<()>, 3>, &'static str> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4, vertex5]);
+
+        assert!(cell.is_err());
+
+        // Human readable output for cargo test -- --nocapture
+        println!("{:?}", cell);
+    }
 
     #[test]
     fn cell_new_with_data() {
@@ -422,45 +461,35 @@ mod tests {
     }
 
     #[test]
-    fn cell_new() {
+    fn cell_clone() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell1: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell2 = cell1.clone();
+
+        assert_eq!(cell1, cell2);
+    }
+
+    #[test]
+    fn cell_into_hashmap() {
         let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
         let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
         let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
         let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let hashmap = Cell::into_hashmap(vec![cell.clone()]);
+        let values: Vec<Cell<f64, i32, Option<()>, 3>> = hashmap.into_values().collect();
 
-        assert_eq!(cell.vertices[0], vertex1);
-        assert_eq!(cell.vertices[1], vertex2);
-        assert_eq!(cell.vertices[2], vertex3);
-        assert_eq!(cell.vertices[3], vertex4);
-        assert_eq!(cell.vertices[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices[3].data.unwrap(), 2);
-        assert_eq!(cell.dim(), 3);
-        assert_eq!(cell.number_of_vertices(), 4);
-        assert!(cell.neighbors.is_none());
-        assert!(cell.data.is_none());
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0], cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
-    }
-
-    #[test]
-    fn cell_new_with_too_many_vertices() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
-        let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
-        let cell: Result<Cell<f64, i32, Option<()>, 3>, &'static str> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4, vertex5]);
-
-        assert!(cell.is_err());
-
-        // Human readable output for cargo test -- --nocapture
-        println!("{:?}", cell);
+        println!("values: {:?}", values);
+        println!("cells = {:?}", cell);
     }
 
     #[test]
@@ -470,6 +499,7 @@ mod tests {
         let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+
         assert_eq!(cell.number_of_vertices(), 3);
     }
 
@@ -480,6 +510,7 @@ mod tests {
         let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+
         assert_eq!(cell.dim(), 2);
     }
 
@@ -530,6 +561,7 @@ mod tests {
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
         let circumcenter = cell.circumcenter();
+
         assert!(circumcenter.is_err());
     }
 
@@ -545,9 +577,7 @@ mod tests {
         let vertex4 = Vertex::new_with_data(point4, 2);
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-
         let circumradius = cell.circumradius().unwrap();
-
         let radius: f64 = 3.0_f64.sqrt() / 2.0;
 
         assert_eq!(circumradius, radius);
@@ -568,7 +598,6 @@ mod tests {
         let vertex4 = Vertex::new_with_data(point4, 2);
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-
         let vertex5 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 3);
 
         assert!(cell.circumsphere_contains(vertex5).unwrap());
@@ -589,7 +618,6 @@ mod tests {
         let vertex4 = Vertex::new_with_data(point4, 2);
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-
         let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
 
         assert!(!cell.circumsphere_contains(vertex5).unwrap());
@@ -606,8 +634,8 @@ mod tests {
         let vertex4 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-
         let serialized = serde_json::to_string(&cell).unwrap();
+
         assert!(serialized.contains("[0.0,0.0,1.0]"));
         assert!(serialized.contains("[0.0,1.0,0.0]"));
         assert!(serialized.contains("[1.0,0.0,0.0]"));
@@ -615,6 +643,7 @@ mod tests {
 
         let deserialized: Cell<f64, Option<()>, Option<()>, 3> =
             serde_json::from_str(&serialized).unwrap();
+
         assert_eq!(deserialized, cell);
 
         // Human readable output for cargo test -- --nocapture
