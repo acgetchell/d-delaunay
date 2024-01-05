@@ -2,15 +2,14 @@
 //!
 //! Intended to match functionality of [CGAL Triangulations](https://doc.cgal.org/latest/Triangulation/index.html).
 
-use super::utilities::find_extreme_coordinates;
-use super::{cell::Cell, point::Point, vertex::Vertex};
+use super::{cell::Cell, point::Point, utilities::find_extreme_coordinates, vertex::Vertex};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::cmp::{Ordering, PartialEq};
+use std::cmp::{min, Ordering, PartialEq};
+use std::collections::HashMap;
 use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
-use std::{cmp::min, collections::HashMap};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]

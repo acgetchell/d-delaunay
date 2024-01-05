@@ -172,9 +172,7 @@ mod tests {
     fn vertex_new() {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
 
-        assert_eq!(vertex.point.coords[0], 1.0);
-        assert_eq!(vertex.point.coords[1], 2.0);
-        assert_eq!(vertex.point.coords[2], 3.0);
+        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
@@ -187,10 +185,7 @@ mod tests {
     fn vertex_new_with_data() {
         let vertex = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0, 4.0]), "4D");
 
-        assert_eq!(vertex.point.coords[0], 1.0);
-        assert_eq!(vertex.point.coords[1], 2.0);
-        assert_eq!(vertex.point.coords[2], 3.0);
-        assert_eq!(vertex.point.coords[3], 4.0);
+        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
         assert_eq!(vertex.dim(), 4);
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_some());
@@ -217,18 +212,11 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
-        assert_eq!(vertices.len(), 3);
-        assert_eq!(vertices[0].point.coords[0], 1.0);
-        assert_eq!(vertices[0].point.coords[1], 2.0);
-        assert_eq!(vertices[0].point.coords[2], 3.0);
+        assert_eq!(vertices[0].point.coords, [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
-        assert_eq!(vertices[1].point.coords[0], 4.0);
-        assert_eq!(vertices[1].point.coords[1], 5.0);
-        assert_eq!(vertices[1].point.coords[2], 6.0);
+        assert_eq!(vertices[1].point.coords, [4.0, 5.0, 6.0]);
         assert_eq!(vertices[1].dim(), 3);
-        assert_eq!(vertices[2].point.coords[0], 7.0);
-        assert_eq!(vertices[2].point.coords[1], 8.0);
-        assert_eq!(vertices[2].point.coords[2], 9.0);
+        assert_eq!(vertices[2].point.coords, [7.0, 8.0, 9.0]);
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture

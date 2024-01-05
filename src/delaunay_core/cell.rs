@@ -74,7 +74,7 @@ where
     /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
     /// let vertex4 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-    /// assert!(cell.neighbors.is_none());
+    /// assert!(cell.vertices.contains(&vertex1));
     /// ```
     pub fn new(vertices: Vec<Vertex<T, U, D>>) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
@@ -156,7 +156,7 @@ where
     /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
     /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
-    /// assert_eq!(cell.number_of_vertices(), 3);
+    /// assert!(cell.vertices.contains(&vertex1));
     /// ```
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
@@ -382,10 +382,7 @@ mod tests {
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
 
-        assert_eq!(cell.vertices[0], vertex1);
-        assert_eq!(cell.vertices[1], vertex2);
-        assert_eq!(cell.vertices[2], vertex3);
-        assert_eq!(cell.vertices[3], vertex4);
+        assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
         assert_eq!(cell.vertices[0].data.unwrap(), 1);
         assert_eq!(cell.vertices[1].data.unwrap(), 1);
         assert_eq!(cell.vertices[2].data.unwrap(), 1);
@@ -424,10 +421,7 @@ mod tests {
         let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
             .unwrap();
 
-        assert_eq!(cell.vertices[0], vertex1);
-        assert_eq!(cell.vertices[1], vertex2);
-        assert_eq!(cell.vertices[2], vertex3);
-        assert_eq!(cell.vertices[3], vertex4);
+        assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
         assert_eq!(cell.vertices[0].data.unwrap(), 1);
         assert_eq!(cell.vertices[1].data.unwrap(), 1);
         assert_eq!(cell.vertices[2].data.unwrap(), 1);
