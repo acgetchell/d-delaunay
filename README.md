@@ -1,5 +1,6 @@
 # d-delaunay
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/7aa30658ae7844f18dec7217607aa9c2)](https://app.codacy.com/gh/acgetchell/d-delaunay?utm_source=github.com&utm_medium=referral&utm_content=acgetchell/d-delaunay&utm_campaign=Badge_Grade)
 [![CI](https://github.com/acgetchell/d-delaunay/actions/workflows/ci.yml/badge.svg)](https://github.com/acgetchell/d-delaunay/actions/workflows/ci.yml)
 [![rust-clippy analyze](https://github.com/acgetchell/d-delaunay/actions/workflows/rust-clippy.yml/badge.svg)](https://github.com/acgetchell/d-delaunay/actions/workflows/rust-clippy.yml)
 [![codecov](https://codecov.io/gh/acgetchell/d-delaunay/graph/badge.svg?token=WT7qZGT9bO)](https://codecov.io/gh/acgetchell/d-delaunay)
