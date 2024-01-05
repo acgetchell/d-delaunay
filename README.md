@@ -9,21 +9,28 @@ D-dimensional Delaunay triangulations in [Rust], inspired by [CGAL].
 
 ## Introduction
 
-This library implements d-dimensional Delaunay triangulations in [Rust]. It is inspired by the [CGAL] library, which is a C++ library for computational geometry; and [Spade], a Rust library
-implementing 2D Delaunay triangulations, Constrained Delaunay triangulations, and Voronoi diagrams. The eventual goal of this library is to provide a lightweight alternative to [CGAL] for the [Rust]
-ecosystem.
-
-At some point I may merge it into another library, such as [Spade], or [delaunay], but for now I am developing this library without trying to figure out how to fit it into other coding styles and with the minimum number of traits to do generic mathematics.
+This library implements d-dimensional Delaunay triangulations in [Rust]. It is inspired by [CGAL], which is a [C++]
+library for computational geometry; and [Spade], a [Rust] library implementing 2D [Delaunay triangulations],
+[Constrained Delaunay triangulations], and [Voronoi diagrams]. The eventual goal of this library is to provide a
+lightweight alternative to [CGAL] for the [Rust] ecosystem.
 
 ## Features
 
 - [ ] d-dimensional [Delaunay triangulations]
 - [x] Arbitrary data types associated with vertices and cells
-- [x] Serialization/Deserialization with [serde]
+- [x] Serialization/Deserialization of all data structures to/from [JSON]
+
+At some point I may merge it into another library, such as [Spade], or [delaunay], but for now I am developing
+this to use in my [research] without trying to figure out how to fit it into other libraries and with the
+minimum number of traits to do generic computational geometry.
 
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/
+[C++]: https://isocpp.org
 [Spade]: https://github.com/Stoeoef/spade
 [delaunay]: https://crates.io/crates/delaunay
-[serde]: https://serde.rs
+[JSON]: https://www.json.org/json-en.html
 [Delaunay triangulations]: https://en.wikipedia.org/wiki/Delaunay_triangulation
+[Constrained Delaunay triangulations]: https://en.wikipedia.org/wiki/Constrained_Delaunay_triangulation
+[Voronoi diagrams]: https://en.wikipedia.org/wiki/Voronoi_diagram
+[research]: https://github.com/acgetchell/cdt-rs
