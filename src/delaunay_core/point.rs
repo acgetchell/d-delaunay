@@ -3,14 +3,15 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
-/// The `Point` struct represents a point in a D-dimensional space, where the coordinates are of type
-/// `T`.
+/// The `Point` struct represents a point in a D-dimensional space, where the
+/// coordinates are of type `T`.
 ///
 /// # Properties:
 ///
-/// * `coords`: `coords` is a public property of the `Point`. It is an array of type `T` with a
-/// length of `D`. The type `T` is a generic type parameter, which means it can be any type. The length
-/// `D` is a constant unsigned integer, which means it cannot be changed and is known at compile time.
+/// * `coords`: `coords` is a public property of the `Point`. It is an array of
+/// type `T` with a length of `D`. The type `T` is a generic type parameter,
+/// which means it can be any type. The length `D` is a constant unsigned
+/// integer, which means it cannot be changed and is known at compile time.
 pub struct Point<T: Clone + Copy + Default, const D: usize>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -36,11 +37,13 @@ impl<T: Clone + Copy + Default, const D: usize> Point<T, D>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function `new` creates a new instance of a `Point` with the given coordinates.
+    /// The function `new` creates a new instance of a `Point` with the given
+    /// coordinates.
     ///
     /// # Arguments:
     ///
-    /// * `coords`: The `coords` parameter is an array of type `T` with a length of `D`.
+    /// * `coords`: The `coords` parameter is an array of type `T` with a
+    /// length of `D`.
     ///
     /// # Returns:
     ///
@@ -61,7 +64,8 @@ where
     ///
     /// # Returns:
     ///
-    /// The `dim` function returns the value of `D`, which the number of coordinates.
+    /// The `dim` function returns the value of `D`, which the number of
+    /// coordinates.
     ///
     /// # Example
     ///

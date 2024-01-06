@@ -1,6 +1,7 @@
 //! Data and operations on d-dimensional triangulation data structures.
 //!
-//! Intended to match functionality of [CGAL Triangulations](https://doc.cgal.org/latest/Triangulation/index.html).
+//! Intended to match functionality of the
+//! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
 
 use super::{cell::Cell, point::Point, utilities::find_extreme_coordinates, vertex::Vertex};
 use na::{ComplexField, Const, OPoint};
@@ -13,42 +14,49 @@ use std::ops::{AddAssign, Div, SubAssign};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-/// The `Tds` struct represents a triangulation data structure with vertices and cells, where the vertices
-/// and cells are identified by UUIDs.
+/// The `Tds` struct represents a triangulation data structure with vertices
+/// and cells, where the vertices and cells are identified by UUIDs.
 ///
 /// # Properties:
 ///
-/// * `vertices`: A HashMap that stores vertices with their corresponding UUIDs as keys. Each `Vertex` has
-/// a `Point` of type T, vertex data of type U, and a constant D representing the dimension.
-/// * `cells`: The `cells` property is a `HashMap` that stores `Cell` objects. Each `Cell` has
-/// one or more `Vertex<T, U, D>` with cell data of type V. Note the dimensionality of the cell may differ
-/// from D, though the TDS only stores cells of maximal dimensionality D and infers other lower dimensional
-/// cells from the maximal cells and their vertices.
+/// * `vertices`: A `HashMap` that stores vertices with their corresponding
+/// `Uuid`s as keys. Each `Vertex` has a `Point` of type T, vertex data of type
+///  U, and a constant D representing the dimension.
+/// * `cells`: The `cells` property is a `HashMap` that stores `Cell` objects.
+/// Each `Cell` has one or more `Vertex<T, U, D>` with cell data of type V.
+/// Note the dimensionality of the cell may differ from D, though the `Tds`
+/// only stores cells of maximal dimensionality D and infers other lower
+/// dimensional cells (cf. `Facet`) from the maximal cells and their vertices.
 ///
 /// For example, in 3 dimensions:
 ///
 /// * A 0-dimensional cell is a `Vertex`.
-/// * A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two `Vertex` endpoints.
-/// * A 2-dimensional cell is a `Facet` given by the `Tetrahedron` and the opposite `Vertex`.
+/// * A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
+/// `Vertex` endpoints.
+/// * A 2-dimensional cell is a `Facet` given by the `Tetrahedron` and the
+/// opposite `Vertex`.
 /// * A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
 ///
 /// A similar pattern holds for higher dimensions.
 ///
-/// In general, vertices are embedded into D-dimensional Euclidean space, and so the `Tds` is a finite simplicial complex.
+/// In general, vertices are embedded into D-dimensional Euclidean space,
+/// and so the `Tds` is a finite simplicial complex.
 pub struct Tds<T: Clone + Copy + Default, U, V, const D: usize>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
     U: Clone + Copy,
     V: Clone + Copy,
 {
-    /// A HashMap that stores vertices with their corresponding UUIDs as keys.
-    /// Each `Vertex` has a `Point` of type T, vertex data of type U, and a constant D representing the dimension.
+    /// A `HashMap` that stores vertices with their corresponding `Uuid`s as
+    /// keys. Each `Vertex` has a `Point` of type T, vertex data of type U,
+    /// and a constant D representing the dimension.
     pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
 
-    /// The `cells` property is a `HashMap` that stores `Cell` objects.
+    /// A `HashMap` that stores `Cell` objects.
     /// Each `Cell` has one or more `Vertex<T, U, D>` with cell data of type V.
-    /// Note the dimensionality of the cell may differ from D, though the TDS only stores cells of maximal dimensionality D
-    /// and infers other lower dimensional cells from the maximal cells and their vertices.
+    /// Note the dimensionality of the cell may differ from D, though the TDS
+    /// only stores cells of maximal dimensionality D and infers other lower
+    /// dimensional cells from the maximal cells and their vertices.
     pub cells: HashMap<Uuid, Cell<T, U, V, D>>,
 }
 
@@ -71,16 +79,18 @@ where
     U: Clone + Copy,
     V: Clone + Copy,
 {
-    /// The function creates a new instance of a triangulation data structure with given points, initializing the vertices and
-    /// cells.
+    /// The function creates a new instance of a triangulation data structure
+    /// with given points, initializing the vertices and cells.
     ///
     /// # Arguments:
     ///
-    /// * `points`: A vector of points with which to initialize the triangulation.
+    /// * `points`: A vector of points with which to initialize the
+    /// triangulation.
     ///
     /// # Returns:
     ///
-    /// A delaunay triangulation with cells and neighbors aligned, and vertices associated with cells.
+    /// A Delaunay triangulation with cells and neighbors aligned, and vertices
+    /// associated with cells.
     pub fn new(points: Vec<Point<T, D>>) -> Self {
         // handle case where vertices are constructed with data
         let vertices = Vertex::into_hashmap(Vertex::from_points(points));
@@ -93,8 +103,8 @@ where
         Self { vertices, cells }
     }
 
-    /// The `add` function checks if a vertex with the same coordinates already exists in a hashmap, and
-    /// if not, inserts the vertex into the hashmap.
+    /// The `add` function checks if a vertex with the same coordinates already
+    /// exists in a hashmap, and if not, inserts the vertex into the hashmap.
     ///
     /// # Arguments:
     ///
@@ -102,8 +112,9 @@ where
     ///
     /// # Returns:
     ///
-    /// The function `add` returns `Ok(())` if the vertex was successfully added to the hashmap, or
-    /// an error message if the vertex already exists or if there is a uuid collision.
+    /// The function `add` returns `Ok(())` if the vertex was successfully
+    /// added to the `HashMap``, or an error message if the vertex already
+    /// exists or if there is a `Uuid` collision.
     ///
     /// # Example:
     ///
@@ -124,21 +135,23 @@ where
         // Don't add if vertex with that point already exists
         for val in self.vertices.values() {
             if val.point.coords == vertex.point.coords {
-                return Err("Vertex already exists");
+                return Err("Vertex already exists!");
             }
         }
 
-        // Hashmap::insert returns the old value if the key already exists and updates it with the new value
+        // Hashmap::insert returns the old value if the key already exists and
+        // updates it with the new value
         let result = self.vertices.insert(vertex.uuid, vertex);
 
         // Return an error if there is a uuid collision
         match result {
-            Some(_) => Err("Uuid already exists"),
+            Some(_) => Err("Uuid already exists!"),
             None => Ok(()),
         }
     }
 
-    /// The function returns the number of vertices in the triangulation data structure.
+    /// The function returns the number of vertices in the triangulation
+    /// data structure.
     ///
     /// # Returns:
     ///
@@ -160,12 +173,13 @@ where
         self.vertices.len()
     }
 
-    /// The `dim` function returns the dimensionality of the triangulation data structure.
+    /// The `dim` function returns the dimensionality of the triangulation
+    /// data structure.
     ///
     /// # Returns:
     ///
-    /// The `dim` function returns the minimum value between the number of vertices minus one and the
-    /// value of `D` as an `i32`.
+    /// The `dim` function returns the minimum value between the number of
+    /// vertices minus one and the value of `D` as an `i32`.
     ///
     /// # Example:
     ///
@@ -180,7 +194,8 @@ where
         min(len - 1, D as i32)
     }
 
-    /// The function `number_of_cells` returns the number of cells in a triangulation data structure.
+    /// The function `number_of_cells` returns the number of cells in the
+    /// triangulation data structure.
     ///
     /// # Returns:
     ///
@@ -189,8 +204,8 @@ where
         self.cells.len()
     }
 
-    /// The `supercell` function creates a larger cell that contains all the input vertices,
-    /// with some padding added.
+    /// The `supercell` function creates a larger cell that contains all the
+    /// input vertices, with some padding added.
     ///
     /// # Returns:
     ///
@@ -219,7 +234,8 @@ where
         let max_vector: na::SMatrix<T, D, 1> = na::Matrix::from(max_coords);
         let max_point_coords: na::SMatrix<T, D, D> = na::Matrix::from_diagonal(&max_vector);
 
-        // Create new maximal vertices for the supercell from slices of the max_point_coords matrix
+        // Create new maximal vertices for the supercell from slices of the
+        // max_point_coords matrix
         for row in max_point_coords.row_iter() {
             let mut row_vec: Vec<T> = Vec::new();
             for elem in row.iter() {
@@ -399,7 +415,7 @@ mod tests {
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let supercell = tds.supercell();
         let unwrapped_supercell =
-            supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}", err));
+            supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}!", err));
 
         assert_eq!(unwrapped_supercell.vertices.len(), 4);
         assert!(unwrapped_supercell
@@ -421,7 +437,8 @@ mod tests {
         ];
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let cells = tds.bowyer_watson();
-        let unwrapped_cells = cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}", err));
+        let unwrapped_cells =
+            cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}!", err));
 
         assert_eq!(unwrapped_cells.len(), 1);
 

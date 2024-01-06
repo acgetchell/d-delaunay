@@ -9,7 +9,8 @@
 //! * Arbitrary data types associated with vertices and cells
 //! * Serialization/Deserialization with [serde](https://serde.rs)
 
-/// The main module of the library. This module contains the public interface for the library.
+/// The main module of the library. This module contains the public interface
+/// for the library.
 pub mod delaunay_core {
     pub mod cell;
     pub mod facet;
@@ -20,7 +21,8 @@ pub mod delaunay_core {
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
-/// Traits are checked at compile time, so this function is only used for testing.
+/// Traits are checked at compile time, so this function is only used for
+/// testing.
 #[allow(clippy::extra_unused_type_parameters)]
 fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true

@@ -10,8 +10,8 @@ use uuid::Uuid;
 ///
 /// # Returns:
 ///
-/// a randomly generated UUID (Universally Unique Identifier) using the `new_v4` method from the `Uuid`
-/// struct.
+/// a randomly generated UUID (Universally Unique Identifier) using the
+/// `new_v4` method from the `Uuid` struct.
 ///
 /// # Example
 ///
@@ -24,20 +24,23 @@ pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }
 
-/// The function `find_extreme_coordinates` takes a hashmap of vertices and returns the minimum or
-/// maximum coordinates based on the specified ordering.
+/// The function `find_extreme_coordinates` takes a `HashMap` of vertices and
+/// returns the minimum or maximum coordinates based on the specified
+/// ordering.
 ///
 /// # Arguments:
 ///
-/// * `vertices`: A HashMap containing vertices, where the key is a Uuid and the value is a Vertex
-/// struct.
-/// * `ordering`: The `ordering` parameter is of type `Ordering` and is used to specify whether the
-/// function should find the minimum or maximum coordinates. `Ordering` is an enum with three possible
-/// values: `Less`, `Equal`, and `Greater`.
+/// * `vertices`: A HashMap containing vertices, where the key is a `Uuid` and
+/// the value is a Vertex struct.
+/// * `ordering`: The `ordering` parameter is of type `Ordering` and is used to
+/// specify whether the function should find the minimum or maximum
+/// coordinates. `Ordering` is an enum with three possible values: `Less`,
+/// `Equal`, and `Greater`.
 ///
 /// # Returns:
 ///
-/// an array of type `T` with length `D` containing the minimum or maximum coordinate for each dimension.
+/// an array of type `T` with length `D` containing the minimum or maximum
+/// coordinate for each dimension.
 ///
 /// # Example
 ///

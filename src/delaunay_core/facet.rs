@@ -1,9 +1,10 @@
 //! A facet is a d-1 sub-simplex of a d-dimensional simplex.
-//! It is defined in terms of a cell and the vertex in the cell opposite to it, as per
-//! [CGAL](https://doc.cgal.org/latest/TDS_3/index.html#title3).
-//! This provides convenience methods used in the [Bowyer-Watson algorithm](https://en.wikipedia.org/wiki/Bowyer–Watson_algorithm).
-//! Facets are not stored in the `Triangulation Data Structure` (TDS) directly, but created
-//! on the fly when needed.
+//! It is defined in terms of a cell and the vertex in the cell opposite to it,
+//! as per [CGAL](https://doc.cgal.org/latest/TDS_3/index.html#title3).
+//! This provides convenience methods used in the
+//! [Bowyer-Watson algorithm](https://en.wikipedia.org/wiki/Bowyer–Watson_algorithm).
+//! Facets are not stored in the `Triangulation Data Structure` (TDS)
+//! directly, but created on the fly when needed.
 
 use super::{cell::Cell, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -40,9 +41,9 @@ where
     U: Clone + Copy + PartialEq,
     V: Clone + Copy,
 {
-    /// The `new` function is a constructor for the `Facet` struct. It takes in a `Cell` and a `Vertex`
-    /// as arguments and returns a `Result` containing a `Facet` struct or an error message (`&'static
-    /// str`).
+    /// The `new` function is a constructor for the `Facet` struct. It takes
+    /// in a `Cell` and a `Vertex` as arguments and returns a `Result`
+    /// containing a `Facet` struct or an error message (`&'static str`).
     ///
     /// # Arguments
     ///
@@ -51,8 +52,8 @@ where
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `Facet` struct or an error message as to why the `Facet` could not be
-    /// created.
+    /// A `Result` containing a `Facet` struct or an error message as to why
+    /// the `Facet` could not be created.
     ///
     /// # Example
     ///
@@ -71,18 +72,18 @@ where
     /// ```
     pub fn new(cell: Cell<T, U, V, D>, vertex: Vertex<T, U, D>) -> Result<Self, &'static str> {
         if !cell.vertices.contains(&vertex) {
-            return Err("The cell does not contain the vertex.");
+            return Err("The cell does not contain the vertex!");
         }
 
         if cell.vertices.len() == 1 {
-            return Err("The cell is a 0-simplex with no facet.");
+            return Err("The cell is a 0-simplex with no facet!");
         }
 
         Ok(Facet { cell, vertex })
     }
 
-    /// The `vertices` method in the `Facet` struct returns a vector of `Vertices` that are in
-    /// the facet.
+    /// The `vertices` method in the `Facet` struct returns a vector of
+    /// `Vertices` that are in the facet.
     pub fn vertices(&mut self) -> Vec<Vertex<T, U, D>> {
         let mut vertices = self.cell.clone().vertices;
         vertices.retain(|v| *v != self.vertex);
