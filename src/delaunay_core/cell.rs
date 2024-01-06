@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, iter::Sum, ops::Div};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
 /// The `Cell` struct represents a d-dimensional
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.

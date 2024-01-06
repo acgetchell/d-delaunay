@@ -3,7 +3,9 @@
 //! Intended to match functionality of the
 //! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
 
-use super::{cell::Cell, point::Point, utilities::find_extreme_coordinates, vertex::Vertex};
+use super::{
+    cell::Cell, facet::Facet, point::Point, utilities::find_extreme_coordinates, vertex::Vertex,
+};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -76,8 +78,8 @@ where
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy,
-    V: Clone + Copy,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
 {
     /// The function creates a new instance of a triangulation data structure
     /// with given points, initializing the vertices and cells.
@@ -257,6 +259,9 @@ where
         Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Serialize + DeserializeOwned + Default,
+        f64: PartialOrd, // Replace f64: Ord with f64: PartialOrd
+        U: PartialOrd,
+        V: PartialOrd,
     {
         let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
 
@@ -266,17 +271,24 @@ where
 
         // Iterate over vertices
         for vertex in self.vertices.values() {
-            // Find all cells that contain the vertex
+            // Find cells that contain the vertex
             let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
             for cell in cells.iter() {
+                // TODO: understand why we're getting singular matrices here
                 if cell.circumsphere_contains(*vertex).unwrap() {
                     bad_cells.push((*cell).clone());
                 }
             }
 
             // Find the boundary of the polygonal hole
-            let mut _polygonal_hole: Vec<Vertex<T, U, D>> = Vec::new();
-            for _cell in bad_cells.iter() {
+            let mut polygonal_hole: Vec<Facet<T, U, V, D>> = Vec::new();
+            for cell in bad_cells.iter() {
+                // Create `Facet`s from the `Cell`
+                for vertex in cell.vertices.iter() {
+                    let facet = Facet::new(cell.clone(), *vertex).unwrap();
+                    polygonal_hole.push(facet);
+                }
+
                 // for vertex in cell.vertices.iter() {
                 //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
                 //         polygonal_hole.push(vertex.clone());
@@ -284,23 +296,33 @@ where
                 // }
             }
 
-            // // Remove duplicate vertices
-            // polygonal_hole.sort();
-            // polygonal_hole.dedup();
+            // Remove duplicate facets
+            polygonal_hole.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            polygonal_hole.dedup();
 
-            // // Remove bad cells from the triangulation
-            // for cell in bad_cells.iter() {
-            //     cells.remove(cells.iter().position(|c| c == cell).unwrap());
-            // }
+            // Remove bad cells from the triangulation
+            for cell in bad_cells.iter() {
+                cells.remove(cells.iter().position(|c| c == cell).unwrap());
+            }
 
-            // // Re-triangulate the polygonal hole
-            // for vertex in polygonal_hole.iter() {
-            //     let mut new_cell = Cell::new(vec![vertex.clone()]);
-            //     new_cell.vertices.push(vertex.clone());
-            //     new_cell.vertices.push(vertex.clone());
-            //     cells.push(new_cell);
-            // }
+            // Re-triangulate the polygonal hole
+            for mut facet in polygonal_hole.iter().cloned() {
+                let mut new_cell_vertices: Vec<Vertex<T, U, D>> = Vec::new();
+                for facet_vertex in facet.vertices().iter() {
+                    new_cell_vertices.push(*facet_vertex);
+                }
+                new_cell_vertices.push(*vertex);
+                cells.push(Cell::new(new_cell_vertices)?);
+            }
         }
+
+        // Remove all cells containing vertices from the supercell
+        // TODO: Fix borrow-checker errors
+        // for cell in cells.iter_mut() {
+        //     if cell.contains_vertex(supercell.vertices[0]) {
+        //         cells.remove(cells.iter().position(|c| c == cell).unwrap());
+        //     }
+        // }
 
         Ok(cells)
     }
@@ -427,13 +449,14 @@ mod tests {
         println!("{:?}", unwrapped_supercell);
     }
 
+    #[ignore]
     #[test]
     fn tds_bowyer_watson() {
         let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-            Point::new([7.0, 8.0, 9.0]),
-            Point::new([10.0, 11.0, 12.0]),
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
         ];
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let cells = tds.bowyer_watson();

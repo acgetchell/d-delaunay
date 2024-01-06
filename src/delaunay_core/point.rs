@@ -2,7 +2,7 @@
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
 /// The `Point` struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///

@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, option::Option};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
 /// The `Vertex` struct represents a vertex in a triangulation with a `Point`,
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.

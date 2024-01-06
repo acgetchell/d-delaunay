@@ -23,10 +23,10 @@ the [Rust] ecosystem.
 - [x] Arbitrary data types associated with vertices and cells
 - [x] Serialization/Deserialization of all data structures to/from [JSON]
 
-At some point I may merge it into another library, such as [Spade], or
-[delaunay], but for now I am developing this to use in my [research] without
-trying to figure out how to fit it into other libraries and with the
-minimum number of traits to do generic computational geometry.
+At some point I may merge into another library, such as [Spade] or [delaunay],
+but for now I am developing this to use in my [research] without trying to
+figure out how to mesh with other libraries and coding conventions, and with
+the minimum number of [traits] to do generic computational geometry.
 
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/
@@ -38,3 +38,4 @@ minimum number of traits to do generic computational geometry.
 [Constrained Delaunay triangulations]: https://en.wikipedia.org/wiki/Constrained_Delaunay_triangulation
 [Voronoi diagrams]: https://en.wikipedia.org/wiki/Voronoi_diagram
 [research]: https://github.com/acgetchell/cdt-rs
+[traits]: https://doc.rust-lang.org/book/ch10-02-traits.html
