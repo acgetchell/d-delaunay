@@ -28,8 +28,8 @@ use uuid::Uuid;
 pub struct Cell<T: Clone + Copy + Default, U, V, const D: usize>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy,
-    V: Clone + Copy,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
 {
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
@@ -47,8 +47,8 @@ where
     for<'a> &'a T: Div<f64>,
     f64: From<T>,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy,
-    V: Clone + Copy,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
 {
     /// The function `new` creates a new `Cell`` object with the given
     /// vertices. A D-dimensional cell has D + 1 vertices, so the number of

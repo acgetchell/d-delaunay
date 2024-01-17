@@ -46,8 +46,8 @@ use uuid::Uuid;
 pub struct Tds<T: Clone + Copy + Default, U, V, const D: usize>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy,
-    V: Clone + Copy,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
 {
     /// A `HashMap` that stores vertices with their corresponding `Uuid`s as
     /// keys. Each `Vertex` has a `Point` of type T, vertex data of type U,
@@ -267,7 +267,7 @@ where
 
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-        cells.push(supercell);
+        cells.push(supercell.clone());
 
         // Iterate over vertices
         for vertex in self.vertices.values() {
@@ -275,7 +275,7 @@ where
             let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
             for cell in cells.iter() {
                 // TODO: understand why we're getting singular matrices here
-                if cell.circumsphere_contains(*vertex).unwrap() {
+                if cell.circumsphere_contains(*vertex)? {
                     bad_cells.push((*cell).clone());
                 }
             }
@@ -285,7 +285,7 @@ where
             for cell in bad_cells.iter() {
                 // Create `Facet`s from the `Cell`
                 for vertex in cell.vertices.iter() {
-                    let facet = Facet::new(cell.clone(), *vertex).unwrap();
+                    let facet = Facet::new(cell.clone(), *vertex)?;
                     polygonal_hole.push(facet);
                 }
 
@@ -317,12 +317,8 @@ where
         }
 
         // Remove all cells containing vertices from the supercell
-        // TODO: Fix borrow-checker errors
-        // for cell in cells.iter_mut() {
-        //     if cell.contains_vertex(supercell.vertices[0]) {
-        //         cells.remove(cells.iter().position(|c| c == cell).unwrap());
-        //     }
-        // }
+        cells
+            .retain(|c| !c.contains_vertex(supercell.vertices.clone().into_iter().next().unwrap()));
 
         Ok(cells)
     }
@@ -453,15 +449,14 @@ mod tests {
     #[test]
     fn tds_bowyer_watson() {
         let points = vec![
-            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 1.0, 1.0]),
             Point::new([1.0, 0.0, 0.0]),
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let cells = tds.bowyer_watson();
-        let unwrapped_cells =
-            cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}!", err));
+        let unwrapped_cells = cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}", err));
 
         assert_eq!(unwrapped_cells.len(), 1);
 

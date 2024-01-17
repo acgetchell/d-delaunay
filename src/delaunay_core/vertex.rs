@@ -25,7 +25,7 @@ use uuid::Uuid;
 pub struct Vertex<T: Clone + Copy + Default, U, const D: usize>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy,
+    U: Clone + Copy + PartialEq,
 {
     /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
@@ -40,7 +40,7 @@ where
 impl<T: Clone + Copy + Default, U, const D: usize> Vertex<T, U, D>
 where
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy,
+    U: Clone + Copy + PartialEq,
 {
     /// The function creates a new instance of a `Vertex`.
     ///
