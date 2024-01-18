@@ -66,8 +66,8 @@ pub fn find_extreme_coordinates<T, U, const D: usize>(
 ) -> [T; D]
 where
     T: Clone + Copy + Default + PartialOrd,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
     U: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     let mut min_coords = [Default::default(); D];
 

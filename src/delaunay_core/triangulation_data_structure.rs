@@ -43,11 +43,12 @@ use uuid::Uuid;
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space,
 /// and so the `Tds` is a finite simplicial complex.
-pub struct Tds<T: Clone + Copy + Default, U, V, const D: usize>
+pub struct Tds<T, U, V, const D: usize>
 where
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + PartialEq,
     V: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// A `HashMap` that stores vertices with their corresponding `Uuid`s as
     /// keys. Each `Vertex` has a `Point` of type T, vertex data of type U,
@@ -62,24 +63,21 @@ where
     pub cells: HashMap<Uuid, Cell<T, U, V, D>>,
 }
 
-impl<
-        T: AddAssign<f64>
-            + Clone
-            + Copy
-            + ComplexField<RealField = T>
-            + Default
-            + SubAssign<f64>
-            + Sum,
-        U,
-        V,
-        const D: usize,
-    > Tds<T, U, V, D>
+impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
+    T: AddAssign<f64>
+        + Clone
+        + Copy
+        + ComplexField<RealField = T>
+        + Default
+        + PartialOrd
+        + SubAssign<f64>
+        + Sum,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
 {
     /// The function creates a new instance of a triangulation data structure
     /// with given points, initializing the vertices and cells.
@@ -449,7 +447,7 @@ mod tests {
     #[test]
     fn tds_bowyer_watson() {
         let points = vec![
-            Point::new([1.0, 1.0, 1.0]),
+            Point::new([0.0, 0.0, 0.0]),
             Point::new([1.0, 0.0, 0.0]),
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),

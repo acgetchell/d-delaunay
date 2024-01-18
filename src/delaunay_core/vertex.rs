@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, option::Option};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
 /// The `Vertex` struct represents a vertex in a triangulation with a `Point`,
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.
@@ -22,10 +22,11 @@ use uuid::Uuid;
 /// calculated by the `delaunay_core::triangulation_data_structure::Tds`.
 /// * `data`: The `data` property is an optional field that can hold any
 /// type `U`. It is used to store additional data associated with the vertex.
-pub struct Vertex<T: Clone + Copy + Default, U, const D: usize>
+pub struct Vertex<T, U, const D: usize>
 where
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + PartialEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
@@ -37,10 +38,11 @@ where
     pub data: Option<U>,
 }
 
-impl<T: Clone + Copy + Default, U, const D: usize> Vertex<T, U, D>
+impl<T, U, const D: usize> Vertex<T, U, D>
 where
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + PartialEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function creates a new instance of a `Vertex`.
     ///
@@ -173,6 +175,34 @@ where
         todo!("Implement is_valid for Vertex")
     }
 }
+
+impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + PartialEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.point == other.point
+        // && self.uuid == other.uuid
+        // && self.incident_cell == other.incident_cell
+        // && self.data == other.data
+    }
+}
+
+impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + PartialEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.point.partial_cmp(&other.point)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -276,5 +306,24 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Serialized: {:?}", serialized);
+    }
+
+    #[test]
+    fn vertex_partial_eq() {
+        let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 4.0]));
+
+        assert_eq!(vertex1, vertex2);
+        assert_ne!(vertex1, vertex3);
+    }
+
+    #[test]
+    fn vertex_partial_ord() {
+        let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 4.0]));
+
+        assert!(vertex1 < vertex2);
+        assert!(vertex2 > vertex1);
     }
 }

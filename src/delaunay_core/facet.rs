@@ -21,11 +21,12 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 ///
 /// Note that `D` is the dimensionality of the `Cell` and `Vertex`;
 /// the `Facet` is one dimension less than the `Cell` (co-dimension 1).
-pub struct Facet<T: Clone + Copy + Default, U, V, const D: usize>
+pub struct Facet<T, U, V, const D: usize>
 where
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + PartialEq,
     V: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// The `Cell` that contains this facet.
     pub cell: Cell<T, U, V, D>,
@@ -36,10 +37,10 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: Copy + Default + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + PartialEq,
     V: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// The `new` function is a constructor for the `Facet` struct. It takes
     /// in a `Cell` and a `Vertex` as arguments and returns a `Result`

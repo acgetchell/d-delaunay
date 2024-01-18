@@ -25,11 +25,12 @@ use uuid::Uuid;
 /// `i-th`` vertex.
 /// * `data`: The `data` property is an optional field that can hold a value of
 /// type `V`. It allows storage of additional data associated with the `Cell`.
-pub struct Cell<T: Clone + Copy + Default, U, V, const D: usize>
+pub struct Cell<T, U, V, const D: usize>
 where
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + PartialEq,
     V: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
@@ -41,14 +42,14 @@ where
     pub data: Option<V>,
 }
 
-impl<T: Clone + ComplexField<RealField = T> + Copy + Default + Sum, U, V, const D: usize>
-    Cell<T, U, V, D>
+impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
+    T: Clone + ComplexField<RealField = T> + Copy + Default + PartialOrd + Sum,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
     for<'a> &'a T: Div<f64>,
     f64: From<T>,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
 {
     /// The function `new` creates a new `Cell`` object with the given
     /// vertices. A D-dimensional cell has D + 1 vertices, so the number of

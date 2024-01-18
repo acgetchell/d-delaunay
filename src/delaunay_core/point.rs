@@ -2,7 +2,7 @@
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
 /// The `Point` struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///
@@ -12,9 +12,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 /// type `T` with a length of `D`. The type `T` is a generic type parameter,
 /// which means it can be any type. The length `D` is a constant unsigned
 /// integer, which means it cannot be changed and is known at compile time.
-pub struct Point<T: Clone + Copy + Default, const D: usize>
+pub struct Point<T, const D: usize>
 where
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + PartialEq + Serialize + Sized,
 {
     /// The coordinates of the point.
     pub coords: [T; D],
@@ -22,9 +23,9 @@ where
 
 impl<T, const D: usize> From<[T; D]> for Point<f64, D>
 where
+    T: Into<f64>,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
-    T: Into<f64>,
 {
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[f64; D]`
@@ -33,8 +34,9 @@ where
     }
 }
 
-impl<T: Clone + Copy + Default, const D: usize> Point<T, D>
+impl<T, const D: usize> Point<T, D>
 where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new instance of a `Point` with the given
@@ -93,7 +95,7 @@ where
     /// ```
     pub fn origin() -> Self
     where
-        T: num_traits::Zero + Copy, // Add the Copy trait bound
+        T: num_traits::Zero + Copy,
     {
         Self::new([T::zero(); D])
     }
