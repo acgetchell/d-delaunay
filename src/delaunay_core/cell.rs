@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, iter::Sum, ops::Div};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Serialize)]
 /// The `Cell` struct represents a d-dimensional
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.
@@ -391,6 +391,40 @@ where
     }
 }
 
+impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        let mut left = self.vertices.clone();
+        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut right = other.vertices.clone();
+        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        left == right
+    }
+}
+
+impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + PartialEq,
+    V: Clone + Copy + PartialEq,
+    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut left = self.vertices.clone();
+        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut right = other.vertices.clone();
+        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        left.partial_cmp(&right)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -667,5 +701,54 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Serialized: {:?}", serialized);
+    }
+
+    #[test]
+    fn cell_partial_eq() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let vertex5 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell3: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex4, vertex2, vertex3, vertex1]).unwrap();
+        let cell4: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex5, vertex4, vertex3, vertex2]).unwrap();
+
+        assert_eq!(cell1, cell2);
+        // Two cells with the same vertices but different uuids are equal
+        assert_ne!(cell1.uuid, cell2.uuid);
+        assert_eq!(cell1.vertices, cell2.vertices);
+        assert_eq!(cell2, cell3);
+        assert_ne!(cell3, cell4);
+    }
+
+    #[test]
+    fn cell_partial_ord() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let vertex2 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let vertex5 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex4, vertex3, vertex2, vertex1]).unwrap();
+        let cell3: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex5, vertex4, vertex3, vertex2]).unwrap();
+
+        assert!(cell1 < cell3);
+        assert_eq!(cell1, cell2);
+        // These should fail
+        // assert!(cell1 < cell2);
+        // assert!(cell2 < cell1);
+        assert!(cell1 < cell3);
+        assert!(cell2 < cell3);
+        assert!(cell3 > cell1);
+        assert!(cell3 > cell2);
     }
 }

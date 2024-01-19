@@ -2,7 +2,7 @@
 
 use super::{point::Point, utilities::make_uuid};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, option::Option};
+use std::{cmp::Ordering, collections::HashMap, option::Option};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
@@ -198,7 +198,7 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.point.partial_cmp(&other.point)
     }
 }

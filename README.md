@@ -19,9 +19,9 @@ the [Rust] ecosystem.
 
 ## Features
 
-- [ ] d-dimensional [Delaunay triangulations]
-- [x] Arbitrary data types associated with vertices and cells
-- [x] Serialization/Deserialization of all data structures to/from [JSON]
+- [ ]  d-dimensional [Delaunay triangulations]
+- [x]  Arbitrary data types associated with vertices and cells
+- [x]  Serialization/Deserialization of all data structures to/from [JSON]
 
 At some point I may merge into another library, such as [Spade] or [delaunay],
 but for now I am developing this to use in my [research] without trying to
