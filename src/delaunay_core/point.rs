@@ -14,8 +14,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 /// integer, which means it cannot be changed and is known at compile time.
 pub struct Point<T, const D: usize>
 where
-    T: PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + PartialEq + Serialize + Sized,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
     pub coords: [T; D],
@@ -23,8 +23,8 @@ where
 
 impl<T, const D: usize> From<[T; D]> for Point<f64, D>
 where
-    T: Into<f64>,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: Clone + Copy + Default + Into<f64> + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(coords: [T; D]) -> Self {
@@ -37,7 +37,7 @@ where
 impl<T, const D: usize> Point<T, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new instance of a `Point` with the given
     /// coordinates.

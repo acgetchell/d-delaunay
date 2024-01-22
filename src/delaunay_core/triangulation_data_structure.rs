@@ -10,9 +10,8 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{min, Ordering, PartialEq};
-use std::collections::HashMap;
-use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
+use std::{collections::HashMap, hash::Hash, iter::Sum};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -46,9 +45,9 @@ use uuid::Uuid;
 pub struct Tds<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// A `HashMap` that stores vertices with their corresponding `Uuid`s as
     /// keys. Each `Vertex` has a `Point` of type T, vertex data of type U,
@@ -70,14 +69,15 @@ where
         + Copy
         + ComplexField<RealField = T>
         + Default
+        + PartialEq
         + PartialOrd
         + SubAssign<f64>
         + Sum,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function creates a new instance of a triangulation data structure
     /// with given points, initializing the vertices and cells.
@@ -128,10 +128,7 @@ where
     /// let result = tds.add(vertex);
     /// assert!(result.is_ok());
     /// ```
-    pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str>
-    where
-        T: PartialEq,
-    {
+    pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str> {
         // Don't add if vertex with that point already exists
         for val in self.vertices.values() {
             if val.point.coords == vertex.point.coords {
@@ -210,11 +207,7 @@ where
     /// # Returns:
     ///
     /// A `Cell` that encompasses all vertices in the triangulation.
-    fn supercell(&self) -> Result<Cell<T, U, V, D>, &'static str>
-    where
-        T: Copy + Default + PartialOrd,
-        Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
-    {
+    fn supercell(&self) -> Result<Cell<T, U, V, D>, &'static str> {
         // First, find the min and max coordinates
         let mut min_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Less);
         let mut max_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Greater);
@@ -253,13 +246,8 @@ where
 
     fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, &'static str>
     where
-        T: Copy + Default + PartialOrd,
-        Vertex<T, U, D>: Clone, // Add the Clone trait bound for Vertex
         OPoint<T, Const<D>>: From<[f64; D]>,
-        [f64; D]: Serialize + DeserializeOwned + Default,
-        f64: PartialOrd, // Replace f64: Ord with f64: PartialOrd
-        U: PartialOrd,
-        V: PartialOrd,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
 

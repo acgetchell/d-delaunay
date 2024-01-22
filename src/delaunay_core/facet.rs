@@ -8,6 +8,7 @@
 
 use super::{cell::Cell, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::hash::Hash;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
 /// The `Facet` struct represents a facet of a d-dimensional simplex.
@@ -24,9 +25,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct Facet<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The `Cell` that contains this facet.
     pub cell: Cell<T, U, V, D>,
@@ -38,9 +39,9 @@ where
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The `new` function is a constructor for the `Facet` struct. It takes
     /// in a `Cell` and a `Vertex` as arguments and returns a `Result`

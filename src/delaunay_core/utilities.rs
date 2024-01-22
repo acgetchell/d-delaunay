@@ -2,8 +2,8 @@
 
 use super::vertex::Vertex;
 use serde::{de::DeserializeOwned, Serialize};
-use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::{cmp::Ordering, hash::Hash};
 use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 UUID in Rust.
@@ -65,8 +65,8 @@ pub fn find_extreme_coordinates<T, U, const D: usize>(
     ordering: Ordering,
 ) -> [T; D]
 where
-    T: Clone + Copy + Default + PartialOrd,
-    U: Clone + Copy + PartialEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     let mut min_coords = [Default::default(); D];

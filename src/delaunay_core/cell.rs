@@ -4,7 +4,7 @@ use super::{point::Point, utilities::make_uuid, vertex::Vertex};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, iter::Sum, ops::Div};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, Serialize)]
@@ -24,13 +24,14 @@ use uuid::Uuid;
 /// to the current cell, indexed such that the `i-th` neighbor is opposite the
 /// `i-th`` vertex.
 /// * `data`: The `data` property is an optional field that can hold a value of
-/// type `V`. It allows storage of additional data associated with the `Cell`.
+/// type `V`. It allows storage of additional data associated with the `Cell`;
+/// the data must implement Eq, Hash, Ord, PartialEq, and PartialOrd.
 pub struct Cell<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
@@ -44,12 +45,12 @@ where
 
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone + ComplexField<RealField = T> + Copy + Default + PartialOrd + Sum,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
+    T: Clone + ComplexField<RealField = T> + Copy + Default + PartialEq + PartialOrd + Sum,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     for<'a> &'a T: Div<f64>,
     f64: From<T>,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new `Cell`` object with the given
     /// vertices. A D-dimensional cell has D + 1 vertices, so the number of
@@ -234,11 +235,7 @@ where
     /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
-    pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool
-    where
-        T: PartialEq,
-        U: PartialEq,
-    {
+    pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool {
         self.vertices.contains(&vertex)
     }
 
@@ -281,8 +278,6 @@ where
     /// will return an Err variant containing an error message.
     fn circumcenter(&self) -> Result<Point<f64, D>, &'static str>
     where
-        T: Clone + Copy + Debug + PartialEq,
-        [T; D]: Default + DeserializeOwned + Serialize + Sized,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let dim = self.dim();
@@ -337,7 +332,6 @@ where
     /// otherwise returns an Err with an error message.
     fn circumradius(&self) -> Result<T, &'static str>
     where
-        T: Clone + Copy + Default,
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
@@ -377,7 +371,6 @@ where
     /// ```
     pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, &'static str>
     where
-        T: Clone + Copy + Default + PartialOrd,
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
@@ -395,9 +388,9 @@ where
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -413,9 +406,9 @@ where
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
-    V: Clone + Copy + PartialEq,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {

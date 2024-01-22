@@ -2,7 +2,7 @@
 
 use super::{point::Point, utilities::make_uuid};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap, option::Option};
+use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
@@ -22,10 +22,15 @@ use uuid::Uuid;
 /// calculated by the `delaunay_core::triangulation_data_structure::Tds`.
 /// * `data`: The `data` property is an optional field that can hold any
 /// type `U`. It is used to store additional data associated with the vertex.
+///
+/// Data type T is in practice f64 which does not implement Eq, Hash, or Ord.
+///
+/// U is intended to be data associated with the vertex, e.g. a string, which
+/// implements Eq, Hash, Ord, PartialEq, and PartialOrd.
 pub struct Vertex<T, U, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the vertex in a D-dimensional space.
@@ -41,7 +46,7 @@ where
 impl<T, U, const D: usize> Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function creates a new instance of a `Vertex`.
@@ -180,7 +185,7 @@ where
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -196,7 +201,7 @@ where
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + PartialEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
