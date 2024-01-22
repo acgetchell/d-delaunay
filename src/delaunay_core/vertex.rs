@@ -176,6 +176,7 @@ where
     }
 }
 
+/// Equality of vertices is based on equality of elements in vector of coords.
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -191,6 +192,7 @@ where
     }
 }
 
+/// Order of vertices is based on lexicographic order of elements in vector of coords.
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -315,15 +317,19 @@ mod tests {
         let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 4.0]));
 
         assert_eq!(vertex1, vertex2);
-        assert_ne!(vertex1, vertex3);
+        assert_ne!(vertex2, vertex3);
     }
 
     #[test]
     fn vertex_partial_ord() {
         let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 4.0]));
+        let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([10.0, 0.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 10.0]));
 
         assert!(vertex1 < vertex2);
-        assert!(vertex2 > vertex1);
+        assert!(vertex3 > vertex2);
+        assert!(vertex1 < vertex3);
+        assert!(vertex1 > vertex4);
     }
 }

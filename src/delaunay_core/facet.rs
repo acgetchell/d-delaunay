@@ -9,7 +9,7 @@
 use super::{cell::Cell, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, PartialOrd)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
 /// The `Facet` struct represents a facet of a d-dimensional simplex.
 /// Passing in a `Vertex` and a `Cell` containing that vertex to the
 /// constructor will create a `Facet` struct.
@@ -178,5 +178,41 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Serialized = {:?}", serialized);
+    }
+
+    #[test]
+    fn facet_partial_eq() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let vertex2 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
+
+        assert_eq!(facet1, facet2);
+        assert_ne!(facet1, facet3);
+    }
+
+    #[test]
+    fn facet_partial_ord() {
+        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let vertex2 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex3 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
+        let facet4 = Facet::new(cell.clone(), vertex3).unwrap();
+
+        assert!(facet1 < facet3);
+        assert!(facet2 < facet3);
+        assert!(facet3 > facet1);
+        assert!(facet3 > facet2);
+        assert!(facet3 > facet4);
     }
 }

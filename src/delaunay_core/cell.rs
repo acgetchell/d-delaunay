@@ -391,6 +391,7 @@ where
     }
 }
 
+/// Equality of cells is based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -408,6 +409,7 @@ where
     }
 }
 
+/// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -715,7 +717,7 @@ mod tests {
         let cell2: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let cell3: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex4, vertex2, vertex3, vertex1]).unwrap();
+            Cell::new(vec![vertex4, vertex3, vertex2, vertex1]).unwrap();
         let cell4: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex5, vertex4, vertex3, vertex2]).unwrap();
 
@@ -741,11 +743,6 @@ mod tests {
         let cell3: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex5, vertex4, vertex3, vertex2]).unwrap();
 
-        assert!(cell1 < cell3);
-        assert_eq!(cell1, cell2);
-        // These should fail
-        // assert!(cell1 < cell2);
-        // assert!(cell2 < cell1);
         assert!(cell1 < cell3);
         assert!(cell2 < cell3);
         assert!(cell3 > cell1);
