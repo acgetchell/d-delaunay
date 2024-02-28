@@ -20,28 +20,28 @@ use uuid::Uuid;
 ///
 /// # Properties:
 ///
-/// * `vertices`: A `HashMap` that stores vertices with their corresponding
-/// `Uuid`s as keys. Each `Vertex` has a `Point` of type T, vertex data of type
+/// * `vertices`: A [HashMap] that stores vertices with their corresponding
+/// [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
 ///  U, and a constant D representing the dimension.
-/// * `cells`: The `cells` property is a `HashMap` that stores `Cell` objects.
-/// Each `Cell` has one or more `Vertex<T, U, D>` with cell data of type V.
-/// Note the dimensionality of the cell may differ from D, though the `Tds`
+/// * `cells`: The `cells` property is a [HashMap] that stores [Cell] objects.
+/// Each [Cell] has one or more [Vertex] objects with cell data of type V.
+/// Note the dimensionality of the cell may differ from D, though the [Tds]
 /// only stores cells of maximal dimensionality D and infers other lower
-/// dimensional cells (cf. `Facet`) from the maximal cells and their vertices.
+/// dimensional cells (cf. [Facet]) from the maximal cells and their vertices.
 ///
 /// For example, in 3 dimensions:
 ///
-/// * A 0-dimensional cell is a `Vertex`.
+/// * A 0-dimensional cell is a [Vertex].
 /// * A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
-/// `Vertex` endpoints.
-/// * A 2-dimensional cell is a `Facet` given by the `Tetrahedron` and the
-/// opposite `Vertex`.
+/// [Vertex] endpoints.
+/// * A 2-dimensional cell is a [Facet] given by the `Tetrahedron` and the
+/// opposite [Vertex].
 /// * A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
 ///
 /// A similar pattern holds for higher dimensions.
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space,
-/// and so the `Tds` is a finite simplicial complex.
+/// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -49,14 +49,15 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// A `HashMap` that stores vertices with their corresponding `Uuid`s as
-    /// keys. Each `Vertex` has a `Point` of type T, vertex data of type U,
+    /// A [HashMap] that stores [Vertex] objects with their corresponding [Uuid]s as
+    /// keys. Each [Vertex] has a [Point] of type T, vertex data of type U,
     /// and a constant D representing the dimension.
     pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
 
-    /// A `HashMap` that stores `Cell` objects.
-    /// Each `Cell` has one or more `Vertex<T, U, D>` with cell data of type V.
-    /// Note the dimensionality of the cell may differ from D, though the TDS
+    /// A [HashMap] that stores [Cell] objects with their corresponding [Uuid]s as
+    /// keys.
+    /// Each [Cell] has one or more [Vertex] objects and cell data of type V.
+    /// Note the dimensionality of the cell may differ from D, though the [Tds]
     /// only stores cells of maximal dimensionality D and infers other lower
     /// dimensional cells from the maximal cells and their vertices.
     pub cells: HashMap<Uuid, Cell<T, U, V, D>>,
@@ -84,7 +85,7 @@ where
     ///
     /// # Arguments:
     ///
-    /// * `points`: A vector of points with which to initialize the
+    /// * `points`: A container of [Point]s with which to initialize the
     /// triangulation.
     ///
     /// # Returns:
@@ -103,18 +104,18 @@ where
         Self { vertices, cells }
     }
 
-    /// The `add` function checks if a vertex with the same coordinates already
-    /// exists in a hashmap, and if not, inserts the vertex into the hashmap.
+    /// The `add` function checks if a [Vertex] with the same coordinates already
+    /// exists in the [HashMap], and if not, inserts the [Vertex].
     ///
     /// # Arguments:
     ///
-    /// * `vertex`: The `vertex` parameter is of type `Vertex<T, U, D>`.
+    /// * `vertex`: The [Vertex] to add.
     ///
     /// # Returns:
     ///
     /// The function `add` returns `Ok(())` if the vertex was successfully
-    /// added to the `HashMap``, or an error message if the vertex already
-    /// exists or if there is a `Uuid` collision.
+    /// added to the [HashMap], or an error message if the vertex already
+    /// exists or if there is a [Uuid] collision.
     ///
     /// # Example:
     ///
@@ -152,7 +153,7 @@ where
     ///
     /// # Returns:
     ///
-    /// The number of vertices in the Tds.
+    /// The number of [Vertex] objects in the [Tds].
     ///
     /// # Example:
     ///
@@ -170,13 +171,12 @@ where
         self.vertices.len()
     }
 
-    /// The `dim` function returns the dimensionality of the triangulation
-    /// data structure.
+    /// The `dim` function returns the dimensionality of the [Tds].
     ///
     /// # Returns:
     ///
     /// The `dim` function returns the minimum value between the number of
-    /// vertices minus one and the value of `D` as an `i32`.
+    /// vertices minus one and the value of `D` as an [i32].
     ///
     /// # Example:
     ///
@@ -191,12 +191,11 @@ where
         min(len - 1, D as i32)
     }
 
-    /// The function `number_of_cells` returns the number of cells in the
-    /// triangulation data structure.
+    /// The function `number_of_cells` returns the number of cells in the [Tds].
     ///
     /// # Returns:
     ///
-    /// The number of cells in the Tds.
+    /// The number of [Cell]s in the [Tds].
     pub fn number_of_cells(&self) -> usize {
         self.cells.len()
     }
@@ -206,7 +205,7 @@ where
     ///
     /// # Returns:
     ///
-    /// A `Cell` that encompasses all vertices in the triangulation.
+    /// A [Cell] that encompasses all [Vertex] objects in the triangulation.
     fn supercell(&self) -> Result<Cell<T, U, V, D>, &'static str> {
         // First, find the min and max coordinates
         let mut min_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Less);
@@ -244,22 +243,28 @@ where
         Cell::new(Vertex::from_points(points))
     }
 
+    /// Performs the Bowyer-Watson algorithm to triangulate a set of vertices.
+    ///
+    /// # Returns:
+    ///
+    /// A [Result] containing a [Vec] of [Cell] objects representing the triangulation, or an error message.
     fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, &'static str>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let mut cells: Vec<Cell<T, U, V, D>> = Vec::new();
+        let mut triangulation: Vec<Cell<T, U, V, D>> = Vec::new();
 
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-        cells.push(supercell.clone());
+        triangulation.push(supercell.clone());
 
         // Iterate over vertices
         for vertex in self.vertices.values() {
             // Find cells that contain the vertex
             let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
-            for cell in cells.iter() {
+
+            for cell in &triangulation {
                 // TODO: understand why we're getting singular matrices here
                 if cell.circumsphere_contains(*vertex)? {
                     bad_cells.push((*cell).clone());
@@ -269,7 +274,7 @@ where
             // Find the boundary of the polygonal hole
             let mut polygonal_hole: Vec<Facet<T, U, V, D>> = Vec::new();
             for cell in bad_cells.iter() {
-                // Create `Facet`s from the `Cell`
+                // Create Facets from the Cell
                 for vertex in cell.vertices.iter() {
                     let facet = Facet::new(cell.clone(), *vertex)?;
                     polygonal_hole.push(facet);
@@ -288,7 +293,7 @@ where
 
             // Remove bad cells from the triangulation
             for cell in bad_cells.iter() {
-                cells.remove(cells.iter().position(|c| c == cell).unwrap());
+                triangulation.remove(triangulation.iter().position(|c| c == cell).unwrap());
             }
 
             // Re-triangulate the polygonal hole
@@ -298,15 +303,15 @@ where
                     new_cell_vertices.push(*facet_vertex);
                 }
                 new_cell_vertices.push(*vertex);
-                cells.push(Cell::new(new_cell_vertices)?);
+                triangulation.push(Cell::new(new_cell_vertices)?);
             }
         }
 
         // Remove all cells containing vertices from the supercell
-        cells
+        triangulation
             .retain(|c| !c.contains_vertex(supercell.vertices.clone().into_iter().next().unwrap()));
 
-        Ok(cells)
+        Ok(triangulation)
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {

@@ -11,17 +11,17 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
-/// The `Facet` struct represents a facet of a d-dimensional simplex.
-/// Passing in a `Vertex` and a `Cell` containing that vertex to the
-/// constructor will create a `Facet` struct.
+/// The Facet] struct represents a facet of a d-dimensional simplex.
+/// Passing in a [Vertex] and a [Cell] containing that vertex to the
+/// constructor will create a [Facet] struct.
 ///
 /// # Properties
 ///
-/// * `cell` - The `Cell` that contains this facet.
-/// * `vertex` - The `Vertex` in the `Cell` opposite to this facet.
+/// * `cell` - The [Cell] that contains this facet.
+/// * `vertex` - The [Vertex] in the [Cell] opposite to this facet.
 ///
-/// Note that `D` is the dimensionality of the `Cell` and `Vertex`;
-/// the `Facet` is one dimension less than the `Cell` (co-dimension 1).
+/// Note that `D` is the dimensionality of the [Cell] and [Vertex];
+/// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
 pub struct Facet<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -29,10 +29,10 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The `Cell` that contains this facet.
+    /// The [Cell] that contains this facet.
     pub cell: Cell<T, U, V, D>,
 
-    /// The `Vertex` opposite to this facet.
+    /// The [Vertex] opposite to this facet.
     pub vertex: Vertex<T, U, D>,
 }
 
@@ -43,19 +43,19 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The `new` function is a constructor for the `Facet` struct. It takes
-    /// in a `Cell` and a `Vertex` as arguments and returns a `Result`
-    /// containing a `Facet` struct or an error message (`&'static str`).
+    /// The `new` function is a constructor for the [Facet] struct. It takes
+    /// in a [Cell] and a [Vertex] as arguments and returns a [Result]
+    /// containing a [Facet] struct or an error message (`&'static str`).
     ///
     /// # Arguments
     ///
-    /// * `cell`: The `Cell` that contains the `Facet`.
-    /// * `vertex`: The `Vertex` opposite to the `Facet`.
+    /// * `cell`: The [Cell] that contains the [Facet].
+    /// * `vertex`: The [Vertex] opposite to the [Facet].
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `Facet` struct or an error message as to why
-    /// the `Facet` could not be created.
+    /// A [Result] containing a [Facet] struct or an error message as to why
+    /// the [Facet] could not be created.
     ///
     /// # Example
     ///
@@ -84,7 +84,7 @@ where
         Ok(Facet { cell, vertex })
     }
 
-    /// The `vertices` method in the `Facet` struct returns a vector of
+    /// The `vertices` method in the [Facet] struct returns a vector of
     /// `Vertices` that are in the facet.
     pub fn vertices(&mut self) -> Vec<Vertex<T, U, D>> {
         let mut vertices = self.cell.clone().vertices;

@@ -3,15 +3,15 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
-/// The `Point` struct represents a point in a D-dimensional space, where the
+/// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///
 /// # Properties:
 ///
-/// * `coords`: `coords` is a public property of the `Point`. It is an array of
+/// * `coords`: `coords` is a public property of the [Point]. It is an array of
 /// type `T` with a length of `D`. The type `T` is a generic type parameter,
 /// which means it can be any type. The length `D` is a constant unsigned
-/// integer, which means it cannot be changed and is known at compile time.
+/// integer known at compile time.
 pub struct Point<T, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -39,7 +39,7 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function `new` creates a new instance of a `Point` with the given
+    /// The function `new` creates a new instance of a [Point] with the given
     /// coordinates.
     ///
     /// # Arguments:
@@ -49,7 +49,7 @@ where
     ///
     /// # Returns:
     ///
-    /// The `new` function returns an instance of the `Point`.
+    /// The `new` function returns an instance of the [Point].
     ///
     /// # Example
     ///
@@ -62,7 +62,7 @@ where
         Self { coords }
     }
 
-    /// The `dim` function returns the dimensionality of the `Point`.
+    /// The `dim` function returns the dimensionality of the [Point].
     ///
     /// # Returns:
     ///
@@ -80,7 +80,7 @@ where
         D
     }
 
-    /// The `origin` function returns the origin Point.
+    /// The `origin` function returns the origin [Point].
     ///
     /// # Returns:
     ///

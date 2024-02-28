@@ -8,24 +8,24 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, Serialize)]
-/// The `Cell` struct represents a d-dimensional
+/// The [Cell] struct represents a d-dimensional
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.
 ///
 /// # Properties:
 ///
-/// * `vertices`: A vector of vertices. Each `Vertex`` has a type T, optional
+/// * `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 /// data U, and a constant D representing the number of dimensions.
-/// * `uuid`: The `uuid` property is of type `Uuid` and represents a
-/// universally unique identifier for a `Cell`. It is used to uniquely identify
-/// each instance of a `Cell`.
-/// * `neighbors`: The `neighbors` property is an optional vector of `Uuid`
-/// values. It represents the UUIDs of the neighboring cells that are connected
-/// to the current cell, indexed such that the `i-th` neighbor is opposite the
-/// `i-th`` vertex.
+/// * `uuid`: The `uuid` property is of type [Uuid] and represents a
+/// universally unique identifier for a [Cell] in order to identify
+/// each instance.
+/// * `neighbors`: The `neighbors` property is an optional container of [Uuid]
+/// values. It represents the [Uuid]s of the neighboring cells that are connected
+/// to the current [Cell], indexed such that the `i-th` neighbor is opposite the
+/// `i-th`` [Vertex].
 /// * `data`: The `data` property is an optional field that can hold a value of
-/// type `V`. It allows storage of additional data associated with the `Cell`;
-/// the data must implement Eq, Hash, Ord, PartialEq, and PartialOrd.
+/// type `V`. It allows storage of additional data associated with the [Cell];
+/// the data must implement [Eq], [Hash], [Ord], [PartialEq], and [PartialOrd].
 pub struct Cell<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -52,20 +52,20 @@ where
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function `new` creates a new `Cell`` object with the given
+    /// The function `new` creates a new [Cell] object with the given
     /// vertices. A D-dimensional cell has D + 1 vertices, so the number of
     /// vertices must be less than or equal to D + 1.
     ///
     /// # Arguments:
     ///
-    /// * `vertices`: The vertices of the Cell to be constructed.
+    /// * `vertices`: The vertices of the [Cell] to be constructed.
     ///
     /// # Returns:
     ///
-    /// a `Result` type. If the condition `vertices.len() > D + 1` is true, it
-    /// returns an `Err` variant with the message "Number of vertices must be
-    /// less than or equal to D + 1". Otherwise, it returns an `Ok` variant
-    /// with a `Cell` containing the provided `vertices`, a generated `uuid`,
+    /// a [Result] type. If the condition `vertices.len() > D + 1` is true, it
+    /// returns an [Err] variant with the message "Number of vertices must be
+    /// less than or equal to D + 1". Otherwise, it returns an [Ok] variant
+    /// with a [Cell] containing the provided `vertices`, a generated [Uuid],
     /// and optional neighbor and data fields.
     ///
     /// Neighbors will be calculated by the
@@ -99,21 +99,21 @@ where
         })
     }
 
-    /// The function `new_with_data` creates a new `Cell` object with the given
+    /// The function `new_with_data` creates a new [Cell] object with the given
     /// vertices and data. A D-dimensional cell has D + 1 vertices, so the
     /// number of vertices must be less than or equal to D + 1.
     ///
     /// # Arguments:
     ///
-    /// * `vertices`: The vertices of the Cell to be constructed.
-    /// * `data`: The data associated with the cell.
+    /// * `vertices`: The vertices of the [Cell] to be constructed.
+    /// * `data`: The data associated with the [Cell].
     ///
     /// # Returns:
     ///
-    /// a `Result` type. If the condition `vertices.len() > D + 1` is true, it
-    /// returns an `Err` variant with the message "Number of vertices must be
-    /// less than or equal to D + 1". Otherwise, it returns an `Ok` variant
-    /// with a `Cell` containing the provided `vertices`, a generated `uuid`,
+    /// a [Result] type. If the condition `vertices.len() > D + 1` is true, it
+    /// returns an [Err] variant with the message "Number of vertices must be
+    /// less than or equal to D + 1". Otherwise, it returns an [Ok] variant
+    /// with a [Cell] containing the provided `vertices`, a generated [Uuid],
     /// the provided data, and optional neighbor fields which will be later be
     /// calculated by the
     /// `delaunay_core::triangulation_data_structure::Tds`.
@@ -146,17 +146,17 @@ where
         })
     }
 
-    /// The function `into_hashmap` converts a vector of cells into a hashmap,
-    /// using the cells' UUIDs as keys.
+    /// The function `into_hashmap` converts a [Vec] of cells into a [HashMap],
+    /// using the [Cell] [Uuid]s as keys.
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
         cells.into_iter().map(|c| (c.uuid, c)).collect()
     }
 
-    /// The function returns the number of vertices in the `Cell`.
+    /// The function returns the number of vertices in the [Cell].
     ///
     /// # Returns:
     ///
-    /// The number of vertices in the `Cell`.
+    /// The number of vertices in the [Cell].
     ///
     /// # Example
     ///
@@ -174,12 +174,12 @@ where
         self.vertices.len()
     }
 
-    /// The `dim` function returns the dimensionality of the `Cell`.
+    /// The `dim` function returns the dimensionality of the [Cell].
     ///
     /// # Returns:
     ///
     /// The `dim` function returns the dimension, which is calculated by
-    /// subtracting 1 from the number of vertices in the `Cell`.
+    /// subtracting 1 from the number of vertices in the [Cell].
     ///
     /// # Example
     ///
@@ -197,15 +197,15 @@ where
         self.vertices.len() - 1
     }
 
-    /// The function is_valid checks if a `Cell` is valid.
+    /// The function is_valid checks if a [Cell] is valid.
     /// struct.
     ///
     /// # Returns:
     ///
-    /// True if the `Cell` is valid; the `Vertices` are correct, the `UUID` is
+    /// True if the [Cell] is valid; the `Vertices` are correct, the `UUID` is
     /// valid and unique, the `neighbors` contains `UUID`s of neighboring
-    /// `Cell`s, and the `neighbors` are indexed such that the index of the
-    /// `Vertex` opposite the neighboring cell is the same.
+    /// [Cell]s, and the `neighbors` are indexed such that the index of the
+    /// [Vertex] opposite the neighboring cell is the same.
     pub fn is_valid(self) -> bool {
         todo!("Implement is_valid for Cell")
     }
@@ -215,11 +215,11 @@ where
     ///
     /// # Arguments:
     ///
-    /// * `vertex`: The vertex to check.
+    /// * [Vertex]: The vertex to check.
     ///
     /// # Returns:
     ///
-    /// Returns `true` if the given `Vertex` is present in the `Cell`, and
+    /// Returns `true` if the given [Vertex] is present in the [Cell], and
     /// `false` otherwise.
     ///
     /// # Example
@@ -246,7 +246,7 @@ where
     /// Lévy, Bruno, and Yang Liu.
     /// “Lp Centroidal Voronoi Tessellation and Its Applications.”
     /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
-    /// https://doi.org/10.1145/1778765.1778856.
+    /// <https://doi.org/10.1145/1778765.1778856>.
     ///
     /// The circumcenter C of a cell with vertices x_0, x_1, ..., x_n is the
     /// solution to the system:
@@ -353,8 +353,8 @@ where
     ///
     /// # Returns:
     ///
-    /// Returns `true` if the given `Vertex` is contained in the circumsphere
-    /// of the `Cell`, and `false` otherwise.
+    /// Returns `true` if the given [Vertex] is contained in the circumsphere
+    /// of the [Cell], and `false` otherwise.
     ///
     /// # Example
     ///

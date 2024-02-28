@@ -6,19 +6,19 @@ use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
-/// The `Vertex` struct represents a vertex in a triangulation with a `Point`,
+/// The [Vertex] struct represents a vertex in a triangulation with a [Point],
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.
 ///
 /// # Properties:
 ///
-/// * `point`: A generic type `Point<T, D>` representing the coordinates of
+/// * `point`: A generic [Point] representing the coordinates of
 /// the vertex in a D-dimensional space.
-/// * `uuid`: The `uuid` property is of type `Uuid` and represents a
-/// universally unique identifier for the vertex. This can be used to uniquely
+/// * `uuid`: A [Uuid] representing a universally unique identifier for the
+/// for the [Vertex]. This can be used to uniquely
 /// identify the vertex in a graph or any other data structure.
-/// * `incident_cell`: The `incident_cell` property is an optional `Uuid` that
-/// represents the `Uuid` of the cell that the vertex is incident to. This is
+/// * `incident_cell`: The `incident_cell` property is an optional [Uuid] that
+/// represents a `Cell` containing the [Vertex]. This is
 /// calculated by the `delaunay_core::triangulation_data_structure::Tds`.
 /// * `data`: The `data` property is an optional field that can hold any
 /// type `U`. It is used to store additional data associated with the vertex.
@@ -37,7 +37,7 @@ where
     pub point: Point<T, D>,
     /// A universally unique identifier for the vertex.
     pub uuid: Uuid,
-    /// The UUID of the cell that the vertex is incident to.
+    /// The [Uuid] of the `Cell` that the vertex is incident to.
     pub incident_cell: Option<Uuid>,
     /// Optional data associated with the vertex.
     pub data: Option<U>,
@@ -49,17 +49,17 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function creates a new instance of a `Vertex`.
+    /// The function creates a new instance of a [Vertex].
     ///
     /// # Arguments:
     ///
-    /// * `point`: A generic type `Point<T, D>`, representing a point in a
+    /// * `point`: A generic [Point], representing a point in a
     /// multi-dimensional space, where the coordinates are of type `T` and the
     /// dimensionality is `D`.
     ///
     /// # Returns:
     ///
-    /// The `new` function returns an instance of the `Vertex`.
+    /// The `new` function returns an instance of the [Vertex].
     ///
     /// # Example
     ///
@@ -82,19 +82,19 @@ where
         }
     }
 
-    /// The function `new_with_data` creates a new instance of a `Vertex` with
+    /// The function `new_with_data` creates a new instance of a [Vertex] with
     /// the given point and data, and assigns a unique identifier to it.
     ///
     /// # Arguments:
     ///
-    /// * `point`: A generic type `Point<T, D>` representing a point in a
+    /// * `point`: A generic [Point] representing a point in a
     /// multi-dimensional space, where the coordinates are of type `T` and the
     /// dimensionality is `D`.
     /// * `data`: The `data` parameter is of type `U`.
     ///
     /// # Returns:
     ///
-    /// The `new_with_data` function returns an instance of the `Vertex`.
+    /// The `new_with_data` function returns an instance of the [Vertex].
     ///
     /// # Example
     ///
@@ -123,20 +123,20 @@ where
     ///
     /// # Arguments:
     ///
-    /// * `points`: `points` is a vector of `Point<T, D>` objects.
+    /// * `points`: `points` is a vector of [Point] objects.
     ///
     /// # Returns:
     ///
     /// The function `from_points` returns a `Vec<Vertex<T, U, D>>`, where `T`
-    /// is the type of the coordinates of the `Vertex`, `U` is the type of the
-    /// optional data associated with the `Vertex`, and `D` is the
-    /// dimensionality of the `Vertex`.
+    /// is the type of the coordinates of the [Vertex], `U` is the type of the
+    /// optional data associated with the [Vertex], and `D` is the
+    /// dimensionality of the [Vertex].
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
         points.into_iter().map(|p| Self::new(p)).collect()
     }
 
     /// The function `into_hashmap` converts a vector of vertices into a
-    /// `HashMap`, using the vertices `Uuid` as the key.
+    /// [HashMap], using the vertices [Uuid] as the key.
     ///
     /// # Arguments:
     ///
@@ -144,13 +144,14 @@ where
     ///
     /// # Returns:
     ///
-    /// The function `into_hashmap` returns a
+    /// The function `into_hashmap` returns a [HashMap] with the key type
+    /// [Uuid] and the value type [Vertex], i.e.
     /// `std::collections::HashMap<Uuid, Vertex<T, U, D>`.
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
         vertices.into_iter().map(|v| (v.uuid, v)).collect()
     }
 
-    /// The `dim` function returns the dimensionality of the `Vertex`.
+    /// The `dim` function returns the dimensionality of the [Vertex].
     ///
     /// # Returns:
     ///
@@ -169,13 +170,13 @@ where
         D
     }
 
-    /// The function is_valid checks if a `Vertex`` is valid.
+    /// The function is_valid checks if a [Vertex] is valid.
     ///
     /// # Returns:
     ///
-    /// True if the `Vertex` is valid; the `Point` is correct, the `Uuid` is
-    /// valid and unique, and the `incident_cell` contains the `Uuid` of a
-    /// `Cell` that contains the `Vertex`.
+    /// True if the [Vertex] is valid; the [Point] is correct, the [Uuid] is
+    /// valid and unique, and the `incident_cell` contains the [Uuid] of a
+    /// `Cell` that contains the [Vertex].
     pub fn is_valid(self) -> bool {
         todo!("Implement is_valid for Vertex")
     }
