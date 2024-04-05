@@ -11,14 +11,14 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
-/// The Facet] struct represents a facet of a d-dimensional simplex.
+/// The [Facet] struct represents a facet of a d-dimensional simplex.
 /// Passing in a [Vertex] and a [Cell] containing that vertex to the
 /// constructor will create a [Facet] struct.
 ///
 /// # Properties
 ///
 /// * `cell` - The [Cell] that contains this facet.
-/// * `vertex` - The [Vertex] in the [Cell] opposite to this facet.
+/// * `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].
 ///
 /// Note that `D` is the dimensionality of the [Cell] and [Vertex];
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
@@ -43,9 +43,9 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The `new` function is a constructor for the [Facet] struct. It takes
+    /// The `new` function is a constructor for the [Facet]. It takes
     /// in a [Cell] and a [Vertex] as arguments and returns a [Result]
-    /// containing a [Facet] struct or an error message (`&'static str`).
+    /// containing a [Facet] or an error message.
     ///
     /// # Arguments
     ///
@@ -54,7 +54,7 @@ where
     ///
     /// # Returns
     ///
-    /// A [Result] containing a [Facet] struct or an error message as to why
+    /// A [Result] containing a [Facet] or an error message as to why
     /// the [Facet] could not be created.
     ///
     /// # Example
@@ -84,8 +84,8 @@ where
         Ok(Facet { cell, vertex })
     }
 
-    /// The `vertices` method in the [Facet] struct returns a vector of
-    /// `Vertices` that are in the facet.
+    /// The `vertices` method in the [Facet] returns a container of
+    /// [Vertex] objects that are in the [Facet].
     pub fn vertices(&mut self) -> Vec<Vertex<T, U, D>> {
         let mut vertices = self.cell.clone().vertices;
         vertices.retain(|v| *v != self.vertex);

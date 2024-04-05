@@ -2,8 +2,7 @@
 
 use super::vertex::Vertex;
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashMap;
-use std::{cmp::Ordering, hash::Hash};
+use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
