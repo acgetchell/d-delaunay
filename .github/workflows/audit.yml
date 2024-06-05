@@ -7,6 +7,9 @@ on:
       # Run on changed dependencies
       - '**/Cargo.toml'
       - '**/Cargo.lock'
+  pull_request:
+    # Run on merged pull requests
+    types: [ closed ]
   # Rerun periodically to pick up new advisories
   schedule:
     - cron: '0 0 * * *'

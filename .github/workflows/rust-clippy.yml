@@ -11,14 +11,11 @@ name: rust-clippy analyze
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ "main" ]
+    # Run on merged pull requests
+    types: [ closed ]
   schedule:
     - cron: '17 22 * * 0'
-  # Run manually
-  workflow_dispatch:
 
 jobs:
   rust-clippy-analyze:
