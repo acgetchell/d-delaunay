@@ -17,18 +17,31 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      # - name: Install stable toolchain
+      #   uses: actions-rs/toolchain@v1
+      #   with:
+      #     toolchain: stable
+      #     override: true
+
+      # - name: Run cargo-tarpaulin
+      #   uses: actions-rs/tarpaulin@v0.1
+      #   with:
+      #     version: '0.15.0'
+      #     args: '-- --test-threads 1'
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          override: true
+      
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin
 
-      - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          version: '0.15.0'
-          args: '-- --test-threads 1'
-
+      - name: Run tarpaulin
+        run: |
+          # export VAR=var
+          cargo tarpaulin --out Xml -- --test-threads=1
+      
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
         env:
