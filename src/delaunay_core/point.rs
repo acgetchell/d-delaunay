@@ -9,9 +9,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 /// # Properties:
 ///
 /// * `coords`: `coords` is a public property of the [Point]. It is an array of
-/// type `T` with a length of `D`. The type `T` is a generic type parameter,
-/// which means it can be any type. The length `D` is a constant unsigned
-/// integer known at compile time.
+///   type `T` with a length of `D`. The type `T` is a generic type parameter,
+///   which means it can be any type. The length `D` is a constant unsigned
+///   integer known at compile time.
 pub struct Point<T, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -45,7 +45,7 @@ where
     /// # Arguments:
     ///
     /// * `coords`: The `coords` parameter is an array of type `T` with a
-    /// length of `D`.
+    ///   length of `D`.
     ///
     /// # Returns:
     ///

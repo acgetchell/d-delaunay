@@ -13,15 +13,15 @@ use uuid::Uuid;
 /// # Properties:
 ///
 /// * `point`: A generic [Point] representing the coordinates of
-/// the vertex in a D-dimensional space.
+///   the vertex in a D-dimensional space.
 /// * `uuid`: A [Uuid] representing a universally unique identifier for the
-/// for the [Vertex]. This can be used to uniquely
-/// identify the vertex in a graph or any other data structure.
+///   for the [Vertex]. This can be used to uniquely
+///   identify the vertex in a graph or any other data structure.
 /// * `incident_cell`: The `incident_cell` property is an optional [Uuid] that
-/// represents a `Cell` containing the [Vertex]. This is
-/// calculated by the `delaunay_core::triangulation_data_structure::Tds`.
+///   represents a `Cell` containing the [Vertex]. This is
+///   calculated by the `delaunay_core::triangulation_data_structure::Tds`.
 /// * `data`: The `data` property is an optional field that can hold any
-/// type `U`. It is used to store additional data associated with the vertex.
+///   type `U`. It is used to store additional data associated with the vertex.
 ///
 /// Data type T is in practice f64 which does not implement Eq, Hash, or Ord.
 ///
@@ -54,8 +54,8 @@ where
     /// # Arguments:
     ///
     /// * `point`: A generic [Point], representing a point in a
-    /// multi-dimensional space, where the coordinates are of type `T` and the
-    /// dimensionality is `D`.
+    ///   multi-dimensional space, where the coordinates are of type `T` and the
+    ///   dimensionality is `D`.
     ///
     /// # Returns:
     ///
@@ -88,8 +88,8 @@ where
     /// # Arguments:
     ///
     /// * `point`: A generic [Point] representing a point in a
-    /// multi-dimensional space, where the coordinates are of type `T` and the
-    /// dimensionality is `D`.
+    ///   multi-dimensional space, where the coordinates are of type `T` and the
+    ///   dimensionality is `D`.
     /// * `data`: The `data` parameter is of type `U`.
     ///
     /// # Returns:
