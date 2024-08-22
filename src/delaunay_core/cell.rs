@@ -731,6 +731,25 @@ mod tests {
     }
 
     #[test]
+    fn cell_facets_contains() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
+            .unwrap();
+        let facets = cell.facets();
+
+        assert_eq!(facets.len(), 4);
+        for facet in facets.iter() {
+            assert!(cell.contains_facet(facet.clone()));
+        }
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Facets: {:?}", facets);
+    }
+
+    #[test]
     fn cell_to_and_from_json() {
         let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
         let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
