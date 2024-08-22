@@ -1,6 +1,6 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
-use super::{point::Point, utilities::make_uuid, vertex::Vertex};
+use super::{facet::Facet, point::Point, utilities::make_uuid, vertex::Vertex};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -215,7 +215,7 @@ where
     ///
     /// # Arguments:
     ///
-    /// * [Vertex]: The vertex to check.
+    /// * vertex: The [Vertex] to check.
     ///
     /// # Returns:
     ///
@@ -381,6 +381,62 @@ where
         );
 
         Ok(circumradius >= radius)
+    }
+
+    /// The function `facets` returns the [Facet]s of the [Cell].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let facets = cell.facets();
+    /// assert_eq!(facets.len(), 4);
+    pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
+        let mut facets: Vec<Facet<T, U, V, D>> = Vec::new();
+        for vertex in self.vertices.iter() {
+            facets.push(Facet::new(self.clone(), *vertex).unwrap());
+        }
+
+        facets
+    }
+
+    /// The function `contains_facet` checks if a given [Facet] is present in
+    /// the [Cell].
+    ///
+    /// # Arguments:
+    ///
+    /// * facet: The [Facet] to check.
+    ///
+    /// # Returns:
+    ///
+    /// Returns `true` if the given [Facet] is present in the [Cell], and
+    /// `false` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
+    /// assert!(cell.contains_facet(facet));
+    /// ```
+    pub fn contains_facet(&self, facet: Facet<T, U, V, D>) -> bool {
+        self.facets().contains(&facet)
     }
 }
 

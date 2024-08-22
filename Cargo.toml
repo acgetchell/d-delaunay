@@ -8,9 +8,9 @@ edition = "2021"
 [dependencies]
 nalgebra = "0.33.0"
 num-traits = "0.2.19"
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.121" 
-serde_test = "1.0.176"
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = "1.0.125" 
+serde_test = "1.0.177"
 uuid = { version = "1.10.0", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
 
 [lints.rust]
