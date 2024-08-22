@@ -146,6 +146,50 @@ where
         })
     }
 
+    /// The function `from_facet_and_vertex` creates a new [Cell] object from a [Facet] and a [Vertex].
+    ///
+    /// # Arguments:
+    ///
+    /// * `facet`: The [Facet] to be used to create the [Cell].
+    /// * `vertex`: The [Vertex] to be added to the [Cell].
+    ///
+    /// # Returns:
+    ///
+    /// A [Result] type containing the new [Cell] or an error message.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([0.0, 0.0, 1.0]));
+    /// let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([0.0, 1.0, 0.0]));
+    /// let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+    /// let vertex4: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+    /// let cell: Cell<f64, Option<()>, Option<()>,3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+    /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
+    /// let vertex5 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+    /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
+    /// assert!(new_cell.vertices.contains(&vertex5));
+    pub fn from_facet_and_vertex(
+        mut facet: Facet<T, U, V, D>,
+        vertex: Vertex<T, U, D>,
+    ) -> Result<Self, &'static str> {
+        let mut vertices = facet.vertices();
+        vertices.push(vertex);
+        let uuid = make_uuid();
+        let neighbors = None;
+        let data = None;
+        Ok(Cell {
+            vertices,
+            uuid,
+            neighbors,
+            data,
+        })
+    }
+
     /// The function `into_hashmap` converts a [Vec] of cells into a [HashMap],
     /// using the [Cell] [Uuid]s as keys.
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
@@ -237,6 +281,34 @@ where
     /// ```
     pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool {
         self.vertices.contains(&vertex)
+    }
+
+    /// The function `contains_vertex_of` checks if the [Cell] contains any [Vertex] of a given [Cell].
+    ///
+    /// # Arguments:
+    ///
+    /// * `cell`: The [Cell] to check.
+    ///
+    /// # Returns:
+    ///
+    /// Returns `true` if the given [Cell] has any [Vertex] in common with the [Cell].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let vertex5 = Vertex::new_with_data(Point::new([0.0, 0.0, 0.0]), 0);
+    /// let cell2 = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex5], "one-three cell").unwrap();
+    /// assert!(cell.contains_vertex_of(cell2));
+    pub fn contains_vertex_of(&self, cell: Cell<T, U, V, D>) -> bool {
+        self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
 
     /// The function `circumcenter` returns the circumcenter of the cell.
@@ -407,37 +479,6 @@ where
 
         facets
     }
-
-    /// The function `contains_facet` checks if a given [Facet] is present in
-    /// the [Cell].
-    ///
-    /// # Arguments:
-    ///
-    /// * facet: The [Facet] to check.
-    ///
-    /// # Returns:
-    ///
-    /// Returns `true` if the given [Facet] is present in the [Cell], and
-    /// `false` otherwise.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
-    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
-    /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
-    /// assert!(cell.contains_facet(facet));
-    /// ```
-    pub fn contains_facet(&self, facet: Facet<T, U, V, D>) -> bool {
-        self.facets().contains(&facet)
-    }
 }
 
 /// Equality of cells is based on equality of sorted vector of vertices.
@@ -578,6 +619,27 @@ mod tests {
     }
 
     #[test]
+    fn cell_from_facet_and_vertex() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell: Cell<f64, i32, Option<()>, 3> =
+            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let facet = Facet::new(cell.clone(), vertex4).unwrap();
+        let vertex5 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
+
+        assert!(new_cell.vertices.contains(&vertex1));
+        assert!(new_cell.vertices.contains(&vertex2));
+        assert!(new_cell.vertices.contains(&vertex3));
+        assert!(new_cell.vertices.contains(&vertex5));
+
+        // Human readable output for cargo test -- --nocapture
+        println!("New Cell: {:?}", new_cell);
+    }
+
+    #[test]
     fn cell_into_hashmap() {
         let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
         let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
@@ -631,6 +693,24 @@ mod tests {
         assert!(cell.contains_vertex(vertex2));
         assert!(cell.contains_vertex(vertex3));
         assert!(cell.contains_vertex(vertex4));
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell: {:?}", cell);
+    }
+
+    #[test]
+    fn cell_contains_vertex_of() {
+        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
+            .unwrap();
+        let vertex5 = Vertex::new_with_data(Point::new([0.0, 0.0, 0.0]), 0);
+        let cell2 = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex5], "one-three cell")
+            .unwrap();
+
+        assert!(cell.contains_vertex_of(cell2));
 
         // Human readable output for cargo test -- --nocapture
         println!("Cell: {:?}", cell);
@@ -742,7 +822,7 @@ mod tests {
 
         assert_eq!(facets.len(), 4);
         for facet in facets.iter() {
-            assert!(cell.contains_facet(facet.clone()));
+            assert!(cell.facets().contains(facet))
         }
 
         // Human readable output for cargo test -- --nocapture

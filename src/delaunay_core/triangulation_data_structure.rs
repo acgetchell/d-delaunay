@@ -265,51 +265,73 @@ where
             let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
 
             for cell in &triangulation {
-                // TODO: understand why we're getting singular matrices here
                 if cell.circumsphere_contains(*vertex)? {
                     bad_cells.push((*cell).clone());
                 }
             }
 
-            // Find the boundary of the polygonal hole
-            let mut polygonal_hole: Vec<Facet<T, U, V, D>> = Vec::new();
-            for cell in bad_cells.iter() {
-                // Create Facets from the Cell
-                for vertex in cell.vertices.iter() {
-                    let facet = Facet::new(cell.clone(), *vertex)?;
-                    polygonal_hole.push(facet);
+            // Find the boundary of the hole left by the bad cells
+            let mut boundary_facets: Vec<Facet<T, U, V, D>> = Vec::new();
+            for bad_cell in &bad_cells {
+                for facet in bad_cell.facets() {
+                    if !bad_cells.iter().any(|c| c.facets().contains(&facet)) {
+                        boundary_facets.push(facet);
+                    }
                 }
-
-                // for vertex in cell.vertices.iter() {
-                //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
-                //         polygonal_hole.push(vertex.clone());
-                //     }
-                // }
             }
 
-            // Remove duplicate facets
-            polygonal_hole.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            polygonal_hole.dedup();
-
-            // Remove bad cells from the triangulation
-            for cell in bad_cells.iter() {
-                triangulation.remove(triangulation.iter().position(|c| c == cell).unwrap());
+            // Create new cells from the boundary facets and new vertex
+            for facet in boundary_facets {
+                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
+                triangulation.push(new_cell);
             }
 
-            // Re-triangulate the polygonal hole
-            for mut facet in polygonal_hole.iter().cloned() {
-                let mut new_cell_vertices: Vec<Vertex<T, U, D>> = Vec::new();
-                for facet_vertex in facet.vertices().iter() {
-                    new_cell_vertices.push(*facet_vertex);
-                }
-                new_cell_vertices.push(*vertex);
-                triangulation.push(Cell::new(new_cell_vertices)?);
-            }
+            // Remove bad cells from triangulation
+            triangulation.retain(|cell| !bad_cells.contains(cell));
         }
 
-        // Remove all cells containing vertices from the supercell
-        triangulation
-            .retain(|c| !c.contains_vertex(supercell.vertices.clone().into_iter().next().unwrap()));
+        //     // Find the boundary of the polygonal hole
+        //     let mut polygonal_hole: Vec<Facet<T, U, V, D>> = Vec::new();
+        //     for cell in bad_cells.iter() {
+        //         // Create Facets from the Cell
+        //         for vertex in cell.vertices.iter() {
+        //             let facet = Facet::new(cell.clone(), *vertex)?;
+        //             polygonal_hole.push(facet);
+        //         }
+
+        //         // for vertex in cell.vertices.iter() {
+        //         //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
+        //         //         polygonal_hole.push(vertex.clone());
+        //         //     }
+        //         // }
+        //     }
+
+        //     // Remove duplicate facets
+        //     polygonal_hole.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        //     polygonal_hole.dedup();
+
+        //     // Remove bad cells from the triangulation
+        //     for cell in bad_cells.iter() {
+        //         triangulation.remove(triangulation.iter().position(|c| c == cell).unwrap());
+        //     }
+
+        //     // Re-triangulate the polygonal hole
+        //     for mut facet in polygonal_hole.iter().cloned() {
+        //         let mut new_cell_vertices: Vec<Vertex<T, U, D>> = Vec::new();
+        //         for facet_vertex in facet.vertices().iter() {
+        //             new_cell_vertices.push(*facet_vertex);
+        //         }
+        //         new_cell_vertices.push(*vertex);
+        //         triangulation.push(Cell::new(new_cell_vertices)?);
+        //     }
+        // }
+
+        // // Remove all cells containing vertices from the supercell
+        // triangulation
+        //     .retain(|c| !c.contains_vertex(supercell.vertices.clone().into_iter().next().unwrap()));
+
+        // Remove any cells that contain a vertex of the supercell
+        triangulation.retain(|cell| !cell.contains_vertex_of(supercell.clone()));
 
         Ok(triangulation)
     }
