@@ -122,9 +122,10 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// // let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
     /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
     /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
@@ -270,12 +271,12 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
     /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
@@ -297,14 +298,14 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
     /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
-    /// let vertex5 = Vertex::new_with_data(Point::new([0.0, 0.0, 0.0]), 0);
+    /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
     /// let cell2 = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex5], "one-three cell").unwrap();
     /// assert!(cell.contains_vertex_of(cell2));
     pub fn contains_vertex_of(&self, cell: Cell<T, U, V, D>) -> bool {

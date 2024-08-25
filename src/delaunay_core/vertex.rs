@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::{point::Point, utilities::make_uuid};
@@ -52,27 +54,7 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function creates a new instance of a [Vertex].
-    ///
-    /// # Arguments:
-    ///
-    /// * `point`: A generic [Point], representing a point in a
-    ///   multi-dimensional space, where the coordinates are of type `T` and the
-    ///   dimensionality is `D`.
-    ///
-    /// # Returns:
-    ///
-    /// The `new` function returns an instance of the [Vertex].
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-    /// let vertex: Vertex<f64, Option<()>, 4> = Vertex::new(point);
-    /// assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
-    /// ```
+    #[deprecated(note = "Please use `VertexBuilder` instead")]
     pub fn new(point: Point<T, D>) -> Self {
         let uuid = make_uuid();
         let incident_cell = None;
@@ -85,30 +67,7 @@ where
         }
     }
 
-    /// The function `new_with_data` creates a new instance of a [Vertex] with
-    /// the given point and data, and assigns a unique identifier to it.
-    ///
-    /// # Arguments:
-    ///
-    /// * `point`: A generic [Point] representing a point in a
-    ///   multi-dimensional space, where the coordinates are of type `T` and the
-    ///   dimensionality is `D`.
-    /// * `data`: The `data` parameter is of type `U`.
-    ///
-    /// # Returns:
-    ///
-    /// The `new_with_data` function returns an instance of the [Vertex].
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-    /// let vertex = Vertex::new_with_data(point, "4D");
-    /// assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
-    /// assert_eq!(vertex.data.unwrap(), "4D");
-    /// ```
+    #[deprecated(note = "Please use `VertexBuilder` instead")]
     pub fn new_with_data(point: Point<T, D>, data: U) -> Self {
         let uuid = make_uuid();
         let incident_cell = None;
@@ -135,7 +94,11 @@ where
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
-        points.into_iter().map(|p| Self::new(p)).collect()
+        // points.into_iter().map(|p| Self::new(p)).collect()
+        points
+            .into_iter()
+            .map(|p| VertexBuilder::default().point(p).build().unwrap())
+            .collect()
     }
 
     /// The function `into_hashmap` converts a vector of vertices into a
@@ -235,6 +198,27 @@ mod tests {
 
     #[test]
     fn vertex_builder() {
+        let mut vertex: Vertex<f64, &str, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+
+        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.dim(), 3);
+        assert!(!vertex.uuid.is_nil());
+        assert!(vertex.incident_cell.is_none());
+        assert!(vertex.data.is_none());
+
+        // Can mutate later
+        vertex.data = Some("3D");
+        assert_eq!(vertex.data.unwrap(), "3D");
+
+        // Human readable output for cargo test -- --nocapture
+        println!("{:?}", vertex);
+    }
+
+    #[test]
+    fn vertex_builder_with_data() {
         let vertex: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .data(1)
@@ -251,36 +235,40 @@ mod tests {
         println!("{:?}", vertex);
     }
 
-    #[test]
-    fn vertex_new() {
-        let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+    // #[test]
+    // fn vertex_new() {
+    //     let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
-        assert_eq!(vertex.dim(), 3);
-        assert!(vertex.incident_cell.is_none());
-        assert!(vertex.data.is_none());
+    //     assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
+    //     assert_eq!(vertex.dim(), 3);
+    //     assert!(vertex.incident_cell.is_none());
+    //     assert!(vertex.data.is_none());
 
-        // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
-    }
+    //     // Human readable output for cargo test -- --nocapture
+    //     println!("{:?}", vertex);
+    // }
 
-    #[test]
-    fn vertex_new_with_data() {
-        let vertex = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0, 4.0]), "4D");
+    // #[test]
+    // fn vertex_new_with_data() {
+    //     let vertex = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0, 4.0]), "4D");
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
-        assert_eq!(vertex.dim(), 4);
-        assert!(vertex.incident_cell.is_none());
-        assert!(vertex.data.is_some());
-        assert_eq!(vertex.data.unwrap(), "4D");
+    //     assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
+    //     assert_eq!(vertex.dim(), 4);
+    //     assert!(vertex.incident_cell.is_none());
+    //     assert!(vertex.data.is_some());
+    //     assert_eq!(vertex.data.unwrap(), "4D");
 
-        // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
-    }
+    //     // Human readable output for cargo test -- --nocapture
+    //     println!("{:?}", vertex);
+    // }
 
     #[test]
     fn vertex_copy() {
-        let vertex = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0, 4.0]), "4D");
+        let vertex: Vertex<f64, &str, 4> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0, 4.0]))
+            .data("4D")
+            .build()
+            .unwrap();
         let vertex_copy = vertex;
 
         assert_eq!(vertex, vertex_copy);
@@ -331,13 +319,20 @@ mod tests {
 
     #[test]
     fn vertex_dim() {
-        let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
         assert_eq!(vertex.dim(), 3);
     }
 
     #[test]
     fn vertex_to_and_from_json() {
-        let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        // let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
         let serialized = serde_json::to_string(&vertex).unwrap();
 
         assert!(serialized.contains("point"));
@@ -353,9 +348,18 @@ mod tests {
 
     #[test]
     fn vertex_partial_eq() {
-        let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
-        let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
-        let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 4.0]));
+        let vertex1: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        let vertex2: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        let vertex3: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 4.0]))
+            .build()
+            .unwrap();
 
         assert_eq!(vertex1, vertex2);
         assert_ne!(vertex2, vertex3);
@@ -363,10 +367,22 @@ mod tests {
 
     #[test]
     fn vertex_partial_ord() {
-        let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
-        let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 4.0]));
-        let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([10.0, 0.0, 0.0]));
-        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 10.0]));
+        let vertex1: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        let vertex2: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 4.0]))
+            .build()
+            .unwrap();
+        let vertex3: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([10.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex4: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 10.0]))
+            .build()
+            .unwrap();
 
         assert!(vertex1 < vertex2);
         assert!(vertex3 > vertex2);
