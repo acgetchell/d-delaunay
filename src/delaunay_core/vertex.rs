@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
+#[derive(Builder, Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
 /// The [Vertex] struct represents a vertex in a triangulation with a [Point],
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.
@@ -36,10 +36,13 @@ where
     /// The coordinates of the vertex in a D-dimensional space.
     pub point: Point<T, D>,
     /// A universally unique identifier for the vertex.
+    #[builder(setter(skip), default = "make_uuid()")]
     pub uuid: Uuid,
     /// The [Uuid] of the `Cell` that the vertex is incident to.
+    #[builder(setter(skip), default = "None")]
     pub incident_cell: Option<Uuid>,
     /// Optional data associated with the vertex.
+    #[builder(setter(into, strip_option), default)]
     pub data: Option<U>,
 }
 
@@ -215,6 +218,38 @@ where
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn vertex_default() {
+        let vertex: Vertex<f64, Option<()>, 3> = Default::default();
+
+        assert_eq!(vertex.point.coords, [0.0, 0.0, 0.0]);
+        assert_eq!(vertex.dim(), 3);
+        assert!(vertex.uuid.is_nil());
+        assert!(vertex.incident_cell.is_none());
+        assert!(vertex.data.is_none());
+
+        // Human readable output for cargo test -- --nocapture
+        println!("{:?}", vertex);
+    }
+
+    #[test]
+    fn vertex_builder() {
+        let vertex: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .data(1)
+            .build()
+            .unwrap();
+
+        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.dim(), 3);
+        assert!(!vertex.uuid.is_nil());
+        assert!(vertex.incident_cell.is_none());
+        assert_eq!(vertex.data.unwrap(), 1);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("{:?}", vertex);
+    }
 
     #[test]
     fn vertex_new() {

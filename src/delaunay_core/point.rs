@@ -26,6 +26,7 @@ where
     T: Clone + Copy + Default + Into<f64> + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    f64: From<T>,
 {
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[f64; D]`
@@ -107,6 +108,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn point_default() {
+        let point: Point<f64, 4> = Default::default();
+
+        assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Default: {:?}", point);
+    }
+
+    #[test]
     fn point_new() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
 
@@ -142,16 +153,6 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Origin: {:?} is {}-D", point, point.dim());
-    }
-
-    #[test]
-    fn point_default_trait() {
-        let point: Point<f64, 4> = Default::default();
-
-        assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
-
-        // Human readable output for cargo test -- --nocapture
-        println!("Default: {:?} is {}-D", point, point.dim());
     }
 
     #[test]

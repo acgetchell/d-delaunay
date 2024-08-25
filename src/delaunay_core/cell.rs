@@ -520,16 +520,32 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::delaunay_core::point::Point;
+    use crate::delaunay_core::{point::Point, vertex::VertexBuilder};
 
     use super::*;
 
     #[test]
     fn cell_new() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
 
@@ -549,11 +565,31 @@ mod tests {
 
     #[test]
     fn cell_new_with_too_many_vertices() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
-        let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
+        let vertex5 = VertexBuilder::default()
+            .point(Point::new([2.0, 2.0, 2.0]))
+            .data(3)
+            .build()
+            .unwrap();
         let cell: Result<Cell<f64, i32, Option<()>, 3>, &'static str> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4, vertex5]);
 
@@ -565,10 +601,26 @@ mod tests {
 
     #[test]
     fn cell_new_with_data() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
             .unwrap();
 
@@ -589,11 +641,31 @@ mod tests {
 
     #[test]
     fn cell_new_with_data_with_too_many_vertices() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
-        let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
+        let vertex5 = VertexBuilder::default()
+            .point(Point::new([2.0, 2.0, 2.0]))
+            .data(3)
+            .build()
+            .unwrap();
         let cell = Cell::new_with_data(
             vec![vertex1, vertex2, vertex3, vertex4, vertex5],
             "three-one cell",

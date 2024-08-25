@@ -96,11 +96,10 @@ where
         // handle case where vertices are constructed with data
         let vertices = Vertex::into_hashmap(Vertex::from_points(points));
         // let cells_vec = bowyer_watson(vertices);
+        let cells = HashMap::new();
         // assign_neighbors(cells_vec);
         // assign_incident_cells(vertices);
 
-        // Put cells_vec into hashmap
-        let cells = HashMap::new();
         Self { vertices, cells }
     }
 
@@ -280,14 +279,14 @@ where
                 }
             }
 
+            // Remove bad cells from triangulation
+            triangulation.retain(|cell| !bad_cells.contains(cell));
+
             // Create new cells from the boundary facets and new vertex
             for facet in boundary_facets {
                 let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
                 triangulation.push(new_cell);
             }
-
-            // Remove bad cells from triangulation
-            triangulation.retain(|cell| !bad_cells.contains(cell));
         }
 
         //     // Find the boundary of the polygonal hole

@@ -9,6 +9,9 @@
 //! * Arbitrary data types associated with vertices and cells
 //! * Serialization/Deserialization with [serde](https://serde.rs)
 
+#[macro_use]
+extern crate derive_builder;
+
 /// The main module of the library. This module contains the public interface
 /// for the library.
 pub mod delaunay_core {
