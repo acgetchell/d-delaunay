@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::{point::Point, utilities::make_uuid};
@@ -54,32 +52,6 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    #[deprecated(note = "Please use `VertexBuilder` instead")]
-    pub fn new(point: Point<T, D>) -> Self {
-        let uuid = make_uuid();
-        let incident_cell = None;
-        let data = None;
-        Self {
-            point,
-            uuid,
-            incident_cell,
-            data,
-        }
-    }
-
-    #[deprecated(note = "Please use `VertexBuilder` instead")]
-    pub fn new_with_data(point: Point<T, D>, data: U) -> Self {
-        let uuid = make_uuid();
-        let incident_cell = None;
-        let data = Some(data);
-        Self {
-            point,
-            uuid,
-            incident_cell,
-            data,
-        }
-    }
-
     /// The function `from_points` takes a vector of points and returns a
     /// vector of vertices, using the `new` method.
     ///
@@ -126,10 +98,10 @@ where
     ///
     /// # Example:
     /// ```
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-    /// let vertex: Vertex<f64, Option<()>, 4> = Vertex::new(point);
+    /// let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_eq!(vertex.dim(), 4);
     /// ```
     pub fn dim(&self) -> usize {

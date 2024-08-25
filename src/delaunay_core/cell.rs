@@ -75,12 +75,12 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-    /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-    /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
-    /// let vertex4 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex4 = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
     /// assert!(cell.vertices.contains(&vertex1));
     /// ```
@@ -124,11 +124,10 @@ where
     /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// // let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
-    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
     /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
     /// assert_eq!(cell.data.unwrap(), "three-one cell");
     /// ```
@@ -163,15 +162,15 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-    /// let vertex2: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-    /// let vertex3: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 0.0, 0.0]));
-    /// let vertex4: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex4 = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>,3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
     /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
-    /// let vertex5 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+    /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
     /// assert!(new_cell.vertices.contains(&vertex5));
     pub fn from_facet_and_vertex(
@@ -207,13 +206,13 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-    /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-    /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
-    /// assert!(cell.vertices.contains(&vertex1));
+    /// assert_eq!(cell.number_of_vertices(), 3);
     /// ```
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
@@ -230,11 +229,11 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-    /// let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-    /// let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
     /// assert_eq!(cell.dim(), 2);
     /// ```
@@ -433,14 +432,15 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
     /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
-    /// assert!(cell.circumsphere_contains(Vertex::new(Point::origin())).unwrap());
+    /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
+    /// assert!(cell.circumsphere_contains(origin).unwrap());
     /// ```
     pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, &'static str>
     where
@@ -462,13 +462,13 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-    /// let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-    /// let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-    /// let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
     /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
     /// let facets = cell.facets();
     /// assert_eq!(facets.len(), 4);
@@ -680,10 +680,26 @@ mod tests {
 
     #[test]
     fn cell_clone() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell1: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let cell2 = cell1.clone();
@@ -693,14 +709,33 @@ mod tests {
 
     #[test]
     fn cell_from_facet_and_vertex() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let facet = Facet::new(cell.clone(), vertex4).unwrap();
-        let vertex5 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
+        let vertex5 = VertexBuilder::default()
+            .point(Point::origin())
+            .build()
+            .unwrap();
         let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
 
         assert!(new_cell.vertices.contains(&vertex1));
@@ -714,10 +749,26 @@ mod tests {
 
     #[test]
     fn cell_into_hashmap() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let hashmap = Cell::into_hashmap(vec![cell.clone()]);
@@ -733,9 +784,18 @@ mod tests {
 
     #[test]
     fn cell_number_of_vertices() {
-        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
 
@@ -744,9 +804,18 @@ mod tests {
 
     #[test]
     fn cell_dim() {
-        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
 
@@ -755,10 +824,26 @@ mod tests {
 
     #[test]
     fn cell_contains_vertex() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
 
@@ -773,13 +858,33 @@ mod tests {
 
     #[test]
     fn cell_contains_vertex_of() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
             .unwrap();
-        let vertex5 = Vertex::new_with_data(Point::new([0.0, 0.0, 0.0]), 0);
+        let vertex5 = VertexBuilder::default()
+            .point(Point::origin())
+            .data(0)
+            .build()
+            .unwrap();
         let cell2 = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex5], "one-three cell")
             .unwrap();
 
@@ -812,9 +917,21 @@ mod tests {
         let point1 = Point::new([0.0, 0.0, 0.0]);
         let point2 = Point::new([1.0, 0.0, 0.0]);
         let point3 = Point::new([0.0, 1.0, 0.0]);
-        let vertex1 = Vertex::new_with_data(point1, 1);
-        let vertex2 = Vertex::new_with_data(point2, 1);
-        let vertex3 = Vertex::new_with_data(point3, 1);
+        let vertex1 = VertexBuilder::default()
+            .point(point1)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(point2)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(point3)
+            .data(1)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
         let circumcenter = cell.circumcenter();
@@ -828,10 +945,26 @@ mod tests {
         let point2 = Point::new([1.0, 0.0, 0.0]);
         let point3 = Point::new([0.0, 1.0, 0.0]);
         let point4 = Point::new([0.0, 0.0, 1.0]);
-        let vertex1 = Vertex::new_with_data(point1, 1);
-        let vertex2 = Vertex::new_with_data(point2, 1);
-        let vertex3 = Vertex::new_with_data(point3, 1);
-        let vertex4 = Vertex::new_with_data(point4, 2);
+        let vertex1 = VertexBuilder::default()
+            .point(point1)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(point2)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(point3)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(point4)
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let circumradius = cell.circumradius().unwrap();
@@ -849,13 +982,33 @@ mod tests {
         let point2 = Point::new([1.0, 0.0, 0.0]);
         let point3 = Point::new([0.0, 1.0, 0.0]);
         let point4 = Point::new([0.0, 0.0, 1.0]);
-        let vertex1 = Vertex::new_with_data(point1, 1);
-        let vertex2 = Vertex::new_with_data(point2, 1);
-        let vertex3 = Vertex::new_with_data(point3, 1);
-        let vertex4 = Vertex::new_with_data(point4, 2);
+        let vertex1 = VertexBuilder::default()
+            .point(point1)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(point2)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(point3)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(point4)
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-        let vertex5 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 3);
+        let vertex5 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(3)
+            .build()
+            .unwrap();
 
         assert!(cell.circumsphere_contains(vertex5).unwrap());
 
@@ -869,13 +1022,33 @@ mod tests {
         let point2 = Point::new([1.0, 0.0, 0.0]);
         let point3 = Point::new([0.0, 1.0, 0.0]);
         let point4 = Point::new([0.0, 0.0, 1.0]);
-        let vertex1 = Vertex::new_with_data(point1, 1);
-        let vertex2 = Vertex::new_with_data(point2, 1);
-        let vertex3 = Vertex::new_with_data(point3, 1);
-        let vertex4 = Vertex::new_with_data(point4, 2);
+        let vertex1 = VertexBuilder::default()
+            .point(point1)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(point2)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(point3)
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(point4)
+            .data(2)
+            .build()
+            .unwrap();
         let cell: Cell<f64, i32, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-        let vertex5 = Vertex::new_with_data(Point::new([2.0, 2.0, 2.0]), 3);
+        let vertex5 = VertexBuilder::default()
+            .point(Point::new([2.0, 2.0, 2.0]))
+            .data(3)
+            .build()
+            .unwrap();
 
         assert!(!cell.circumsphere_contains(vertex5).unwrap());
 
@@ -885,10 +1058,30 @@ mod tests {
 
     #[test]
     fn cell_facets_contains() {
-        let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        // let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
+        // let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
+        // let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
+        // let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
+        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
         let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
             .unwrap();
         let facets = cell.facets();
@@ -904,10 +1097,22 @@ mod tests {
 
     #[test]
     fn cell_to_and_from_json() {
-        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
-        let vertex4 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .build()
+            .unwrap();
         let cell: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let serialized = serde_json::to_string(&cell).unwrap();
@@ -928,11 +1133,26 @@ mod tests {
 
     #[test]
     fn cell_partial_eq() {
-        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-        let vertex2 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-        let vertex3 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
-        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
-        let vertex5 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::origin())
+            .build()
+            .unwrap();
+        let vertex5 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .build()
+            .unwrap();
         let cell1: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let cell2: Cell<f64, Option<()>, Option<()>, 3> =
@@ -952,11 +1172,26 @@ mod tests {
 
     #[test]
     fn cell_partial_ord() {
-        let vertex1 = Vertex::new(Point::new([0.0, 0.0, 0.0]));
-        let vertex2 = Vertex::new(Point::new([1.0, 0.0, 0.0]));
-        let vertex3 = Vertex::new(Point::new([0.0, 1.0, 0.0]));
-        let vertex4 = Vertex::new(Point::new([0.0, 0.0, 1.0]));
-        let vertex5 = Vertex::new(Point::new([1.0, 1.0, 1.0]));
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::origin())
+            .build()
+            .unwrap();
+        let vertex5 = VertexBuilder::default()
+            .point(Point::new([1.0, 1.0, 1.0]))
+            .build()
+            .unwrap();
         let cell1: Cell<f64, Option<()>, Option<()>, 3> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
         let cell2: Cell<f64, Option<()>, Option<()>, 3> =

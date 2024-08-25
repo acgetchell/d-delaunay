@@ -120,11 +120,11 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
     /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// let vertex = Vertex::new(point);
+    /// let vertex = VertexBuilder::default().point(point).build().unwrap();
     /// let result = tds.add(vertex);
     /// assert!(result.is_ok());
     /// ```
@@ -159,10 +159,10 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
-    /// let new_vertex1: Vertex<f64, usize, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+    /// let new_vertex1 = VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap();
     /// let _ = tds.add(new_vertex1);
     /// assert_eq!(tds.number_of_vertices(), 1);
     /// ```
@@ -350,6 +350,8 @@ where
 #[cfg(test)]
 mod tests {
 
+    use crate::delaunay_core::vertex::VertexBuilder;
+
     use super::*;
 
     #[test]
@@ -381,31 +383,46 @@ mod tests {
         assert_eq!(tds.number_of_cells(), 0);
         assert_eq!(tds.dim(), -1);
 
-        let new_vertex1: Vertex<f64, usize, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let new_vertex1 = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
         let _ = tds.add(new_vertex1);
 
         assert_eq!(tds.number_of_vertices(), 1);
         assert_eq!(tds.dim(), 0);
 
-        let new_vertex2: Vertex<f64, usize, 3> = Vertex::new(Point::new([4.0, 5.0, 6.0]));
+        let new_vertex2 = VertexBuilder::default()
+            .point(Point::new([4.0, 5.0, 6.0]))
+            .build()
+            .unwrap();
         let _ = tds.add(new_vertex2);
 
         assert_eq!(tds.number_of_vertices(), 2);
         assert_eq!(tds.dim(), 1);
 
-        let new_vertex3: Vertex<f64, usize, 3> = Vertex::new(Point::new([7.0, 8.0, 9.0]));
+        let new_vertex3 = VertexBuilder::default()
+            .point(Point::new([7.0, 8.0, 9.0]))
+            .build()
+            .unwrap();
         let _ = tds.add(new_vertex3);
 
         assert_eq!(tds.number_of_vertices(), 3);
         assert_eq!(tds.dim(), 2);
 
-        let new_vertex4: Vertex<f64, usize, 3> = Vertex::new(Point::new([10.0, 11.0, 12.0]));
+        let new_vertex4 = VertexBuilder::default()
+            .point(Point::new([10.0, 11.0, 12.0]))
+            .build()
+            .unwrap();
         let _ = tds.add(new_vertex4);
 
         assert_eq!(tds.number_of_vertices(), 4);
         assert_eq!(tds.dim(), 3);
 
-        let new_vertex5: Vertex<f64, usize, 3> = Vertex::new(Point::new([13.0, 14.0, 15.0]));
+        let new_vertex5 = VertexBuilder::default()
+            .point(Point::new([13.0, 14.0, 15.0]))
+            .build()
+            .unwrap();
         let _ = tds.add(new_vertex5);
 
         assert_eq!(tds.number_of_vertices(), 5);
@@ -426,7 +443,10 @@ mod tests {
         assert_eq!(tds.cells.len(), 0);
         assert_eq!(tds.dim(), 3);
 
-        let new_vertex1: Vertex<f64, usize, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
+        let new_vertex1 = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
         let result = tds.add(new_vertex1);
 
         assert_eq!(tds.number_of_vertices(), 4);
