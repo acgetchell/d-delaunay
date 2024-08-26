@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
 use super::{facet::Facet, point::Point, utilities::make_uuid, vertex::Vertex};
@@ -7,7 +8,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, Serialize)]
+#[derive(Builder, Clone, Debug, Default, Deserialize, Eq, Serialize)]
 /// The [Cell] struct represents a d-dimensional
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.
@@ -36,10 +37,13 @@ where
     /// The vertices of the cell.
     pub vertices: Vec<Vertex<T, U, D>>,
     /// The unique identifier of the cell.
+    #[builder(setter(skip), default = "make_uuid()")]
     pub uuid: Uuid,
     /// The neighboring cells connected to the current cell.
+    #[builder(setter(skip), default = "None")]
     pub neighbors: Option<Vec<Uuid>>,
     /// The optional data associated with the cell.
+    #[builder(setter(into, strip_option), default)]
     pub data: Option<V>,
 }
 
@@ -52,38 +56,7 @@ where
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function `new` creates a new [Cell] object with the given
-    /// vertices. A D-dimensional cell has D + 1 vertices, so the number of
-    /// vertices must be less than or equal to D + 1.
-    ///
-    /// # Arguments:
-    ///
-    /// * `vertices`: The vertices of the [Cell] to be constructed.
-    ///
-    /// # Returns:
-    ///
-    /// a [Result] type. If the condition `vertices.len() > D + 1` is true, it
-    /// returns an [Err] variant with the message "Number of vertices must be
-    /// less than or equal to D + 1". Otherwise, it returns an [Ok] variant
-    /// with a [Cell] containing the provided `vertices`, a generated [Uuid],
-    /// and optional neighbor and data fields.
-    ///
-    /// Neighbors will be calculated by the
-    /// `delaunay_core::triangulation_data_structure::Tds`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex4 = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-    /// assert!(cell.vertices.contains(&vertex1));
-    /// ```
+    #[deprecated(since = "0.1.0", note = "Please use `CellBuilder` instead.")]
     pub fn new(vertices: Vec<Vertex<T, U, D>>) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
             return Err("Number of vertices must be less than or equal to D + 1!");
@@ -99,38 +72,7 @@ where
         })
     }
 
-    /// The function `new_with_data` creates a new [Cell] object with the given
-    /// vertices and data. A D-dimensional cell has D + 1 vertices, so the
-    /// number of vertices must be less than or equal to D + 1.
-    ///
-    /// # Arguments:
-    ///
-    /// * `vertices`: The vertices of the [Cell] to be constructed.
-    /// * `data`: The data associated with the [Cell].
-    ///
-    /// # Returns:
-    ///
-    /// a [Result] type. If the condition `vertices.len() > D + 1` is true, it
-    /// returns an [Err] variant with the message "Number of vertices must be
-    /// less than or equal to D + 1". Otherwise, it returns an [Ok] variant
-    /// with a [Cell] containing the provided `vertices`, a generated [Uuid],
-    /// the provided data, and optional neighbor fields which will be later be
-    /// calculated by the
-    /// `delaunay_core::triangulation_data_structure::Tds`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
-    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
-    /// assert_eq!(cell.data.unwrap(), "three-one cell");
-    /// ```
+    #[deprecated(since = "0.1.0", note = "Please use `CellBuilder` instead.")]
     pub fn new_with_data(vertices: Vec<Vertex<T, U, D>>, data: V) -> Result<Self, &'static str> {
         if vertices.len() > D + 1 {
             return Err("Number of vertices must be less than or equal to D + 1!");
@@ -160,7 +102,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
@@ -168,7 +110,7 @@ where
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
     /// let vertex4 = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>,3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
     /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
     /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
@@ -547,8 +489,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
 
         assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
         assert_eq!(cell.vertices[0].data.unwrap(), 1);
@@ -593,6 +537,7 @@ mod tests {
             .unwrap();
         let cell: Result<Cell<f64, i32, Option<()>, 3>, &'static str> =
             Cell::new(vec![vertex1, vertex2, vertex3, vertex4, vertex5]);
+        // let cell: Cell<f64, i32, Option<()>,3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5]).build().unwrap();
 
         assert!(cell.is_err());
 

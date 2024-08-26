@@ -60,7 +60,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::delaunay_core::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -68,7 +68,7 @@ where
     /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
     /// assert_eq!(facet.cell, cell);
     /// ```
@@ -98,7 +98,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::delaunay_core::{point::Point, vertex::VertexBuilder};
+    use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
 
     #[test]
     fn facet_new() {
@@ -118,8 +118,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
 
         assert_eq!(facet.cell, cell);
@@ -146,8 +148,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::new([1.0, 1.0, 1.0]))
             .build()
@@ -162,7 +166,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1])
+            .build()
+            .unwrap();
 
         assert!(Facet::new(cell.clone(), vertex1).is_err());
     }
@@ -185,8 +192,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
         let vertices = facet.clone().vertices();
 
@@ -217,8 +226,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
         let serialized = serde_json::to_string(&facet).unwrap();
 
@@ -253,8 +264,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
@@ -281,8 +294,10 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet3 = Facet::new(cell.clone(), vertex2).unwrap();

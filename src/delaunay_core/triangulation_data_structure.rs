@@ -4,7 +4,8 @@
 //! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
 
 use super::{
-    cell::Cell, facet::Facet, point::Point, utilities::find_extreme_coordinates, vertex::Vertex,
+    cell::Cell, cell::CellBuilder, facet::Facet, point::Point, utilities::find_extreme_coordinates,
+    vertex::Vertex,
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
@@ -239,7 +240,12 @@ where
             points.push(point);
         }
 
-        Cell::new(Vertex::from_points(points))
+        let supercell = CellBuilder::default()
+            .vertices(Vertex::from_points(points))
+            .build()
+            .unwrap();
+
+        Ok(supercell)
     }
 
     /// Performs the Bowyer-Watson algorithm to triangulate a set of vertices.
