@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
 use super::{facet::Facet, point::Point, utilities::make_uuid, vertex::Vertex};
@@ -9,6 +8,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
 use uuid::Uuid;
 
 #[derive(Builder, Clone, Debug, Default, Deserialize, Eq, Serialize)]
+#[builder(build_fn(validate = "Self::validate"))]
 /// The [Cell] struct represents a d-dimensional
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.
@@ -47,6 +47,31 @@ where
     pub data: Option<V>,
 }
 
+impl<T, U, V, const D: usize> CellBuilder<T, U, V, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn validate(&self) -> Result<(), CellBuilderError> {
+        if self
+            .vertices
+            .as_ref()
+            .expect("Must create a Cell with Vertices")
+            .len()
+            > D + 1
+        {
+            let err = CellBuilderError::ValidationError(
+                "Number of vertices must be less than or equal to D + 1!".to_string(),
+            );
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
     T: Clone + ComplexField<RealField = T> + Copy + Default + PartialEq + PartialOrd + Sum,
@@ -56,38 +81,6 @@ where
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    #[deprecated(since = "0.1.0", note = "Please use `CellBuilder` instead.")]
-    pub fn new(vertices: Vec<Vertex<T, U, D>>) -> Result<Self, &'static str> {
-        if vertices.len() > D + 1 {
-            return Err("Number of vertices must be less than or equal to D + 1!");
-        }
-        let uuid = make_uuid();
-        let neighbors = None;
-        let data = None;
-        Ok(Cell {
-            vertices,
-            uuid,
-            neighbors,
-            data,
-        })
-    }
-
-    #[deprecated(since = "0.1.0", note = "Please use `CellBuilder` instead.")]
-    pub fn new_with_data(vertices: Vec<Vertex<T, U, D>>, data: V) -> Result<Self, &'static str> {
-        if vertices.len() > D + 1 {
-            return Err("Number of vertices must be less than or equal to D + 1!");
-        }
-        let uuid = make_uuid();
-        let neighbors = None;
-        let data = Some(data);
-        Ok(Cell {
-            vertices,
-            uuid,
-            neighbors,
-            data,
-        })
-    }
-
     /// The function `from_facet_and_vertex` creates a new [Cell] object from a [Facet] and a [Vertex].
     ///
     /// # Arguments:
@@ -147,13 +140,13 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
     /// assert_eq!(cell.number_of_vertices(), 3);
     /// ```
     pub fn number_of_vertices(&self) -> usize {
@@ -170,13 +163,13 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
     /// assert_eq!(cell.dim(), 2);
     /// ```
     pub fn dim(&self) -> usize {
@@ -211,14 +204,14 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
     /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
     pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool {
@@ -238,16 +231,16 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
     /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
-    /// let cell2 = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex5], "one-three cell").unwrap();
+    /// let cell2: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
     /// assert!(cell.contains_vertex_of(cell2));
     pub fn contains_vertex_of(&self, cell: Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
@@ -342,6 +335,7 @@ where
     /// The circumradius is the distance from the circumcenter to any vertex.
     ///
     /// # Returns:
+    ///
     /// If successful, returns an Ok containing the circumradius of the cell,
     /// otherwise returns an Err with an error message.
     fn circumradius(&self) -> Result<T, &'static str>
@@ -373,14 +367,14 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
     /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
     /// ```
@@ -403,7 +397,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// use d_delaunay::delaunay_core::facet::Facet;
@@ -411,7 +405,7 @@ where
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
     /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell").unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let facets = cell.facets();
     /// assert_eq!(facets.len(), 4);
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
@@ -463,12 +457,11 @@ where
 #[cfg(test)]
 mod tests {
 
+    use super::*;
     use crate::delaunay_core::{point::Point, vertex::VertexBuilder};
 
-    use super::*;
-
     #[test]
-    fn cell_new() {
+    fn cell_build() {
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(1)
@@ -509,7 +502,14 @@ mod tests {
     }
 
     #[test]
-    fn cell_new_with_too_many_vertices() {
+    #[should_panic(expected = "Must create a Cell with Vertices")]
+    fn cell_empty() {
+        let _cell: Result<Cell<f64, i32, Option<()>, 3>, CellBuilderError> =
+            CellBuilder::default().build();
+    }
+
+    #[test]
+    fn cell_build_with_too_many_vertices() {
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(1)
@@ -535,9 +535,9 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let cell: Result<Cell<f64, i32, Option<()>, 3>, &'static str> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4, vertex5]);
-        // let cell: Cell<f64, i32, Option<()>,3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5]).build().unwrap();
+        let cell: Result<Cell<f64, i32, Option<()>, 3>, CellBuilderError> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5])
+            .build();
 
         assert!(cell.is_err());
 
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn cell_new_with_data() {
+    fn cell_build_with_data() {
         let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(1)
@@ -567,7 +567,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
+        let cell: Cell<f64, i32, &str, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .data("three-one cell")
+            .build()
             .unwrap();
 
         assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
@@ -583,44 +586,6 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Cell: {:?}", cell);
-    }
-
-    #[test]
-    fn cell_new_with_data_with_too_many_vertices() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0]))
-            .data(3)
-            .build()
-            .unwrap();
-        let cell = Cell::new_with_data(
-            vec![vertex1, vertex2, vertex3, vertex4, vertex5],
-            "three-one cell",
-        );
-
-        assert!(cell.is_err());
-
-        // Human readable output for cargo test -- --nocapture
-        println!("{:?}", cell);
     }
 
     #[test]
@@ -645,8 +610,11 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell1: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell1: Cell<f64, i32, &str, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .data("three-one cell")
+            .build()
+            .unwrap();
         let cell2 = cell1.clone();
 
         assert_eq!(cell1, cell2);
@@ -674,8 +642,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let facet = Facet::new(cell.clone(), vertex4).unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::origin())
@@ -714,8 +684,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let hashmap = Cell::into_hashmap(vec![cell.clone()]);
         let values: Vec<Cell<f64, i32, Option<()>, 3>> = hashmap.into_values().collect();
 
@@ -741,8 +713,10 @@ mod tests {
             .point(Point::new([1.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3])
+            .build()
+            .unwrap();
 
         assert_eq!(cell.number_of_vertices(), 3);
     }
@@ -761,8 +735,10 @@ mod tests {
             .point(Point::new([1.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3])
+            .build()
+            .unwrap();
 
         assert_eq!(cell.dim(), 2);
     }
@@ -789,8 +765,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
 
         assert!(cell.contains_vertex(vertex1));
         assert!(cell.contains_vertex(vertex2));
@@ -803,7 +781,7 @@ mod tests {
 
     #[test]
     fn cell_contains_vertex_of() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+        let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(1)
             .build()
@@ -823,14 +801,20 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
+        let cell: Cell<f64, i32, &str, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .data("three-one cell")
+            .build()
             .unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::origin())
             .data(0)
             .build()
             .unwrap();
-        let cell2 = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex5], "one-three cell")
+        let cell2 = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex5])
+            .data("one-three cell")
+            .build()
             .unwrap();
 
         assert!(cell.contains_vertex_of(cell2));
@@ -847,8 +831,10 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(Vertex::from_points(points)).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(Vertex::from_points(points))
+            .build()
+            .unwrap();
         let circumcenter = cell.circumcenter().unwrap();
 
         assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
@@ -877,8 +863,10 @@ mod tests {
             .data(1)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3])
+            .build()
+            .unwrap();
         let circumcenter = cell.circumcenter();
 
         assert!(circumcenter.is_err());
@@ -910,8 +898,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let circumradius = cell.circumradius().unwrap();
         let radius: f64 = 3.0_f64.sqrt() / 2.0;
 
@@ -947,8 +937,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::new([1.0, 1.0, 1.0]))
             .data(3)
@@ -987,8 +979,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::new([2.0, 2.0, 2.0]))
             .data(3)
@@ -1003,10 +997,6 @@ mod tests {
 
     #[test]
     fn cell_facets_contains() {
-        // let vertex1 = Vertex::new_with_data(Point::new([0.0, 0.0, 1.0]), 1);
-        // let vertex2 = Vertex::new_with_data(Point::new([0.0, 1.0, 0.0]), 1);
-        // let vertex3 = Vertex::new_with_data(Point::new([1.0, 0.0, 0.0]), 1);
-        // let vertex4 = Vertex::new_with_data(Point::new([1.0, 1.0, 1.0]), 2);
         let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(1)
@@ -1027,7 +1017,10 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let cell = Cell::new_with_data(vec![vertex1, vertex2, vertex3, vertex4], "three-one cell")
+        let cell: Cell<f64, i32, Option<&str>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .data("three-one cell")
+            .build()
             .unwrap();
         let facets = cell.facets();
 
@@ -1058,8 +1051,10 @@ mod tests {
             .point(Point::new([1.0, 1.0, 1.0]))
             .build()
             .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
         let serialized = serde_json::to_string(&cell).unwrap();
 
         assert!(serialized.contains("[0.0,0.0,1.0]"));
@@ -1098,14 +1093,22 @@ mod tests {
             .point(Point::new([1.0, 1.0, 1.0]))
             .build()
             .unwrap();
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-        let cell3: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex4, vertex3, vertex2, vertex1]).unwrap();
-        let cell4: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex5, vertex4, vertex3, vertex2]).unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
+        let cell2 = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
+        let cell3 = CellBuilder::default()
+            .vertices(vec![vertex4, vertex3, vertex2, vertex1])
+            .build()
+            .unwrap();
+        let cell4 = CellBuilder::default()
+            .vertices(vec![vertex5, vertex4, vertex3, vertex2])
+            .build()
+            .unwrap();
 
         assert_eq!(cell1, cell2);
         // Two cells with the same vertices but different uuids are equal
@@ -1137,12 +1140,18 @@ mod tests {
             .point(Point::new([1.0, 1.0, 1.0]))
             .build()
             .unwrap();
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex1, vertex2, vertex3, vertex4]).unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex4, vertex3, vertex2, vertex1]).unwrap();
-        let cell3: Cell<f64, Option<()>, Option<()>, 3> =
-            Cell::new(vec![vertex5, vertex4, vertex3, vertex2]).unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
+        let cell2 = CellBuilder::default()
+            .vertices(vec![vertex4, vertex3, vertex2, vertex1])
+            .build()
+            .unwrap();
+        let cell3 = CellBuilder::default()
+            .vertices(vec![vertex5, vertex4, vertex3, vertex2])
+            .build()
+            .unwrap();
 
         assert!(cell1 < cell3);
         assert!(cell2 < cell3);
