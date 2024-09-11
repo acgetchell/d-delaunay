@@ -11,7 +11,6 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use peroxide::fuga::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::convert::TryInto;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
 use uuid::Uuid;
 
@@ -291,95 +290,6 @@ where
     /// If the function is successful, it will return an Ok variant containing
     /// the circumcenter as a Point<f64, D> value. If there is an error, it
     /// will return an Err variant containing an error message.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Please use the circumcenter2 function instead."
-    )]
-    fn circumcenter(&self) -> Result<Point<f64, D>, &'static str>
-    where
-        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
-    {
-        let dim = self.dim();
-        if self.vertices[0].dim() != dim {
-            return Err("Not a simplex!");
-        }
-
-        let mut matrix: na::SMatrix<T, D, D> = na::SMatrix::zeros();
-        // Column-major matrix, so data in debugger will be opposite of the
-        // row,col indices
-        for i in 0..dim {
-            // rows
-            for j in 0..dim {
-                // cols
-                matrix[(i, j)] =
-                    self.vertices[i + 1].point.coords[j] - self.vertices[0].point.coords[j];
-            }
-        }
-
-        let a_inv = matrix.try_inverse().ok_or("Singular matrix!")?;
-
-        let mut b: na::SMatrix<T, D, 1> = na::SMatrix::zeros();
-        for i in 0..dim {
-            b[i] = na::distance_squared(
-                &na::Point::from(self.vertices[i + 1].point.coords),
-                &na::Point::from(self.vertices[0].point.coords),
-            );
-        }
-
-        let solution = a_inv * b;
-
-        let mut solution_array: [T; D] = solution
-            .data
-            .as_slice()
-            .try_into()
-            .expect("Failed to convert solution to array!");
-
-        for value in solution_array.iter_mut() {
-            *value /= na::convert::<f64, T>(2.0);
-        }
-
-        let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
-
-        Ok(Point::<f64, D>::new(solution_point.coords))
-    }
-
-    /// The function `circumcenter2` returns the circumcenter of the cell.
-    ///
-    /// Using the approach from:
-    ///
-    /// Lévy, Bruno, and Yang Liu.
-    /// “Lp Centroidal Voronoi Tessellation and Its Applications.”
-    /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
-    /// <https://doi.org/10.1145/1778765.1778856>.
-    ///
-    /// The circumcenter C of a cell with vertices x_0, x_1, ..., x_n is the
-    /// solution to the system:
-    ///
-    /// C = 1/2 (A^-1*B)
-    ///
-    /// Where:
-    ///
-    /// A is a matrix (to be inverted) of the form:
-    ///     (x_1-x0) for all coordinates in x1, x0
-    ///     (x2-x0) for all coordinates in x2, x0
-    ///     ... for all x_n in the cell
-    ///
-    /// These are the perpendicular bisectors of the edges of the cell.
-    ///
-    /// And:
-    ///
-    /// B is a vector of the form:
-    ///     (x_1^2-x0^2) for all coordinates in x1, x0
-    ///     (x_2^2-x0^2) for all coordinates in x2, x0
-    ///     ... for all x_n in the cell
-    ///
-    /// The resulting vector gives the coordinates of the circumcenter.
-    ///
-    /// # Returns:
-    ///
-    /// If the function is successful, it will return an Ok variant containing
-    /// the circumcenter as a Point<f64, D> value. If there is an error, it
-    /// will return an Err variant containing an error message.
     ///
     /// # Example
     ///
@@ -392,10 +302,10 @@ where
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
-    /// let circumcenter = cell.circumcenter2().unwrap();
+    /// let circumcenter = cell.circumcenter().unwrap();
     /// assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
     /// ```
-    pub fn circumcenter2(&self) -> Result<Point<f64, D>, anyhow::Error>
+    pub fn circumcenter(&self) -> Result<Point<f64, D>, anyhow::Error>
     where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
@@ -446,7 +356,7 @@ where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let circumcenter = self.circumcenter2()?;
+        let circumcenter = self.circumcenter()?;
         // Change the type of vertex to match circumcenter
         let vertex = Point::<f64, D>::from(self.vertices[0].point.coords);
         Ok(na::distance(
@@ -488,7 +398,7 @@ where
     {
         let circumradius = self.circumradius()?;
         let radius = na::distance(
-            &na::Point::<T, D>::from(self.circumcenter2()?.coords),
+            &na::Point::<T, D>::from(self.circumcenter()?.coords),
             &na::Point::<T, D>::from(Point::<f64, D>::from(vertex.point.coords).coords),
         );
 
@@ -926,28 +836,8 @@ mod tests {
         println!("Cell: {:?}", cell);
     }
 
-    // #[test]
-    // fn cell_circumcenter() {
-    //     let points = vec![
-    //         Point::new([0.0, 0.0, 0.0]),
-    //         Point::new([1.0, 0.0, 0.0]),
-    //         Point::new([0.0, 1.0, 0.0]),
-    //         Point::new([0.0, 0.0, 1.0]),
-    //     ];
-    //     let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-    //         .vertices(Vertex::from_points(points))
-    //         .build()
-    //         .unwrap();
-    //     let circumcenter = cell.circumcenter().unwrap();
-
-    //     assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
-
-    //     // Human readable output for cargo test -- --nocapture
-    //     println!("Circumcenter: {:?}", circumcenter);
-    // }
-
     #[test]
-    fn cell_circumcenter2() {
+    fn cell_circumcenter() {
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
             Point::new([1.0, 0.0, 0.0]),
@@ -958,7 +848,7 @@ mod tests {
             .vertices(Vertex::from_points(points))
             .build()
             .unwrap();
-        let circumcenter = cell.circumcenter2().unwrap();
+        let circumcenter = cell.circumcenter().unwrap();
 
         assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
 
@@ -990,7 +880,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        let circumcenter = cell.circumcenter2();
+        let circumcenter = cell.circumcenter();
 
         assert!(circumcenter.is_err());
     }
