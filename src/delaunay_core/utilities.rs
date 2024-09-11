@@ -97,11 +97,8 @@ pub fn vec_to_array<const D: usize>(vec: Vec<f64>) -> Result<[f64; D], anyhow::E
             "Vector length does not match array dimension!",
         ));
     }
+    let array: [f64; D] = std::array::from_fn(|i| vec[i]);
 
-    let mut array: [f64; D] = [0.0; D];
-    for (i, value) in vec.iter().enumerate() {
-        array[i] = *value;
-    }
     Ok(array)
 }
 

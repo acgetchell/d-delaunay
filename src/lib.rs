@@ -23,6 +23,14 @@ pub mod delaunay_core {
     pub mod triangulation_data_structure;
     pub mod utilities;
     pub mod vertex;
+    // Re-export the `delaunay_core` modules.
+    pub use cell::*;
+    pub use facet::*;
+    pub use matrix::*;
+    pub use point::*;
+    pub use triangulation_data_structure::*;
+    pub use utilities::*;
+    pub use vertex::*;
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
