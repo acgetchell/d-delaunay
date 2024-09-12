@@ -11,16 +11,26 @@
 
 #[macro_use]
 extern crate derive_builder;
+extern crate peroxide;
 
 /// The main module of the library. This module contains the public interface
 /// for the library.
 pub mod delaunay_core {
     pub mod cell;
     pub mod facet;
+    pub mod matrix;
     pub mod point;
     pub mod triangulation_data_structure;
     pub mod utilities;
     pub mod vertex;
+    // Re-export the `delaunay_core` modules.
+    pub use cell::*;
+    pub use facet::*;
+    pub use matrix::*;
+    pub use point::*;
+    pub use triangulation_data_structure::*;
+    pub use utilities::*;
+    pub use vertex::*;
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.

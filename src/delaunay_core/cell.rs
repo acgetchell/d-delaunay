@@ -1,8 +1,15 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
-use super::{facet::Facet, point::Point, utilities::make_uuid, vertex::Vertex};
+use super::{
+    facet::Facet,
+    matrix::invert,
+    point::Point,
+    utilities::{make_uuid, vec_to_array},
+    vertex::Vertex,
+};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
+use peroxide::fuga::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
 use uuid::Uuid;
@@ -111,7 +118,7 @@ where
     pub fn from_facet_and_vertex(
         mut facet: Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
-    ) -> Result<Self, &'static str> {
+    ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
         vertices.push(vertex);
         let uuid = make_uuid();
@@ -283,48 +290,54 @@ where
     /// If the function is successful, it will return an Ok variant containing
     /// the circumcenter as a Point<f64, D> value. If there is an error, it
     /// will return an Err variant containing an error message.
-    fn circumcenter(&self) -> Result<Point<f64, D>, &'static str>
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
+    /// let circumcenter = cell.circumcenter().unwrap();
+    /// assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
+    /// ```
+    pub fn circumcenter(&self) -> Result<Point<f64, D>, anyhow::Error>
     where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let dim = self.dim();
         if self.vertices[0].dim() != dim {
-            return Err("Not a simplex!");
+            return Err(anyhow::Error::msg("Not a simplex!"));
         }
 
-        let mut matrix: na::SMatrix<T, D, D> = na::SMatrix::zeros();
-        // Column-major matrix, so data in debugger will be opposite of the
-        // row,col indices
+        let mut matrix = zeros(dim, dim);
         for i in 0..dim {
-            // rows
             for j in 0..dim {
-                // cols
-                matrix[(i, j)] =
-                    self.vertices[i + 1].point.coords[j] - self.vertices[0].point.coords[j];
+                matrix[(i, j)] = (self.vertices[i + 1].point.coords[j]
+                    - self.vertices[0].point.coords[j])
+                    .into();
             }
         }
 
-        let a_inv = matrix.try_inverse().ok_or("Singular matrix!")?;
+        let a_inv = invert(&matrix)?;
 
-        let mut b: na::SMatrix<T, D, 1> = na::SMatrix::zeros();
+        let mut b = zeros(dim, 1);
         for i in 0..dim {
-            b[i] = na::distance_squared(
+            b[(i, 0)] = na::distance_squared(
                 &na::Point::from(self.vertices[i + 1].point.coords),
                 &na::Point::from(self.vertices[0].point.coords),
-            );
+            )
+            .into();
         }
 
-        let solution = a_inv * b;
+        let solution = a_inv * b * 0.5;
 
-        let mut solution_array: [T; D] = solution
-            .data
-            .as_slice()
-            .try_into()
-            .expect("Failed to convert solution to array!");
-
-        for value in solution_array.iter_mut() {
-            *value /= na::convert::<f64, T>(2.0);
-        }
+        let solution_vec = solution.col(0).to_vec();
+        let solution_array = vec_to_array(solution_vec).map_err(anyhow::Error::msg)?;
 
         let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
 
@@ -338,7 +351,7 @@ where
     ///
     /// If successful, returns an Ok containing the circumradius of the cell,
     /// otherwise returns an Err with an error message.
-    fn circumradius(&self) -> Result<T, &'static str>
+    fn circumradius(&self) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -378,7 +391,7 @@ where
     /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
     /// ```
-    pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, &'static str>
+    pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,

@@ -16,6 +16,7 @@
         "clippy",
         "Codacy",
         "codecov",
+        "fuga",
         "Getchell",
         "getrandom",
         "Lévy",
@@ -29,6 +30,7 @@
         "simplicial",
         "spacelike",
         "supercell",
+        "thiserror",
         "typenum",
         "Voronoi",
         "wasi"

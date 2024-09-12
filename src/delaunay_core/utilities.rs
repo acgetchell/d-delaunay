@@ -81,6 +81,27 @@ where
     min_coords
 }
 
+/// The function `vec_to_array` converts a [Vec] to an array of f64
+///
+/// # Example
+///
+/// ```
+/// use d_delaunay::delaunay_core::utilities::vec_to_array;
+/// let vec = vec![1.0, 2.0, 3.0];
+/// let array = vec_to_array::<3>(vec).unwrap();
+/// assert_eq!(array, [1.0, 2.0, 3.0]);
+/// ```
+pub fn vec_to_array<const D: usize>(vec: Vec<f64>) -> Result<[f64; D], anyhow::Error> {
+    if vec.len() != D {
+        return Err(anyhow::Error::msg(
+            "Vector length does not match array dimension!",
+        ));
+    }
+    let array: [f64; D] = std::array::from_fn(|i| vec[i]);
+
+    Ok(array)
+}
+
 #[cfg(test)]
 mod tests {
 
