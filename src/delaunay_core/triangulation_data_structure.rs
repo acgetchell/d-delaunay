@@ -206,7 +206,7 @@ where
     /// # Returns:
     ///
     /// A [Cell] that encompasses all [Vertex] objects in the triangulation.
-    fn supercell(&self) -> Result<Cell<T, U, V, D>, &'static str> {
+    fn supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
         // First, find the min and max coordinates
         let mut min_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Less);
         let mut max_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Greater);
@@ -253,7 +253,7 @@ where
     /// # Returns:
     ///
     /// A [Result] containing a [Vec] of [Cell] objects representing the triangulation, or an error message.
-    fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, &'static str>
+    fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
