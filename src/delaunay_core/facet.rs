@@ -9,6 +9,7 @@
 use super::{cell::Cell, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
 /// The [Facet] struct represents a facet of a d-dimensional simplex.
@@ -72,13 +73,13 @@ where
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
     /// assert_eq!(facet.cell, cell);
     /// ```
-    pub fn new(cell: Cell<T, U, V, D>, vertex: Vertex<T, U, D>) -> Result<Self, &'static str> {
+    pub fn new(cell: Cell<T, U, V, D>, vertex: Vertex<T, U, D>) -> Result<Self, anyhow::Error> {
         if !cell.vertices.contains(&vertex) {
-            return Err("The cell does not contain the vertex!");
+            return Err(FacetError::CellDoesNotContainVertex.into());
         }
 
         if cell.vertices.len() == 1 {
-            return Err("The cell is a 0-simplex with no facet!");
+            return Err(FacetError::CellIsZeroSimplex.into());
         }
 
         Ok(Facet { cell, vertex })
@@ -94,6 +95,16 @@ where
     }
 }
 
+/// Error type for facet operations.
+#[derive(Debug, Error)]
+pub enum FacetError {
+    /// The cell does not contain the vertex.
+    #[error("The cell does not contain the vertex!")]
+    CellDoesNotContainVertex,
+    /// The cell is a 0-simplex with no facet.
+    #[error("The cell is a 0-simplex with no facet!")]
+    CellIsZeroSimplex,
+}
 #[cfg(test)]
 mod tests {
 

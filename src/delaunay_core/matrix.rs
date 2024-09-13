@@ -43,7 +43,7 @@ pub fn invert(matrix: &Matrix) -> Result<Matrix, anyhow::Error> {
 #[derive(Debug, Error)]
 pub enum MatrixError {
     /// Matrix is singular.
-    #[error("Matrix is singular")]
+    #[error("Matrix is singular!")]
     SingularMatrix,
 }
 

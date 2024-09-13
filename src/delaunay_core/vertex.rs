@@ -207,33 +207,6 @@ mod tests {
         println!("{:?}", vertex);
     }
 
-    // #[test]
-    // fn vertex_new() {
-    //     let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
-
-    //     assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
-    //     assert_eq!(vertex.dim(), 3);
-    //     assert!(vertex.incident_cell.is_none());
-    //     assert!(vertex.data.is_none());
-
-    //     // Human readable output for cargo test -- --nocapture
-    //     println!("{:?}", vertex);
-    // }
-
-    // #[test]
-    // fn vertex_new_with_data() {
-    //     let vertex = Vertex::new_with_data(Point::new([1.0, 2.0, 3.0, 4.0]), "4D");
-
-    //     assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
-    //     assert_eq!(vertex.dim(), 4);
-    //     assert!(vertex.incident_cell.is_none());
-    //     assert!(vertex.data.is_some());
-    //     assert_eq!(vertex.data.unwrap(), "4D");
-
-    //     // Human readable output for cargo test -- --nocapture
-    //     println!("{:?}", vertex);
-    // }
-
     #[test]
     fn vertex_copy() {
         let vertex: Vertex<f64, &str, 4> = VertexBuilder::default()

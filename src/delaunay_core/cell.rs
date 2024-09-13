@@ -11,7 +11,7 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use peroxide::fuga::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum, ops::Div};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use uuid::Uuid;
 
 #[derive(Builder, Clone, Debug, Default, Deserialize, Eq, Serialize)]
@@ -65,7 +65,7 @@ where
         if self
             .vertices
             .as_ref()
-            .expect("Must create a Cell with Vertices")
+            .expect("Must create a Cell with Vertices!")
             .len()
             > D + 1
         {
@@ -84,7 +84,6 @@ where
     T: Clone + ComplexField<RealField = T> + Copy + Default + PartialEq + PartialOrd + Sum,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    for<'a> &'a T: Div<f64>,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -858,21 +857,18 @@ mod tests {
 
     #[test]
     fn cell_circumcenter_fail() {
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
         let vertex1 = VertexBuilder::default()
-            .point(point1)
+            .point(Point::new([0.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex2 = VertexBuilder::default()
-            .point(point2)
+            .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex3 = VertexBuilder::default()
-            .point(point3)
+            .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
@@ -887,27 +883,23 @@ mod tests {
 
     #[test]
     fn cell_circumradius() {
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
         let vertex1 = VertexBuilder::default()
-            .point(point1)
+            .point(Point::new([0.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex2 = VertexBuilder::default()
-            .point(point2)
+            .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex3 = VertexBuilder::default()
-            .point(point3)
+            .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex4 = VertexBuilder::default()
-            .point(point4)
+            .point(Point::new([0.0, 0.0, 1.0]))
             .data(2)
             .build()
             .unwrap();
@@ -926,27 +918,23 @@ mod tests {
 
     #[test]
     fn cell_circumsphere_contains() {
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
         let vertex1 = VertexBuilder::default()
-            .point(point1)
+            .point(Point::new([0.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex2 = VertexBuilder::default()
-            .point(point2)
+            .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex3 = VertexBuilder::default()
-            .point(point3)
+            .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex4 = VertexBuilder::default()
-            .point(point4)
+            .point(Point::new([0.0, 0.0, 1.0]))
             .data(2)
             .build()
             .unwrap();
@@ -968,27 +956,23 @@ mod tests {
 
     #[test]
     fn cell_circumsphere_does_not_contain() {
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
         let vertex1 = VertexBuilder::default()
-            .point(point1)
+            .point(Point::new([0.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex2 = VertexBuilder::default()
-            .point(point2)
+            .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex3 = VertexBuilder::default()
-            .point(point3)
+            .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex4 = VertexBuilder::default()
-            .point(point4)
+            .point(Point::new([0.0, 0.0, 1.0]))
             .data(2)
             .build()
             .unwrap();
