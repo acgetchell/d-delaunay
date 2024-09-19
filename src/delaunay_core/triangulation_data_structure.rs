@@ -4,7 +4,7 @@
 //! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
 
 use super::{
-    cell::Cell, cell::CellBuilder, facet::Facet, point::Point, utilities::find_extreme_coordinates,
+    cell::Cell, cell::CellBuilder, point::Point, utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
 use na::{ComplexField, Const, OPoint};
@@ -252,93 +252,60 @@ where
     ///
     /// # Returns:
     ///
-    /// A [Result] containing a [Vec] of [Cell] objects representing the triangulation, or an error message.
-    fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, anyhow::Error>
+    /// A [Result] containing the updated [Tds] with the Delaunay triangulation, or an error message.
+    pub fn bowyer_watson(&mut self) -> Result<Self, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let mut triangulation: Vec<Cell<T, U, V, D>> = Vec::new();
-
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-        triangulation.push(supercell.clone());
+        self.cells.insert(supercell.uuid, supercell.clone());
 
         // Iterate over vertices
-        for vertex in self.vertices.values() {
-            // Find cells that contain the vertex
-            let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
+        for vertex in self.vertices.values().cloned().collect::<Vec<_>>() {
+            let mut bad_cells = Vec::new();
+            let mut boundary_facets = Vec::new();
 
-            for cell in &triangulation {
-                if cell.circumsphere_contains(*vertex)? {
-                    bad_cells.push((*cell).clone());
+            // Find cells whose circumsphere contains the vertex
+            for (cell_id, cell) in self.cells.iter() {
+                if cell.circumsphere_contains(vertex)? {
+                    bad_cells.push(*cell_id);
                 }
             }
 
-            // Find the boundary of the hole left by the bad cells
-            let mut boundary_facets: Vec<Facet<T, U, V, D>> = Vec::new();
-            for bad_cell in &bad_cells {
-                for facet in bad_cell.facets() {
-                    if !bad_cells.iter().any(|c| c.facets().contains(&facet)) {
-                        boundary_facets.push(facet);
+            // Collect boundary facets
+            for &bad_cell_id in &bad_cells {
+                if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
+                    for facet in bad_cell.facets() {
+                        if !bad_cells.iter().any(|&id| {
+                            self.cells
+                                .get(&id)
+                                .map_or(false, |c| c.contains_facet(&facet))
+                        }) {
+                            boundary_facets.push(facet);
+                        }
                     }
                 }
             }
 
-            // Remove bad cells from triangulation
-            triangulation.retain(|cell| !bad_cells.contains(cell));
+            // Remove bad cells
+            for bad_cell_id in bad_cells {
+                self.cells.remove(&bad_cell_id);
+            }
 
-            // Create new cells from the boundary facets and new vertex
+            // Create new cells using the boundary facets and the new vertex
             for facet in boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
-                triangulation.push(new_cell);
+                let new_cell = Cell::from_facet_and_vertex(facet, vertex)?;
+                self.cells.insert(new_cell.uuid, new_cell);
             }
         }
 
-        //     // Find the boundary of the polygonal hole
-        //     let mut polygonal_hole: Vec<Facet<T, U, V, D>> = Vec::new();
-        //     for cell in bad_cells.iter() {
-        //         // Create Facets from the Cell
-        //         for vertex in cell.vertices.iter() {
-        //             let facet = Facet::new(cell.clone(), *vertex)?;
-        //             polygonal_hole.push(facet);
-        //         }
+        // Remove cells that contain vertices of the supercell
+        self.cells
+            .retain(|_, cell| !cell.contains_vertex_of(supercell.clone()));
 
-        //         // for vertex in cell.vertices.iter() {
-        //         //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
-        //         //         polygonal_hole.push(vertex.clone());
-        //         //     }
-        //         // }
-        //     }
-
-        //     // Remove duplicate facets
-        //     polygonal_hole.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        //     polygonal_hole.dedup();
-
-        //     // Remove bad cells from the triangulation
-        //     for cell in bad_cells.iter() {
-        //         triangulation.remove(triangulation.iter().position(|c| c == cell).unwrap());
-        //     }
-
-        //     // Re-triangulate the polygonal hole
-        //     for mut facet in polygonal_hole.iter().cloned() {
-        //         let mut new_cell_vertices: Vec<Vertex<T, U, D>> = Vec::new();
-        //         for facet_vertex in facet.vertices().iter() {
-        //             new_cell_vertices.push(*facet_vertex);
-        //         }
-        //         new_cell_vertices.push(*vertex);
-        //         triangulation.push(Cell::new(new_cell_vertices)?);
-        //     }
-        // }
-
-        // // Remove all cells containing vertices from the supercell
-        // triangulation
-        //     .retain(|c| !c.contains_vertex(supercell.vertices.clone().into_iter().next().unwrap()));
-
-        // Remove any cells that contain a vertex of the supercell
-        triangulation.retain(|cell| !cell.contains_vertex_of(supercell.clone()));
-
-        Ok(triangulation)
+        Ok(self.clone())
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
@@ -493,13 +460,15 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
         ];
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let cells = tds.bowyer_watson();
-        let unwrapped_cells = cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}", err));
+        let result = tds.bowyer_watson().unwrap_or_else(|err| {
+            panic!("Error creating triangulation: {:?}", err);
+        });
 
-        assert_eq!(unwrapped_cells.len(), 1);
+        assert_eq!(result.number_of_vertices(), 4);
+        assert_eq!(result.number_of_cells(), 2);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", unwrapped_cells);
+        println!("{:?}", result);
     }
 
     #[test]

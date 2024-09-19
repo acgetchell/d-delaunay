@@ -115,7 +115,7 @@ where
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
     /// assert!(new_cell.vertices.contains(&vertex5));
     pub fn from_facet_and_vertex(
-        mut facet: Facet<T, U, V, D>,
+        facet: Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
     ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
@@ -257,7 +257,7 @@ where
     /// Using the approach from:
     ///
     /// Lévy, Bruno, and Yang Liu.
-    /// “Lp Centroidal Voronoi Tessellation and Its Applications.”
+    /// "Lp Centroidal Voronoi Tessellation and Its Applications."
     /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
     /// <https://doi.org/10.1145/1778765.1778856>.
     ///
@@ -427,6 +427,19 @@ where
         }
 
         facets
+    }
+
+    /// The function `contains_facet` checks if a given facet is contained in the cell.
+    ///
+    /// # Arguments:
+    ///
+    /// * `facet`: The facet to check.
+    ///
+    /// # Returns:
+    ///
+    /// Returns `true` if the given facet is contained in the cell, and `false` otherwise.
+    pub fn contains_facet(&self, facet: &Facet<T, U, V, D>) -> bool {
+        self.vertices.iter().all(|v| facet.vertices().contains(v))
     }
 }
 
