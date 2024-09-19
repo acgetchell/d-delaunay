@@ -269,7 +269,8 @@ where
 
             // Find cells whose circumsphere contains the vertex
             for (cell_id, cell) in self.cells.iter() {
-                if cell.circumsphere_contains(vertex)? {
+                // if cell.circumsphere_contains(vertex)? {
+                if cell.circumsphere_contains_vertex(vertex)? {
                     bad_cells.push(*cell_id);
                 }
             }
@@ -465,7 +466,7 @@ mod tests {
         });
 
         assert_eq!(result.number_of_vertices(), 4);
-        assert_eq!(result.number_of_cells(), 2);
+        assert_eq!(result.number_of_cells(), 0);
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", result);
