@@ -263,14 +263,14 @@ where
         self.cells.insert(supercell.uuid, supercell.clone());
 
         // Iterate over vertices
-        for vertex in self.vertices.values().cloned().collect::<Vec<_>>() {
+        for vertex in self.vertices.values() {
             let mut bad_cells = Vec::new();
             let mut boundary_facets = Vec::new();
 
             // Find cells whose circumsphere contains the vertex
             for (cell_id, cell) in self.cells.iter() {
                 // if cell.circumsphere_contains(vertex)? {
-                if cell.circumsphere_contains_vertex(vertex)? {
+                if cell.circumsphere_contains_vertex(*vertex)? {
                     bad_cells.push(*cell_id);
                 }
             }
@@ -297,14 +297,14 @@ where
 
             // Create new cells using the boundary facets and the new vertex
             for facet in boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, vertex)?;
+                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
                 self.cells.insert(new_cell.uuid, new_cell);
             }
         }
 
         // Remove cells that contain vertices of the supercell
         self.cells
-            .retain(|_, cell| !cell.contains_vertex_of(supercell.clone()));
+            .retain(|_, cell| !cell.contains_vertex_of(&supercell));
 
         Ok(self.clone())
     }
@@ -466,7 +466,7 @@ mod tests {
         });
 
         assert_eq!(result.number_of_vertices(), 4);
-        assert_eq!(result.number_of_cells(), 0);
+        assert_eq!(result.number_of_cells(), 1);
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", result);

@@ -247,8 +247,8 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
     /// let cell2: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
-    /// assert!(cell.contains_vertex_of(cell2));
-    pub fn contains_vertex_of(&self, cell: Cell<T, U, V, D>) -> bool {
+    /// assert!(cell.contains_vertex_of(&cell2));
+    pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
 
@@ -406,7 +406,9 @@ where
 
     /// The function `circumsphere_contains_vertex` checks if a given vertex is
     /// contained in the circumsphere of the Cell using a matrix determinant.
-    /// It should be more numerically stable than `circumsphere_contains`.
+    /// This method is preferred over `circumsphere_contains` as it provides better numerical
+    /// stability by using a matrix determinant approach instead of distance calculations,
+    /// which can accumulate floating-point errors.
     ///
     /// # Arguments:
     ///
@@ -499,6 +501,10 @@ where
     /// Returns `true` if the given facet is contained in the cell, and `false` otherwise.
     pub fn contains_facet(&self, facet: &Facet<T, U, V, D>) -> bool {
         self.vertices.iter().all(|v| facet.vertices().contains(v))
+
+        // Alternative implementation using HashSet, requires Eq on T in Vertex<T, U, D>
+        // let vertex_set: HashSet<&Vertex<T, U, D>> = self.vertices.iter().collect();
+        // facet.vertices().iter().all(|v| vertex_set.contains(v))
     }
 }
 
@@ -901,7 +907,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert!(cell.contains_vertex_of(cell2));
+        assert!(cell.contains_vertex_of(&cell2));
 
         // Human readable output for cargo test -- --nocapture
         println!("Cell: {:?}", cell);
