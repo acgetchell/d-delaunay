@@ -489,23 +489,6 @@ where
 
         facets
     }
-
-    /// The function `contains_facet` checks if a given facet is contained in the cell.
-    ///
-    /// # Arguments:
-    ///
-    /// * `facet`: The facet to check.
-    ///
-    /// # Returns:
-    ///
-    /// Returns `true` if the given facet is contained in the cell, and `false` otherwise.
-    pub fn contains_facet(&self, facet: &Facet<T, U, V, D>) -> bool {
-        self.vertices.iter().all(|v| facet.vertices().contains(v))
-
-        // Alternative implementation using HashSet, requires Eq on T in Vertex<T, U, D>
-        // let vertex_set: HashSet<&Vertex<T, U, D>> = self.vertices.iter().collect();
-        // facet.vertices().iter().all(|v| vertex_set.contains(v))
-    }
 }
 
 /// Equality of cells is based on equality of sorted vector of vertices.
@@ -1101,7 +1084,7 @@ mod tests {
 
         assert_eq!(facets.len(), 4);
         for facet in facets.iter() {
-            assert!(cell.facets().contains(facet))
+            assert!(cell.facets().contains(facet));
         }
 
         // Human readable output for cargo test -- --nocapture

@@ -253,7 +253,7 @@ where
     /// # Returns:
     ///
     /// A [Result] containing the updated [Tds] with the Delaunay triangulation, or an error message.
-    pub fn bowyer_watson(&mut self) -> Result<Self, anyhow::Error>
+    pub fn bowyer_watson(mut self) -> Result<Self, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -282,7 +282,7 @@ where
                         if !bad_cells.iter().any(|&id| {
                             self.cells
                                 .get(&id)
-                                .map_or(false, |c| c.contains_facet(&facet))
+                                .map_or(false, |c| c.facets().contains(&facet))
                         }) {
                             boundary_facets.push(facet);
                         }
@@ -306,7 +306,7 @@ where
         self.cells
             .retain(|_, cell| !cell.contains_vertex_of(&supercell));
 
-        Ok(self.clone())
+        Ok(self)
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
@@ -460,7 +460,7 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
             panic!("Error creating triangulation: {:?}", err);
         });
