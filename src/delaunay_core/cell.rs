@@ -1084,7 +1084,9 @@ mod tests {
 
         assert_eq!(facets.len(), 4);
         for facet in facets.iter() {
-            assert!(cell.facets().contains(facet));
+            // assert!(cell.facets().contains(facet));
+            let facet_vertices = facet.vertices();
+            assert!(cell.facets().iter().any(|f| f.vertices() == facet_vertices));
         }
 
         // Human readable output for cargo test -- --nocapture

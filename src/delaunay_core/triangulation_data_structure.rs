@@ -306,6 +306,12 @@ where
         self.cells
             .retain(|_, cell| !cell.contains_vertex_of(&supercell));
 
+        // Need Vertex to implement Eq and Hash to use the following code
+        // let supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
+        // self.cells.retain(|_, cell| {
+        //     !cell.vertices.iter().any(|v| supercell_vertices.contains(v))
+        // });
+
         Ok(self)
     }
 
