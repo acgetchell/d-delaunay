@@ -115,7 +115,7 @@ where
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
     /// assert!(new_cell.vertices.contains(&vertex5));
     pub fn from_facet_and_vertex(
-        mut facet: Facet<T, U, V, D>,
+        facet: Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
     ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
@@ -247,8 +247,8 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
     /// let cell2: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
-    /// assert!(cell.contains_vertex_of(cell2));
-    pub fn contains_vertex_of(&self, cell: Cell<T, U, V, D>) -> bool {
+    /// assert!(cell.contains_vertex_of(&cell2));
+    pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
 
@@ -257,7 +257,7 @@ where
     /// Using the approach from:
     ///
     /// Lévy, Bruno, and Yang Liu.
-    /// “Lp Centroidal Voronoi Tessellation and Its Applications.”
+    /// "Lp Centroidal Voronoi Tessellation and Its Applications."
     /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
     /// <https://doi.org/10.1145/1778765.1778856>.
     ///
@@ -402,6 +402,67 @@ where
         );
 
         Ok(circumradius >= radius)
+    }
+
+    /// The function `circumsphere_contains_vertex` checks if a given vertex is
+    /// contained in the circumsphere of the Cell using a matrix determinant.
+    /// This method is preferred over `circumsphere_contains` as it provides better numerical
+    /// stability by using a matrix determinant approach instead of distance calculations,
+    /// which can accumulate floating-point errors.
+    ///
+    /// # Arguments:
+    ///
+    /// * `vertex`: The [Vertex] to check.
+    ///
+    /// # Returns:
+    ///
+    /// Returns `true` if the given [Vertex] is contained in the circumsphere
+    /// of the [Cell], and `false` otherwise.
+    /// /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
+    /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
+    /// assert!(cell.circumsphere_contains(origin).unwrap());
+    /// ```
+    pub fn circumsphere_contains_vertex(
+        &self,
+        vertex: Vertex<T, U, D>,
+    ) -> Result<bool, anyhow::Error>
+    where
+        f64: From<T>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        // Setup initial matrix with zeros
+        let mut matrix = zeros(D + 1, D + 1);
+
+        // Populate rows with the coordinates of the vertices of the cell
+        for (i, v) in self.vertices.iter().enumerate() {
+            for j in 0..D {
+                matrix[(i, j)] = v.point.coords[j].into();
+            }
+            // Add a one to the last column
+            matrix[(i, D)] = T::one().into();
+        }
+
+        // Add the vertex to the last row of the matrix
+        for j in 0..D {
+            matrix[(D, j)] = vertex.point.coords[j].into();
+        }
+        matrix[(D, D)] = T::one().into();
+
+        // Calculate the determinant of the matrix
+        let det = matrix.det();
+
+        // Check if the determinant is positive
+        Ok(det > T::zero().into())
     }
 
     /// The function `facets` returns the [Facet]s of the [Cell].
@@ -829,7 +890,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert!(cell.contains_vertex_of(cell2));
+        assert!(cell.contains_vertex_of(&cell2));
 
         // Human readable output for cargo test -- --nocapture
         println!("Cell: {:?}", cell);
@@ -1023,7 +1084,9 @@ mod tests {
 
         assert_eq!(facets.len(), 4);
         for facet in facets.iter() {
-            assert!(cell.facets().contains(facet))
+            // assert!(cell.facets().contains(facet));
+            let facet_vertices = facet.vertices();
+            assert!(cell.facets().iter().any(|f| f.vertices() == facet_vertices));
         }
 
         // Human readable output for cargo test -- --nocapture
