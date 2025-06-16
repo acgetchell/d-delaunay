@@ -6,16 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.95"
+anyhow = "1.0.98"
 derive_builder = "0.20.2"
 nalgebra = "0.33.2"
 num-traits = "0.2.19"
-peroxide = "0.39.0"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.135" 
+peroxide = "0.39.7"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140" 
 serde_test = "1.0.177"
-thiserror = "2.0.9"
-uuid = { version = "1.11.0", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
+thiserror = "2.0.12"
+uuid = { version = "1.17.0", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
 
 [lints.rust]
 unsafe_code = "forbid"
