@@ -81,6 +81,7 @@ where
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
 {
     /// The function creates a new instance of a triangulation data structure
     /// with given points, initializing the vertices and cells.
@@ -363,7 +364,7 @@ where
 
     fn remove_cells_containing_supercell_vertices(&mut self, supercell: &Cell<T, U, V, D>) {
         // Remove cells that contain vertices of the supercell
-        let supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
+        let _supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {

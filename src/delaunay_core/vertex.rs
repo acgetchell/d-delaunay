@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
 
-#[derive(Builder, Clone, Copy, Debug, Default, Deserialize, Eq, Serialize)]
+#[derive(Builder, Clone, Copy, Debug, Default, Deserialize, Serialize)]
 /// The [Vertex] struct represents a vertex in a triangulation with a [Point],
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.
@@ -136,6 +136,14 @@ where
     }
 }
 
+/// Eq implementation for Vertex based on point equality
+impl<T, U, const D: usize> Eq for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{}
+
 /// Order of vertices is based on lexicographic order of elements in vector of coords.
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
@@ -154,6 +162,7 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.point.hash(state);
