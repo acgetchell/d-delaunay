@@ -36,6 +36,7 @@
         "puruspe",
         "rawpointer",
         "rustversion",
+        "sarif",
         "serde",
         "simplicial",
         "spacelike",
