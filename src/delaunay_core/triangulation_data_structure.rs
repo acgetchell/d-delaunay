@@ -4,13 +4,14 @@
 //! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
 
 use super::{
-    cell::Cell, cell::CellBuilder, point::Point, utilities::find_extreme_coordinates,
+    cell::Cell, cell::CellBuilder, facet::Facet, point::Point, utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{min, Ordering, PartialEq};
+use std::collections::HashSet;
 use std::ops::{AddAssign, Div, SubAssign};
 use std::{collections::HashMap, hash::Hash, iter::Sum};
 use uuid::Uuid;
@@ -263,32 +264,39 @@ where
         self.cells.insert(supercell.uuid, supercell.clone());
 
         // Iterate over vertices
-        for vertex in self.vertices.values() {
-            let mut bad_cells = Vec::new();
-            let mut boundary_facets = Vec::new();
+        // for vertex in self.vertices.values() {
+        // let mut bad_cells = Vec::new();
+        // let mut boundary_facets = Vec::new();
 
-            // Find cells whose circumsphere contains the vertex
-            for (cell_id, cell) in self.cells.iter() {
-                // if cell.circumsphere_contains(vertex)? {
-                if cell.circumsphere_contains_vertex(*vertex)? {
-                    bad_cells.push(*cell_id);
-                }
-            }
+        // // Find cells whose circumsphere contains the vertex
+        // for (cell_id, cell) in self.cells.iter() {
+        //     // if cell.circumsphere_contains(vertex)? {
+        //     if cell.circumsphere_contains_vertex(*vertex)? {
+        //         bad_cells.push(*cell_id);
+        //     }
+        // }
 
-            // Collect boundary facets
-            for &bad_cell_id in &bad_cells {
-                if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
-                    for facet in bad_cell.facets() {
-                        if !bad_cells.iter().any(|&id| {
-                            self.cells
-                                .get(&id)
-                                .map_or(false, |c| c.facets().contains(&facet))
-                        }) {
-                            boundary_facets.push(facet);
-                        }
-                    }
-                }
-            }
+        // // Collect boundary facets
+        // for &bad_cell_id in &bad_cells {
+        //     if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
+        //         for facet in bad_cell.facets() {
+        //             if !bad_cells.iter().any(|&id| {
+        //                 self.cells
+        //                     .get(&id)
+        //                     .map_or(false, |c| c.facets().contains(&facet))
+        //             }) {
+        //                 boundary_facets.push(facet);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Collect vertices into a vector to avoid borrowing conflicts
+        let vertices: Vec<_> = self.vertices.values().cloned().collect();
+
+        // Iterate over vertices
+        for vertex in vertices {
+            let (bad_cells, boundary_facets) = self.find_bad_cells_and_boundary_facets(&vertex)?;
 
             // Remove bad cells
             for bad_cell_id in bad_cells {
@@ -297,14 +305,14 @@ where
 
             // Create new cells using the boundary facets and the new vertex
             for facet in boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
+                let new_cell = Cell::from_facet_and_vertex(facet, vertex)?;
                 self.cells.insert(new_cell.uuid, new_cell);
             }
         }
 
         // Remove cells that contain vertices of the supercell
-        self.cells
-            .retain(|_, cell| !cell.contains_vertex_of(&supercell));
+        // self.cells
+        //     .retain(|_, cell| !cell.contains_vertex_of(&supercell));
 
         // Need Vertex to implement Eq and Hash to use the following code
         // let supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
@@ -313,6 +321,49 @@ where
         // });
 
         Ok(self)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn find_bad_cells_and_boundary_facets(
+        &mut self,
+        vertex: &Vertex<T, U, D>,
+    ) -> Result<(Vec<Uuid>, Vec<Facet<T, U, V, D>>), anyhow::Error>
+    where
+        OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        let mut bad_cells = Vec::new();
+        let mut boundary_facets = Vec::new();
+
+        // Find cells whose circumsphere contains the vertex
+        for (cell_id, cell) in self.cells.iter() {
+            // if cell.circumsphere_contains(vertex)? {
+            if cell.circumsphere_contains_vertex(*vertex)? {
+                bad_cells.push(*cell_id);
+            }
+        }
+
+        // Collect boundary facets
+        for &bad_cell_id in &bad_cells {
+            if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
+                for facet in bad_cell.facets() {
+                    if !bad_cells.iter().any(|&id| {
+                        self.cells
+                            .get(&id)
+                            .map_or(false, |c| c.facets().contains(&facet))
+                    }) {
+                        boundary_facets.push(facet);
+                    }
+                }
+            }
+        }
+
+        Ok((bad_cells, Vec::from_iter(boundary_facets)))
+    }
+
+    fn remove_cells_containing_supercell_vertices(&mut self, supercell: &Cell<T, U, V, D>) {
+        // Remove cells that contain vertices of the supercell
+        let supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {

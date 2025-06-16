@@ -149,6 +149,20 @@ where
     }
 }
 
+impl<T, U, const D: usize> Hash for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

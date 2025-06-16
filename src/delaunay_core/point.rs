@@ -1,6 +1,7 @@
 //! Data and operations on d-dimensional points.
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
@@ -99,6 +100,16 @@ where
         T: num_traits::Zero + Copy,
     {
         Self::new([T::zero(); D])
+    }
+}
+
+impl<T, const D: usize> Hash for Point<T, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.coords.hash(state);
     }
 }
 
