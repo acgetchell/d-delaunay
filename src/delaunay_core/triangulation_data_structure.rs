@@ -351,7 +351,7 @@ where
                     if !bad_cells.iter().any(|&id| {
                         self.cells
                             .get(&id)
-                            .map_or(false, |c| c.facets().contains(&facet))
+                            .is_some_and(|c| c.facets().contains(&facet))
                     }) {
                         boundary_facets.push(facet);
                     }
