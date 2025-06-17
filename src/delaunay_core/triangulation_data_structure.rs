@@ -571,7 +571,7 @@ where
                 if !cell_ids.is_empty() {
                     // For now, just assign the first incident cell
                     // In a full implementation, you might want to store all incident cells
-                    let mut updated_vertex = *vertex;
+                    let mut updated_vertex = vertex.clone();
                     updated_vertex.incident_cell = Some(cell_ids[0]);
                     self.vertices.insert(vertex_id, updated_vertex);
                 }
