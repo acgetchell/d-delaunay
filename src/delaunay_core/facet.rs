@@ -87,11 +87,13 @@ where
 
     /// The `vertices` method in the [Facet] returns a container of
     /// [Vertex] objects that are in the [Facet].
-    pub fn vertices(&mut self) -> Vec<Vertex<T, U, D>> {
-        let mut vertices = self.cell.clone().vertices;
-        vertices.retain(|v| *v != self.vertex);
-
-        vertices
+    pub fn vertices(&self) -> Vec<Vertex<T, U, D>> {
+        self.cell
+            .vertices
+            .iter()
+            .filter(|v| **v != self.vertex)
+            .cloned()
+            .collect()
     }
 }
 

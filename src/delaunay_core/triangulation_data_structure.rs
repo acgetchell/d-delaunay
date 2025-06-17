@@ -11,6 +11,7 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{min, Ordering, PartialEq};
+use std::collections::HashSet;
 use std::ops::{AddAssign, Div, SubAssign};
 use std::{collections::HashMap, hash::Hash, iter::Sum};
 use uuid::Uuid;
@@ -80,6 +81,7 @@ where
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
 {
     /// The function creates a new instance of a triangulation data structure
     /// with given points, initializing the vertices and cells.
@@ -252,93 +254,117 @@ where
     ///
     /// # Returns:
     ///
-    /// A [Result] containing a [Vec] of [Cell] objects representing the triangulation, or an error message.
-    fn bowyer_watson(&mut self) -> Result<Vec<Cell<T, U, V, D>>, anyhow::Error>
+    /// A [Result] containing the updated [Tds] with the Delaunay triangulation, or an error message.
+    pub fn bowyer_watson(mut self) -> Result<Self, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let mut triangulation: Vec<Cell<T, U, V, D>> = Vec::new();
-
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-        triangulation.push(supercell.clone());
+        self.cells.insert(supercell.uuid, supercell.clone());
 
         // Iterate over vertices
-        for vertex in self.vertices.values() {
-            // Find cells that contain the vertex
-            let mut bad_cells: Vec<Cell<T, U, V, D>> = Vec::new();
+        // for vertex in self.vertices.values() {
+        // let mut bad_cells = Vec::new();
+        // let mut boundary_facets = Vec::new();
 
-            for cell in &triangulation {
-                if cell.circumsphere_contains(*vertex)? {
-                    bad_cells.push((*cell).clone());
-                }
+        // // Find cells whose circumsphere contains the vertex
+        // for (cell_id, cell) in self.cells.iter() {
+        //     // if cell.circumsphere_contains(vertex)? {
+        //     if cell.circumsphere_contains_vertex(*vertex)? {
+        //         bad_cells.push(*cell_id);
+        //     }
+        // }
+
+        // // Collect boundary facets
+        // for &bad_cell_id in &bad_cells {
+        //     if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
+        //         for facet in bad_cell.facets() {
+        //             if !bad_cells.iter().any(|&id| {
+        //                 self.cells
+        //                     .get(&id)
+        //                     .map_or(false, |c| c.facets().contains(&facet))
+        //             }) {
+        //                 boundary_facets.push(facet);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Collect vertices into a vector to avoid borrowing conflicts
+        let vertices: Vec<_> = self.vertices.values().cloned().collect();
+
+        // Iterate over vertices
+        for vertex in vertices {
+            let (bad_cells, boundary_facets) = self.find_bad_cells_and_boundary_facets(&vertex)?;
+
+            // Remove bad cells
+            for bad_cell_id in bad_cells {
+                self.cells.remove(&bad_cell_id);
             }
 
-            // Find the boundary of the hole left by the bad cells
-            let mut boundary_facets: Vec<Facet<T, U, V, D>> = Vec::new();
-            for bad_cell in &bad_cells {
+            // Create new cells using the boundary facets and the new vertex
+            for facet in boundary_facets {
+                let new_cell = Cell::from_facet_and_vertex(facet, vertex)?;
+                self.cells.insert(new_cell.uuid, new_cell);
+            }
+        }
+
+        // Remove cells that contain vertices of the supercell
+        // self.cells
+        //     .retain(|_, cell| !cell.contains_vertex_of(&supercell));
+
+        // Need Vertex to implement Eq and Hash to use the following code
+        // let supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
+        // self.cells.retain(|_, cell| {
+        //     !cell.vertices.iter().any(|v| supercell_vertices.contains(v))
+        // });
+
+        Ok(self)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn find_bad_cells_and_boundary_facets(
+        &mut self,
+        vertex: &Vertex<T, U, D>,
+    ) -> Result<(Vec<Uuid>, Vec<Facet<T, U, V, D>>), anyhow::Error>
+    where
+        OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        let mut bad_cells = Vec::new();
+        let mut boundary_facets = Vec::new();
+
+        // Find cells whose circumsphere contains the vertex
+        for (cell_id, cell) in self.cells.iter() {
+            // if cell.circumsphere_contains(vertex)? {
+            if cell.circumsphere_contains_vertex(*vertex)? {
+                bad_cells.push(*cell_id);
+            }
+        }
+
+        // Collect boundary facets
+        for &bad_cell_id in &bad_cells {
+            if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
                 for facet in bad_cell.facets() {
-                    if !bad_cells.iter().any(|c| c.facets().contains(&facet)) {
+                    if !bad_cells.iter().any(|&id| {
+                        self.cells
+                            .get(&id)
+                            .is_some_and(|c| c.facets().contains(&facet))
+                    }) {
                         boundary_facets.push(facet);
                     }
                 }
             }
-
-            // Remove bad cells from triangulation
-            triangulation.retain(|cell| !bad_cells.contains(cell));
-
-            // Create new cells from the boundary facets and new vertex
-            for facet in boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
-                triangulation.push(new_cell);
-            }
         }
 
-        //     // Find the boundary of the polygonal hole
-        //     let mut polygonal_hole: Vec<Facet<T, U, V, D>> = Vec::new();
-        //     for cell in bad_cells.iter() {
-        //         // Create Facets from the Cell
-        //         for vertex in cell.vertices.iter() {
-        //             let facet = Facet::new(cell.clone(), *vertex)?;
-        //             polygonal_hole.push(facet);
-        //         }
+        Ok((bad_cells, Vec::from_iter(boundary_facets)))
+    }
 
-        //         // for vertex in cell.vertices.iter() {
-        //         //     if bad_cells.iter().any(|c| c.contains_vertex(vertex)) {
-        //         //         polygonal_hole.push(vertex.clone());
-        //         //     }
-        //         // }
-        //     }
-
-        //     // Remove duplicate facets
-        //     polygonal_hole.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        //     polygonal_hole.dedup();
-
-        //     // Remove bad cells from the triangulation
-        //     for cell in bad_cells.iter() {
-        //         triangulation.remove(triangulation.iter().position(|c| c == cell).unwrap());
-        //     }
-
-        //     // Re-triangulate the polygonal hole
-        //     for mut facet in polygonal_hole.iter().cloned() {
-        //         let mut new_cell_vertices: Vec<Vertex<T, U, D>> = Vec::new();
-        //         for facet_vertex in facet.vertices().iter() {
-        //             new_cell_vertices.push(*facet_vertex);
-        //         }
-        //         new_cell_vertices.push(*vertex);
-        //         triangulation.push(Cell::new(new_cell_vertices)?);
-        //     }
-        // }
-
-        // // Remove all cells containing vertices from the supercell
-        // triangulation
-        //     .retain(|c| !c.contains_vertex(supercell.vertices.clone().into_iter().next().unwrap()));
-
-        // Remove any cells that contain a vertex of the supercell
-        triangulation.retain(|cell| !cell.contains_vertex_of(supercell.clone()));
-
-        Ok(triangulation)
+    fn remove_cells_containing_supercell_vertices(&mut self, supercell: &Cell<T, U, V, D>) {
+        // Remove cells that contain vertices of the supercell
+        let _supercell_vertices: HashSet<_> = supercell.vertices.iter().collect();
     }
 
     fn assign_neighbors(&mut self, _cells: Vec<Cell<T, U, V, D>>) -> Result<(), &'static str> {
@@ -492,14 +518,16 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let cells = tds.bowyer_watson();
-        let unwrapped_cells = cells.unwrap_or_else(|err| panic!("Error creating cells: {:?}", err));
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let result = tds.bowyer_watson().unwrap_or_else(|err| {
+            panic!("Error creating triangulation: {:?}", err);
+        });
 
-        assert_eq!(unwrapped_cells.len(), 1);
+        assert_eq!(result.number_of_vertices(), 4);
+        assert_eq!(result.number_of_cells(), 1);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", unwrapped_cells);
+        println!("{:?}", result);
     }
 
     #[test]

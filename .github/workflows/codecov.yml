@@ -1,11 +1,18 @@
+name: Codecov
+
 on:
   push:
     branches: ["main"]
   # pull_request:
   #   # Run on merged pull requests
   #   types: [ closed ]
+# Least-privilege permissions — no write-all anywhere
+permissions:
+  contents: read           # allow reading your code
+  checks: write            # if you report a status check
+  pull-requests: write     # if you post PR comments
+# (omit any other keys; defaults are “none”)
 
-name: Codecov
 
 jobs:
   check:
