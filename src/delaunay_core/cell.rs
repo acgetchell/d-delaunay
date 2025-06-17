@@ -1822,8 +1822,8 @@ mod tests {
             .unwrap();
         
         // Test that equal cells are not less than each other
-        assert!(!(cell1 < cell2));
-        assert!(!(cell2 < cell1));
+        assert_ne!(cell1.partial_cmp(&cell2), Some(std::cmp::Ordering::Less));
+        assert_ne!(cell2.partial_cmp(&cell1), Some(std::cmp::Ordering::Less));
         assert!(cell1 <= cell2);
         assert!(cell2 <= cell1);
         assert!(cell1 >= cell2);

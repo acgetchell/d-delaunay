@@ -457,12 +457,14 @@ mod tests {
 
     #[test]
     fn point_ordering_edge_cases() {
+        use std::cmp::Ordering;
+        
         let point1 = Point::new([1.0, 2.0]);
         let point2 = Point::new([1.0, 2.0]);
         
         // Test that equal points are not less than each other
-        assert!(!(point1 < point2));
-        assert!(!(point2 < point1));
+        assert_ne!(point1.partial_cmp(&point2), Some(Ordering::Less));
+        assert_ne!(point2.partial_cmp(&point1), Some(Ordering::Less));
         assert!(point1 <= point2);
         assert!(point2 <= point1);
         assert!(point1 >= point2);

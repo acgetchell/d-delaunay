@@ -599,12 +599,12 @@ mod tests {
             .unwrap();
         
         // Test that equal points result in equal ordering
-        assert!(!(vertex1 < vertex2));
-        assert!(!(vertex2 < vertex1));
-        assert!(vertex1 <= vertex2);
-        assert!(vertex2 <= vertex1);
-        assert!(vertex1 >= vertex2);
-        assert!(vertex2 >= vertex1);
+        assert!(vertex1.partial_cmp(&vertex2) != Some(Ordering::Less));
+        assert!(vertex2.partial_cmp(&vertex1) != Some(Ordering::Less));
+        assert!(matches!(vertex1.partial_cmp(&vertex2), Some(Ordering::Less | Ordering::Equal)));
+        assert!(matches!(vertex2.partial_cmp(&vertex1), Some(Ordering::Less | Ordering::Equal)));
+        assert!(matches!(vertex1.partial_cmp(&vertex2), Some(Ordering::Greater | Ordering::Equal)));
+        assert!(matches!(vertex2.partial_cmp(&vertex1), Some(Ordering::Greater | Ordering::Equal)));
     }
 
     #[test]
