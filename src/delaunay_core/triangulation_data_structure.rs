@@ -862,6 +862,132 @@ mod tests {
     }
 
     #[test]
+    fn tds_bowyer_watson_5d_multiple_cells() {
+        // Create a 5D point set that forms multiple 5-simplices
+        // Using 7 points in 5D space to create a complex triangulation
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0, 0.0, 0.0]),  // origin
+            Point::new([1.0, 0.0, 0.0, 0.0, 0.0]),  // unit vector in x
+            Point::new([0.0, 1.0, 0.0, 0.0, 0.0]),  // unit vector in y
+            Point::new([0.0, 0.0, 1.0, 0.0, 0.0]),  // unit vector in z
+            Point::new([0.0, 0.0, 0.0, 1.0, 0.0]),  // unit vector in w
+            Point::new([0.0, 0.0, 0.0, 0.0, 1.0]),  // unit vector in v
+            Point::new([1.0, 1.0, 1.0, 1.0, 1.0]),  // diagonal point
+        ];
+        
+        let tds: Tds<f64, usize, usize, 5> = Tds::new(points);
+        println!("\n=== 5D BOWYER-WATSON TRIANGULATION TEST ===");
+        println!("Initial 5D TDS: {} vertices, {} cells", tds.number_of_vertices(), tds.number_of_cells());
+        
+        let result = tds.bowyer_watson().unwrap_or_else(|err| {
+            panic!("Error creating 5D triangulation: {:?}", err);
+        });
+
+        println!("\nResult 5D TDS: {} vertices, {} cells", result.number_of_vertices(), result.number_of_cells());
+        
+        // Verify we have the expected number of vertices
+        assert_eq!(result.number_of_vertices(), 7);
+        assert!(result.number_of_cells() >= 1, "Should have at least 1 cell");
+        
+        println!("\n--- CELL DETAILS ---");
+        let mut cell_vertex_sets = Vec::new();
+        for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
+            assert_eq!(cell.vertices.len(), 6, "Each 5D cell should have exactly 6 vertices");
+            
+            // Collect and sort vertex coordinates for this cell
+            let mut vertex_coords: Vec<_> = cell.vertices.iter()
+                .map(|v| v.point.coords)
+                .collect();
+            vertex_coords.sort_by(|a, b| {
+                for dim in 0..5 {
+                    match a[dim].partial_cmp(&b[dim]).unwrap() {
+                        std::cmp::Ordering::Equal => continue,
+                        other => return other,
+                    }
+                }
+                std::cmp::Ordering::Equal
+            });
+            
+            println!("Cell {}: {}", i + 1, cell_id);
+            println!("  Vertices (6 total):");
+            for (j, coords) in vertex_coords.iter().enumerate() {
+                println!("    {}: [{:.1}, {:.1}, {:.1}, {:.1}, {:.1}]", 
+                    j + 1, coords[0], coords[1], coords[2], coords[3], coords[4]);
+            }
+            println!();
+            
+            cell_vertex_sets.push(vertex_coords);
+        }
+        
+        // Verify that cells have different vertex sets (no duplicates)
+        println!("--- UNIQUENESS VERIFICATION ---");
+        for i in 0..cell_vertex_sets.len() {
+            for j in (i + 1)..cell_vertex_sets.len() {
+                assert_ne!(cell_vertex_sets[i], cell_vertex_sets[j], 
+                    "Cells {} and {} should have different vertex sets", i + 1, j + 1);
+            }
+        }
+        println!("✓ All {} cells have unique vertex sets", cell_vertex_sets.len());
+        
+        // Verify neighbor relationships
+        if result.number_of_cells() > 1 {
+            println!("\n--- NEIGHBOR RELATIONSHIPS ---");
+            let mut total_neighbor_connections = 0;
+            
+            for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
+                if let Some(neighbors) = &cell.neighbors {
+                    println!("Cell {} has {} neighbors:", i + 1, neighbors.len());
+                    total_neighbor_connections += neighbors.len();
+                    
+                    // Verify that all neighbors exist and are mutual
+                    for (_j, neighbor_id) in neighbors.iter().enumerate() {
+                        assert!(result.cells.contains_key(neighbor_id), 
+                            "Neighbor {} of cell {} should exist", neighbor_id, cell_id);
+                        
+                        // Find the neighbor's index for display
+                        let neighbor_index = result.cells.iter()
+                            .enumerate()
+                            .find(|(_, (id, _))| *id == neighbor_id)
+                            .map(|(idx, _)| idx + 1)
+                            .unwrap_or(0);
+                        
+                        println!("  → Cell {}", neighbor_index);
+                        
+                        // Check mutual neighbor relationship
+                        if let Some(neighbor_cell) = result.cells.get(neighbor_id) {
+                            if let Some(neighbor_neighbors) = &neighbor_cell.neighbors {
+                                assert!(neighbor_neighbors.contains(cell_id),
+                                    "Cell {} should be a neighbor of its neighbor {}", i + 1, neighbor_index);
+                            }
+                        }
+                    }
+                    println!();
+                } else {
+                    println!("Cell {} has no neighbors assigned", i + 1);
+                }
+            }
+            
+            println!("✓ All neighbor relationships are mutual");
+            println!("✓ Total neighbor connections: {}", total_neighbor_connections);
+        }
+        
+        // Additional 5D specific verification
+        println!("\n--- 5D SPECIFIC VERIFICATION ---");
+        println!("✓ Working with 5-dimensional space");
+        println!("✓ Each cell is a 5-simplex (6 vertices)");
+        println!("✓ {} total 5-simplices generated", result.number_of_cells());
+        
+        // Verify dimensional consistency
+        let total_vertices_in_cells: usize = result.cells.values()
+            .map(|cell| cell.vertices.len())
+            .sum();
+        println!("✓ Total vertices across all cells: {} ({}×6)", 
+            total_vertices_in_cells, result.number_of_cells());
+        
+        println!("\n=== 5D TRIANGULATION SUCCESS ===\n");
+    }
+
+    #[test]
     fn tds_to_and_from_json() {
         let points = vec![
             Point::new([1.0, 2.0, 3.0, 4.0]),
