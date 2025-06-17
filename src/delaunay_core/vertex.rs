@@ -419,7 +419,7 @@ mod tests {
             .data(42)
             .build()
             .unwrap();
-        let cloned_vertex = vertex.clone();
+        let cloned_vertex = vertex;
         
         // Points should be equal but UUIDs should be the same (since we cloned)
         assert_eq!(vertex.point, cloned_vertex.point);

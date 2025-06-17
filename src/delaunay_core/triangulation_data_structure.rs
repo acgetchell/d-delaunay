@@ -4,7 +4,7 @@
 //! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
 
 use super::{
-    cell::Cell, cell::CellBuilder, facet::Facet, point::Point, utilities::find_extreme_coordinates,
+    cell::{Cell, CellBuilder}, facet::Facet, point::Point, utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
 use na::{ComplexField, Const, OPoint};
@@ -31,11 +31,11 @@ where
     // (though they may have different orientations)
     let vertices1 = facet1.vertices();
     let vertices2 = facet2.vertices();
-    
+
     if vertices1.len() != vertices2.len() {
         return false;
     }
-    
+
     // Check if all vertices in facet1 are present in facet2
     vertices1.iter().all(|v1| vertices2.contains(v1))
 }
@@ -246,7 +246,7 @@ where
         // Convert coordinates to f64 for calculations
         let mut center_f64 = [0.0f64; D];
         let mut size_f64 = 0.0f64;
-        
+
         for i in 0..D {
             let min_f64: f64 = min_coords[i].into();
             let max_f64: f64 = max_coords[i].into();
@@ -256,18 +256,18 @@ where
                 size_f64 = dim_size;
             }
         }
-        
+
         // Add significant padding to ensure all vertices are well inside
         size_f64 += 20.0; // Add 20 units of padding
         let radius_f64 = size_f64 / 2.0;
-        
+
         // Convert back to T
         let mut center = [T::default(); D];
         for i in 0..D {
             center[i] = T::from(center_f64[i]);
         }
         let radius = T::from(radius_f64);
-        
+
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
         let points = self.create_supercell_simplex(&center, radius)?;
 
@@ -278,25 +278,29 @@ where
 
         Ok(supercell)
     }
-    
+
     /// Creates a default supercell for empty input
     fn create_default_supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
         let center = [T::default(); D];
         let radius = T::from(20.0f64);
         let points = self.create_supercell_simplex(&center, radius)?;
-        
+
         let supercell = CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
             .unwrap();
-            
+
         Ok(supercell)
     }
-    
+
     /// Creates a well-formed simplex centered at the given point with the given radius
-    fn create_supercell_simplex(&self, center: &[T; D], radius: T) -> Result<Vec<Point<T, D>>, anyhow::Error> {
+    fn create_supercell_simplex(
+        &self,
+        center: &[T; D],
+        radius: T,
+    ) -> Result<Vec<Point<T, D>>, anyhow::Error> {
         let mut points = Vec::new();
-        
+
         // For 3D, create a regular tetrahedron
         if D == 3 {
             // Create a regular tetrahedron with vertices at:
@@ -308,7 +312,7 @@ where
                 [-1.0, 1.0, -1.0],
                 [-1.0, -1.0, 1.0],
             ];
-            
+
             for vertex_coords in &tetrahedron_vertices {
                 let mut coords = [T::default(); D];
                 for i in 0..D {
@@ -322,11 +326,11 @@ where
         } else {
             // For other dimensions, create a simplex using a generalized approach
             // Create D+1 vertices for a D-dimensional simplex
-            
+
             // Create a regular simplex by placing vertices at the corners of a hypercube
             // scaled and offset appropriately
             let radius_f64: f64 = radius.into();
-            
+
             // First vertex: all coordinates positive
             let mut coords = [T::default(); D];
             for i in 0..D {
@@ -334,7 +338,7 @@ where
                 coords[i] = T::from(center_f64 + radius_f64);
             }
             points.push(Point::new(coords));
-            
+
             // Remaining D vertices: flip one coordinate at a time to negative
             for dim in 0..D {
                 let mut coords = [T::default(); D];
@@ -351,7 +355,7 @@ where
                 points.push(Point::new(coords));
             }
         }
-        
+
         Ok(points)
     }
 
@@ -370,16 +374,38 @@ where
             return Ok(self);
         }
 
+        // For simple cases where we have exactly D+1 vertices, just create a single simplex
+        if self.vertices.len() == D + 1 {
+            let vertices: Vec<_> = self.vertices.values().cloned().collect();
+            let cell = CellBuilder::default()
+                .vertices(vertices)
+                .build()
+                .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {:?}", e)))?;
+            self.cells.insert(cell.uuid, cell);
+            
+            // Assign incident cells to vertices
+            self.assign_incident_cells()?;
+            
+            return Ok(self);
+        }
+
+        // For more complex cases, use the full Bowyer-Watson algorithm
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
+        let supercell_vertices: HashSet<Uuid> = supercell.vertices.iter().map(|v| v.uuid).collect();
         let supercell_uuid = supercell.uuid;
         self.cells.insert(supercell_uuid, supercell.clone());
 
-        // Collect vertices into a vector to avoid borrowing conflicts
-        let vertices: Vec<_> = self.vertices.values().cloned().collect();
+        // Collect input vertices into a vector to avoid borrowing conflicts
+        let input_vertices: Vec<_> = self.vertices.values().cloned().collect();
 
-        // Iterate over each vertex and insert it into the triangulation
-        for vertex in vertices.iter() {
+        // Iterate over each input vertex and insert it into the triangulation
+        for vertex in input_vertices.iter() {
+            // Skip if this vertex is already part of supercell vertices
+            if supercell_vertices.contains(&vertex.uuid) {
+                continue;
+            }
+            
             let (bad_cells, boundary_facets) = self.find_bad_cells_and_boundary_facets(vertex)?;
 
             // Remove bad cells
@@ -455,16 +481,17 @@ where
     fn remove_cells_containing_supercell_vertices(&mut self, _supercell: &Cell<T, U, V, D>) {
         // The goal is to remove supercell artifacts while preserving valid Delaunay cells
         // We should only keep cells that are made entirely of input vertices
-        
+
         let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().cloned().collect();
-        
+
         let cells_to_remove: Vec<Uuid> = self
             .cells
             .iter()
             .filter(|(_, cell)| {
-                let cell_vertex_uuids: HashSet<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
+                let cell_vertex_uuids: HashSet<Uuid> =
+                    cell.vertices.iter().map(|v| v.uuid).collect();
                 let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
-                
+
                 // Remove cells that don't consist entirely of input vertices
                 // Keep only cells that are made entirely of input vertices
                 !has_only_input_vertices
@@ -475,16 +502,16 @@ where
         for cell_id in cells_to_remove {
             self.cells.remove(&cell_id);
         }
-        
+
         // Remove duplicate cells (cells with identical vertex sets)
         let mut unique_cells = HashMap::new();
         let mut cells_to_remove_duplicates = Vec::new();
-        
+
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
             let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
             vertex_uuids.sort();
-            
+
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
                 // This is a duplicate cell - mark for removal
                 cells_to_remove_duplicates.push(*cell_id);
@@ -493,7 +520,7 @@ where
                 unique_cells.insert(vertex_uuids, *cell_id);
             }
         }
-        
+
         // Remove duplicate cells
         for cell_id in cells_to_remove_duplicates {
             self.cells.remove(&cell_id);
@@ -511,20 +538,19 @@ where
 
         // Find neighboring cells by comparing facets
         let cell_ids: Vec<Uuid> = self.cells.keys().cloned().collect();
-        
+
         for i in 0..cell_ids.len() {
             for j in (i + 1)..cell_ids.len() {
                 let cell1_id = cell_ids[i];
                 let cell2_id = cell_ids[j];
-                
-                if let (Some(cell1), Some(cell2)) = (
-                    self.cells.get(&cell1_id),
-                    self.cells.get(&cell2_id),
-                ) {
+
+                if let (Some(cell1), Some(cell2)) =
+                    (self.cells.get(&cell1_id), self.cells.get(&cell2_id))
+                {
                     // Check if cells share a facet (are neighbors)
                     let cell1_facets = cell1.facets();
                     let cell2_facets = cell2.facets();
-                    
+
                     for facet1 in &cell1_facets {
                         for facet2 in &cell2_facets {
                             // Two cells are neighbors if they share a facet
@@ -578,7 +604,7 @@ where
                 if !cell_ids.is_empty() {
                     // For now, just assign the first incident cell
                     // In a full implementation, you might want to store all incident cells
-                    let mut updated_vertex = vertex.clone();
+                    let mut updated_vertex = *vertex;
                     updated_vertex.incident_cell = Some(cell_ids[0]);
                     self.vertices.insert(vertex_id, updated_vertex);
                 }
@@ -710,17 +736,17 @@ mod tests {
             supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}!", err));
 
         assert_eq!(unwrapped_supercell.vertices.len(), 4);
-        
+
         // Debug: Print actual supercell coordinates
         println!("Actual supercell vertices:");
         for (i, vertex) in unwrapped_supercell.vertices.iter().enumerate() {
             println!("  Vertex {}: {:?}", i, vertex.point.coords);
         }
-        
+
         // The supercell should contain all input points
         // Let's verify it's a proper tetrahedron rather than checking specific coordinates
         assert_eq!(unwrapped_supercell.vertices.len(), 4);
-        
+
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", unwrapped_supercell);
     }
@@ -734,15 +760,23 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
         ];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        println!("Initial TDS: {} vertices, {} cells", tds.number_of_vertices(), tds.number_of_cells());
-        
+        println!(
+            "Initial TDS: {} vertices, {} cells",
+            tds.number_of_vertices(),
+            tds.number_of_cells()
+        );
+
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
             panic!("Error creating triangulation: {:?}", err);
         });
 
-        println!("Result TDS: {} vertices, {} cells", result.number_of_vertices(), result.number_of_cells());
+        println!(
+            "Result TDS: {} vertices, {} cells",
+            result.number_of_vertices(),
+            result.number_of_cells()
+        );
         println!("Cells: {:?}", result.cells.keys().collect::<Vec<_>>());
-        
+
         assert_eq!(result.number_of_vertices(), 4);
         assert_eq!(result.number_of_cells(), 1);
 
@@ -755,37 +789,47 @@ mod tests {
         // Create a 4D point set that forms multiple 4-simplices
         // Using 6 points in 4D space to create a complex triangulation
         let points = vec![
-            Point::new([0.0, 0.0, 0.0, 0.0]),  // origin
-            Point::new([1.0, 0.0, 0.0, 0.0]),  // unit vector in x
-            Point::new([0.0, 1.0, 0.0, 0.0]),  // unit vector in y
-            Point::new([0.0, 0.0, 1.0, 0.0]),  // unit vector in z
-            Point::new([0.0, 0.0, 0.0, 1.0]),  // unit vector in w
-            Point::new([1.0, 1.0, 1.0, 1.0]),  // diagonal point
+            Point::new([0.0, 0.0, 0.0, 0.0]), // origin
+            Point::new([1.0, 0.0, 0.0, 0.0]), // unit vector in x
+            Point::new([0.0, 1.0, 0.0, 0.0]), // unit vector in y
+            Point::new([0.0, 0.0, 1.0, 0.0]), // unit vector in z
+            Point::new([0.0, 0.0, 0.0, 1.0]), // unit vector in w
+            Point::new([1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
-        
+
         let tds: Tds<f64, usize, usize, 4> = Tds::new(points);
         println!("\n=== 4D BOWYER-WATSON TRIANGULATION TEST ===");
-        println!("Initial 4D TDS: {} vertices, {} cells", tds.number_of_vertices(), tds.number_of_cells());
-        
+        println!(
+            "Initial 4D TDS: {} vertices, {} cells",
+            tds.number_of_vertices(),
+            tds.number_of_cells()
+        );
+
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
             panic!("Error creating 4D triangulation: {:?}", err);
         });
 
-        println!("\nResult 4D TDS: {} vertices, {} cells", result.number_of_vertices(), result.number_of_cells());
-        
+        println!(
+            "\nResult 4D TDS: {} vertices, {} cells",
+            result.number_of_vertices(),
+            result.number_of_cells()
+        );
+
         // Verify we have the expected number of vertices
         assert_eq!(result.number_of_vertices(), 6);
         assert!(result.number_of_cells() >= 1, "Should have at least 1 cell");
-        
+
         println!("\n--- CELL DETAILS ---");
         let mut cell_vertex_sets = Vec::new();
         for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
-            assert_eq!(cell.vertices.len(), 5, "Each 4D cell should have exactly 5 vertices");
-            
+            assert_eq!(
+                cell.vertices.len(),
+                5,
+                "Each 4D cell should have exactly 5 vertices"
+            );
+
             // Collect and sort vertex coordinates for this cell
-            let mut vertex_coords: Vec<_> = cell.vertices.iter()
-                .map(|v| v.point.coords)
-                .collect();
+            let mut vertex_coords: Vec<_> = cell.vertices.iter().map(|v| v.point.coords).collect();
             vertex_coords.sort_by(|a, b| {
                 for dim in 0..4 {
                     match a[dim].partial_cmp(&b[dim]).unwrap() {
@@ -795,56 +839,81 @@ mod tests {
                 }
                 std::cmp::Ordering::Equal
             });
-            
+
             println!("Cell {}: {}", i + 1, cell_id);
             println!("  Vertices (5 total):");
             for (j, coords) in vertex_coords.iter().enumerate() {
-                println!("    {}: [{:.1}, {:.1}, {:.1}, {:.1}]", j + 1, coords[0], coords[1], coords[2], coords[3]);
+                println!(
+                    "    {}: [{:.1}, {:.1}, {:.1}, {:.1}]",
+                    j + 1,
+                    coords[0],
+                    coords[1],
+                    coords[2],
+                    coords[3]
+                );
             }
             println!();
-            
+
             cell_vertex_sets.push(vertex_coords);
         }
-        
+
         // Verify that cells have different vertex sets (no duplicates)
         println!("--- UNIQUENESS VERIFICATION ---");
         for i in 0..cell_vertex_sets.len() {
             for j in (i + 1)..cell_vertex_sets.len() {
-                assert_ne!(cell_vertex_sets[i], cell_vertex_sets[j], 
-                    "Cells {} and {} should have different vertex sets", i + 1, j + 1);
+                assert_ne!(
+                    cell_vertex_sets[i],
+                    cell_vertex_sets[j],
+                    "Cells {} and {} should have different vertex sets",
+                    i + 1,
+                    j + 1
+                );
             }
         }
-        println!("✓ All {} cells have unique vertex sets", cell_vertex_sets.len());
-        
+        println!(
+            "✓ All {} cells have unique vertex sets",
+            cell_vertex_sets.len()
+        );
+
         // Verify neighbor relationships
         if result.number_of_cells() > 1 {
             println!("\n--- NEIGHBOR RELATIONSHIPS ---");
             let mut total_neighbor_connections = 0;
-            
+
             for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
                 if let Some(neighbors) = &cell.neighbors {
                     println!("Cell {} has {} neighbors:", i + 1, neighbors.len());
                     total_neighbor_connections += neighbors.len();
-                    
+
                     // Verify that all neighbors exist and are mutual
                     for (_j, neighbor_id) in neighbors.iter().enumerate() {
-                        assert!(result.cells.contains_key(neighbor_id), 
-                            "Neighbor {} of cell {} should exist", neighbor_id, cell_id);
-                        
+                        assert!(
+                            result.cells.contains_key(neighbor_id),
+                            "Neighbor {} of cell {} should exist",
+                            neighbor_id,
+                            cell_id
+                        );
+
                         // Find the neighbor's index for display
-                        let neighbor_index = result.cells.iter()
+                        let neighbor_index = result
+                            .cells
+                            .iter()
                             .enumerate()
                             .find(|(_, (id, _))| *id == neighbor_id)
                             .map(|(idx, _)| idx + 1)
                             .unwrap_or(0);
-                        
+
                         println!("  → Cell {}", neighbor_index);
-                        
+
                         // Check mutual neighbor relationship
                         if let Some(neighbor_cell) = result.cells.get(neighbor_id) {
                             if let Some(neighbor_neighbors) = &neighbor_cell.neighbors {
-                                assert!(neighbor_neighbors.contains(cell_id),
-                                    "Cell {} should be a neighbor of its neighbor {}", i + 1, neighbor_index);
+                                assert!(
+                                    neighbor_neighbors.contains(cell_id),
+                                    "Cell {} should be a neighbor of its neighbor {}",
+                                    i + 1,
+                                    neighbor_index
+                                );
                             }
                         }
                     }
@@ -853,11 +922,14 @@ mod tests {
                     println!("Cell {} has no neighbors assigned", i + 1);
                 }
             }
-            
+
             println!("✓ All neighbor relationships are mutual");
-            println!("✓ Total neighbor connections: {}", total_neighbor_connections);
+            println!(
+                "✓ Total neighbor connections: {}",
+                total_neighbor_connections
+            );
         }
-        
+
         println!("\n=== 4D TRIANGULATION SUCCESS ===\n");
     }
 
@@ -866,38 +938,48 @@ mod tests {
         // Create a 5D point set that forms multiple 5-simplices
         // Using 7 points in 5D space to create a complex triangulation
         let points = vec![
-            Point::new([0.0, 0.0, 0.0, 0.0, 0.0]),  // origin
-            Point::new([1.0, 0.0, 0.0, 0.0, 0.0]),  // unit vector in x
-            Point::new([0.0, 1.0, 0.0, 0.0, 0.0]),  // unit vector in y
-            Point::new([0.0, 0.0, 1.0, 0.0, 0.0]),  // unit vector in z
-            Point::new([0.0, 0.0, 0.0, 1.0, 0.0]),  // unit vector in w
-            Point::new([0.0, 0.0, 0.0, 0.0, 1.0]),  // unit vector in v
-            Point::new([1.0, 1.0, 1.0, 1.0, 1.0]),  // diagonal point
+            Point::new([0.0, 0.0, 0.0, 0.0, 0.0]), // origin
+            Point::new([1.0, 0.0, 0.0, 0.0, 0.0]), // unit vector in x
+            Point::new([0.0, 1.0, 0.0, 0.0, 0.0]), // unit vector in y
+            Point::new([0.0, 0.0, 1.0, 0.0, 0.0]), // unit vector in z
+            Point::new([0.0, 0.0, 0.0, 1.0, 0.0]), // unit vector in w
+            Point::new([0.0, 0.0, 0.0, 0.0, 1.0]), // unit vector in v
+            Point::new([1.0, 1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
-        
+
         let tds: Tds<f64, usize, usize, 5> = Tds::new(points);
         println!("\n=== 5D BOWYER-WATSON TRIANGULATION TEST ===");
-        println!("Initial 5D TDS: {} vertices, {} cells", tds.number_of_vertices(), tds.number_of_cells());
-        
+        println!(
+            "Initial 5D TDS: {} vertices, {} cells",
+            tds.number_of_vertices(),
+            tds.number_of_cells()
+        );
+
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
             panic!("Error creating 5D triangulation: {:?}", err);
         });
 
-        println!("\nResult 5D TDS: {} vertices, {} cells", result.number_of_vertices(), result.number_of_cells());
-        
+        println!(
+            "\nResult 5D TDS: {} vertices, {} cells",
+            result.number_of_vertices(),
+            result.number_of_cells()
+        );
+
         // Verify we have the expected number of vertices
         assert_eq!(result.number_of_vertices(), 7);
         assert!(result.number_of_cells() >= 1, "Should have at least 1 cell");
-        
+
         println!("\n--- CELL DETAILS ---");
         let mut cell_vertex_sets = Vec::new();
         for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
-            assert_eq!(cell.vertices.len(), 6, "Each 5D cell should have exactly 6 vertices");
-            
+            assert_eq!(
+                cell.vertices.len(),
+                6,
+                "Each 5D cell should have exactly 6 vertices"
+            );
+
             // Collect and sort vertex coordinates for this cell
-            let mut vertex_coords: Vec<_> = cell.vertices.iter()
-                .map(|v| v.point.coords)
-                .collect();
+            let mut vertex_coords: Vec<_> = cell.vertices.iter().map(|v| v.point.coords).collect();
             vertex_coords.sort_by(|a, b| {
                 for dim in 0..5 {
                     match a[dim].partial_cmp(&b[dim]).unwrap() {
@@ -907,57 +989,82 @@ mod tests {
                 }
                 std::cmp::Ordering::Equal
             });
-            
+
             println!("Cell {}: {}", i + 1, cell_id);
             println!("  Vertices (6 total):");
             for (j, coords) in vertex_coords.iter().enumerate() {
-                println!("    {}: [{:.1}, {:.1}, {:.1}, {:.1}, {:.1}]", 
-                    j + 1, coords[0], coords[1], coords[2], coords[3], coords[4]);
+                println!(
+                    "    {}: [{:.1}, {:.1}, {:.1}, {:.1}, {:.1}]",
+                    j + 1,
+                    coords[0],
+                    coords[1],
+                    coords[2],
+                    coords[3],
+                    coords[4]
+                );
             }
             println!();
-            
+
             cell_vertex_sets.push(vertex_coords);
         }
-        
+
         // Verify that cells have different vertex sets (no duplicates)
         println!("--- UNIQUENESS VERIFICATION ---");
         for i in 0..cell_vertex_sets.len() {
             for j in (i + 1)..cell_vertex_sets.len() {
-                assert_ne!(cell_vertex_sets[i], cell_vertex_sets[j], 
-                    "Cells {} and {} should have different vertex sets", i + 1, j + 1);
+                assert_ne!(
+                    cell_vertex_sets[i],
+                    cell_vertex_sets[j],
+                    "Cells {} and {} should have different vertex sets",
+                    i + 1,
+                    j + 1
+                );
             }
         }
-        println!("✓ All {} cells have unique vertex sets", cell_vertex_sets.len());
-        
+        println!(
+            "✓ All {} cells have unique vertex sets",
+            cell_vertex_sets.len()
+        );
+
         // Verify neighbor relationships
         if result.number_of_cells() > 1 {
             println!("\n--- NEIGHBOR RELATIONSHIPS ---");
             let mut total_neighbor_connections = 0;
-            
+
             for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
                 if let Some(neighbors) = &cell.neighbors {
                     println!("Cell {} has {} neighbors:", i + 1, neighbors.len());
                     total_neighbor_connections += neighbors.len();
-                    
+
                     // Verify that all neighbors exist and are mutual
                     for (_j, neighbor_id) in neighbors.iter().enumerate() {
-                        assert!(result.cells.contains_key(neighbor_id), 
-                            "Neighbor {} of cell {} should exist", neighbor_id, cell_id);
-                        
+                        assert!(
+                            result.cells.contains_key(neighbor_id),
+                            "Neighbor {} of cell {} should exist",
+                            neighbor_id,
+                            cell_id
+                        );
+
                         // Find the neighbor's index for display
-                        let neighbor_index = result.cells.iter()
+                        let neighbor_index = result
+                            .cells
+                            .iter()
                             .enumerate()
                             .find(|(_, (id, _))| *id == neighbor_id)
                             .map(|(idx, _)| idx + 1)
                             .unwrap_or(0);
-                        
+
                         println!("  → Cell {}", neighbor_index);
-                        
+
                         // Check mutual neighbor relationship
                         if let Some(neighbor_cell) = result.cells.get(neighbor_id) {
                             if let Some(neighbor_neighbors) = &neighbor_cell.neighbors {
-                                assert!(neighbor_neighbors.contains(cell_id),
-                                    "Cell {} should be a neighbor of its neighbor {}", i + 1, neighbor_index);
+                                assert!(
+                                    neighbor_neighbors.contains(cell_id),
+                                    "Cell {} should be a neighbor of its neighbor {}",
+                                    i + 1,
+                                    neighbor_index
+                                );
                             }
                         }
                     }
@@ -966,24 +1073,29 @@ mod tests {
                     println!("Cell {} has no neighbors assigned", i + 1);
                 }
             }
-            
+
             println!("✓ All neighbor relationships are mutual");
-            println!("✓ Total neighbor connections: {}", total_neighbor_connections);
+            println!(
+                "✓ Total neighbor connections: {}",
+                total_neighbor_connections
+            );
         }
-        
+
         // Additional 5D specific verification
         println!("\n--- 5D SPECIFIC VERIFICATION ---");
         println!("✓ Working with 5-dimensional space");
         println!("✓ Each cell is a 5-simplex (6 vertices)");
         println!("✓ {} total 5-simplices generated", result.number_of_cells());
-        
+
         // Verify dimensional consistency
-        let total_vertices_in_cells: usize = result.cells.values()
-            .map(|cell| cell.vertices.len())
-            .sum();
-        println!("✓ Total vertices across all cells: {} ({}×6)", 
-            total_vertices_in_cells, result.number_of_cells());
-        
+        let total_vertices_in_cells: usize =
+            result.cells.values().map(|cell| cell.vertices.len()).sum();
+        println!(
+            "✓ Total vertices across all cells: {} ({}×6)",
+            total_vertices_in_cells,
+            result.number_of_cells()
+        );
+
         println!("\n=== 5D TRIANGULATION SUCCESS ===\n");
     }
 
@@ -1036,10 +1148,7 @@ mod tests {
 
     #[test]
     fn tds_two_vertices() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-        ];
+        let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
 
         assert_eq!(tds.number_of_vertices(), 2);
@@ -1064,12 +1173,12 @@ mod tests {
     #[test]
     fn tds_add_duplicate_vertex() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
-        
+
         let vertex1 = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        
+
         let vertex2 = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
@@ -1088,12 +1197,12 @@ mod tests {
     #[test]
     fn tds_add_different_vertices() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
-        
+
         let vertex1 = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        
+
         let vertex2 = VertexBuilder::default()
             .point(Point::new([4.0, 5.0, 6.0]))
             .build()
@@ -1124,10 +1233,7 @@ mod tests {
 
     #[test]
     fn tds_clone() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-        ];
+        let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let tds_clone = tds.clone();
 
@@ -1150,10 +1256,7 @@ mod tests {
 
     #[test]
     fn tds_partial_eq() {
-        let points1 = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-        ];
+        let points1 = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let tds1: Tds<f64, usize, usize, 3> = Tds::new(points1.clone());
         let tds2: Tds<f64, usize, usize, 3> = Tds::new(points1);
 
@@ -1171,7 +1274,7 @@ mod tests {
         let points = vec![Point::new([1.0, 2.0, 3.0])];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let debug_str = format!("{:?}", tds);
-        
+
         assert!(debug_str.contains("Tds"));
         assert!(debug_str.contains("vertices"));
         assert!(debug_str.contains("cells"));
@@ -1194,7 +1297,7 @@ mod tests {
             Point::new([7.0, 8.0]),
         ];
         let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(points_2d);
-        assert_eq!(tds_2d.dim(), 2);  // min(4-1, 2) = 2
+        assert_eq!(tds_2d.dim(), 2); // min(4-1, 2) = 2
 
         // Test case where vertices exceed dimension
         let many_points = vec![
@@ -1205,23 +1308,23 @@ mod tests {
             Point::new([5.0]),
         ];
         let tds_many: Tds<f64, usize, usize, 1> = Tds::new(many_points);
-        assert_eq!(tds_many.dim(), 1);  // min(5-1, 1) = 1
+        assert_eq!(tds_many.dim(), 1); // min(5-1, 1) = 1
     }
 
     #[test]
     fn tds_supercell_empty() {
         let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
         let result = tds.supercell();
-        
+
         // Supercell succeeds for empty triangulation but creates default coordinates
         assert!(result.is_ok());
         let supercell = result.unwrap();
         assert_eq!(supercell.vertices.len(), 4);
-        
+
         // The supercell should be a proper tetrahedron, not specific coordinates
         // Just verify it has 4 vertices forming a valid tetrahedron
         assert_eq!(supercell.vertices.len(), 4);
-        
+
         // Debug output to see what's actually created
         println!("Empty supercell vertices:");
         for (i, vertex) in supercell.vertices.iter().enumerate() {
@@ -1234,17 +1337,17 @@ mod tests {
         let points = vec![Point::new([1.0, 2.0, 3.0])];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let result = tds.supercell();
-        
+
         assert!(result.is_ok());
         let supercell = result.unwrap();
-        assert_eq!(supercell.vertices.len(), 4);  // Proper tetrahedron
-        
+        assert_eq!(supercell.vertices.len(), 4); // Proper tetrahedron
+
         // Debug output to see what's actually created
         println!("Single point supercell vertices:");
         for (i, vertex) in supercell.vertices.iter().enumerate() {
             println!("  Vertex {}: {:?}", i, vertex.point.coords);
         }
-        
+
         // The supercell should be a proper tetrahedron that contains the single input point
         // Just verify it has 4 vertices forming a valid tetrahedron
         assert_eq!(supercell.vertices.len(), 4);
@@ -1259,34 +1362,44 @@ mod tests {
         ];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let result = tds.supercell();
-        
+
         assert!(result.is_ok());
         let supercell = result.unwrap();
-        assert_eq!(supercell.vertices.len(), 4);  // Proper tetrahedron
-        
+        assert_eq!(supercell.vertices.len(), 4); // Proper tetrahedron
+
         // Debug output to see what's actually created
         println!("Multiple points supercell vertices:");
         for (i, vertex) in supercell.vertices.iter().enumerate() {
             println!("  Vertex {}: {:?}", i, vertex.point.coords);
         }
-        
+
         // The supercell should be a proper tetrahedron that contains all input points
         // Just verify it has 4 vertices forming a valid tetrahedron
         assert_eq!(supercell.vertices.len(), 4);
-        
+
         // Check that supercell is large enough by verifying bounding box
-        let max_coords = supercell.vertices.iter()
-            .map(|v| v.point.coords)
-            .fold([f64::NEG_INFINITY; 3], |acc, coords| {
-                [acc[0].max(coords[0]), acc[1].max(coords[1]), acc[2].max(coords[2])]
-            });
-        
-        let min_coords = supercell.vertices.iter()
-            .map(|v| v.point.coords)
-            .fold([f64::INFINITY; 3], |acc, coords| {
-                [acc[0].min(coords[0]), acc[1].min(coords[1]), acc[2].min(coords[2])]
-            });
-        
+        let max_coords = supercell.vertices.iter().map(|v| v.point.coords).fold(
+            [f64::NEG_INFINITY; 3],
+            |acc, coords| {
+                [
+                    acc[0].max(coords[0]),
+                    acc[1].max(coords[1]),
+                    acc[2].max(coords[2]),
+                ]
+            },
+        );
+
+        let min_coords = supercell.vertices.iter().map(|v| v.point.coords).fold(
+            [f64::INFINITY; 3],
+            |acc, coords| {
+                [
+                    acc[0].min(coords[0]),
+                    acc[1].min(coords[1]),
+                    acc[2].min(coords[2]),
+                ]
+            },
+        );
+
         // Supercell should contain all input points [0,0,0], [1,1,1], [2,2,2]
         // So min should be <= 0 and max should be >= 2
         assert!(min_coords[0] <= 0.0 && max_coords[0] >= 2.0);
@@ -1301,10 +1414,10 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        
+
         let result = tds.find_bad_cells_and_boundary_facets(&vertex);
         assert!(result.is_ok());
-        
+
         let (bad_cells, boundary_facets) = result.unwrap();
         assert!(bad_cells.is_empty());
         assert!(boundary_facets.is_empty());
@@ -1312,15 +1425,12 @@ mod tests {
 
     #[test]
     fn tds_vertices_hashmap_access() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-        ];
+        let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        
+
         // Test that we can access vertices by UUID
         assert_eq!(tds.vertices.len(), 2);
-        
+
         for (uuid, vertex) in &tds.vertices {
             assert_eq!(vertex.uuid, *uuid);
             assert_eq!(vertex.dim(), 3);
@@ -1329,12 +1439,9 @@ mod tests {
 
     #[test]
     fn tds_cells_hashmap_access() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-        ];
+        let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        
+
         // Initially no cells
         assert_eq!(tds.cells.len(), 0);
         assert!(tds.cells.is_empty());

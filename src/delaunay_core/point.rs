@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn point_clone() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-        let cloned_point = point.clone();
+        let cloned_point = point;
         
         assert_eq!(point, cloned_point);
         assert_eq!(point.coords, cloned_point.coords);
