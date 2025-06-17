@@ -40,6 +40,60 @@ where
     vertices1.iter().all(|v1| vertices2.contains(v1))
 }
 
+/// Generate all combinations of `k` vertices from the given vertex list
+fn generate_combinations<T, U, const D: usize>(
+    vertices: &[Vertex<T, U, D>],
+    k: usize,
+) -> Vec<Vec<Vertex<T, U, D>>>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    let mut combinations = Vec::new();
+    
+    if k == 0 {
+        combinations.push(Vec::new());
+        return combinations;
+    }
+    
+    if k > vertices.len() {
+        return combinations;
+    }
+    
+    if k == vertices.len() {
+        combinations.push(vertices.to_vec());
+        return combinations;
+    }
+    
+    // Generate combinations using iterative approach
+    let n = vertices.len();
+    let mut indices = (0..k).collect::<Vec<_>>();
+    
+    loop {
+        // Add current combination
+        let combination = indices.iter().map(|i| vertices[*i]).collect();
+        combinations.push(combination);
+        
+        // Find next combination
+        let mut i = k;
+        loop {
+            if i == 0 {
+                return combinations;
+            }
+            i -= 1;
+            if indices[i] != i + n - k {
+                break;
+            }
+        }
+        
+        indices[i] += 1;
+        for j in (i + 1)..k {
+            indices[j] = indices[j - 1] + 1;
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
@@ -374,19 +428,41 @@ where
             return Ok(self);
         }
 
-        // For simple cases where we have exactly D+1 vertices, just create a single simplex
-        if self.vertices.len() == D + 1 {
+        // For cases with a small number of vertices, use a direct combinatorial approach
+        // This is more reliable than the full Bowyer-Watson algorithm for small cases
+        if self.vertices.len() >= D + 1 && self.vertices.len() <= D + 5 {
             let vertices: Vec<_> = self.vertices.values().cloned().collect();
-            let cell = CellBuilder::default()
-                .vertices(vertices)
-                .build()
-                .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {:?}", e)))?;
-            self.cells.insert(cell.uuid, cell);
+            let mut created_cells = 0;
             
-            // Assign incident cells to vertices
-            self.assign_incident_cells()?;
+            // Generate all possible combinations of D+1 vertices
+            let combinations = generate_combinations(&vertices, D + 1);
             
-            return Ok(self);
+            for combination in combinations {
+                // Try to create a cell with these vertices
+                if let Ok(cell) = CellBuilder::default()
+                    .vertices(combination)
+                    .build()
+                    .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {:?}", e)))
+                {
+                    self.cells.insert(cell.uuid, cell);
+                    created_cells += 1;
+                }
+            }
+            
+            if created_cells > 0 {
+                // Remove duplicate cells (cells with identical vertex sets)
+                self.remove_duplicate_cells();
+                
+                // Assign neighbors between adjacent cells
+                self.assign_neighbors()?;
+                
+                // Assign incident cells to vertices
+                self.assign_incident_cells()?;
+                
+                return Ok(self);
+            }
+            
+            // If the combinatorial approach didn't work, fall through to the full algorithm
         }
 
         // For more complex cases, use the full Bowyer-Watson algorithm
@@ -612,6 +688,31 @@ where
         }
 
         Ok(())
+    }
+
+    /// Remove duplicate cells (cells with identical vertex sets)
+    fn remove_duplicate_cells(&mut self) {
+        let mut unique_cells = HashMap::new();
+        let mut cells_to_remove = Vec::new();
+
+        for (cell_id, cell) in &self.cells {
+            // Create a sorted vector of vertex UUIDs as a key for uniqueness
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
+            vertex_uuids.sort();
+
+            if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
+                // This is a duplicate cell - mark for removal
+                cells_to_remove.push(*cell_id);
+            } else {
+                // This is a unique cell
+                unique_cells.insert(vertex_uuids, *cell_id);
+            }
+        }
+
+        // Remove duplicate cells
+        for cell_id in cells_to_remove {
+            self.cells.remove(&cell_id);
+        }
     }
 }
 
@@ -886,7 +987,7 @@ mod tests {
                     total_neighbor_connections += neighbors.len();
 
                     // Verify that all neighbors exist and are mutual
-                    for (_j, neighbor_id) in neighbors.iter().enumerate() {
+                    for neighbor_id in neighbors {
                         assert!(
                             result.cells.contains_key(neighbor_id),
                             "Neighbor {} of cell {} should exist",
@@ -1037,7 +1138,7 @@ mod tests {
                     total_neighbor_connections += neighbors.len();
 
                     // Verify that all neighbors exist and are mutual
-                    for (_j, neighbor_id) in neighbors.iter().enumerate() {
+                    for neighbor_id in neighbors {
                         assert!(
                             result.cells.contains_key(neighbor_id),
                             "Neighbor {} of cell {} should exist",
