@@ -142,7 +142,8 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{}
+{
+}
 
 /// Order of vertices is based on lexicographic order of elements in vector of coords.
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
@@ -362,7 +363,7 @@ mod tests {
     fn vertex_hash() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let vertex1: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
@@ -375,15 +376,15 @@ mod tests {
             .point(Point::new([1.0, 2.0, 4.0]))
             .build()
             .unwrap();
-        
+
         let mut hasher1 = DefaultHasher::new();
         let mut hasher2 = DefaultHasher::new();
         let mut hasher3 = DefaultHasher::new();
-        
+
         vertex1.hash(&mut hasher1);
         vertex2.hash(&mut hasher2);
         vertex3.hash(&mut hasher3);
-        
+
         // Different UUIDs mean different hashes even with same points
         assert_ne!(hasher1.finish(), hasher2.finish());
         assert_ne!(hasher1.finish(), hasher3.finish());
@@ -392,9 +393,9 @@ mod tests {
     #[test]
     fn vertex_hash_in_hashmap() {
         use std::collections::HashMap;
-        
+
         let mut map: HashMap<Vertex<f64, Option<()>, 2>, i32> = HashMap::new();
-        
+
         let vertex1: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0]))
             .build()
@@ -403,10 +404,10 @@ mod tests {
             .point(Point::new([3.0, 4.0]))
             .build()
             .unwrap();
-        
+
         map.insert(vertex1, 10);
         map.insert(vertex2, 20);
-        
+
         assert_eq!(map.get(&vertex1), Some(&10));
         assert_eq!(map.get(&vertex2), Some(&20));
         assert_eq!(map.len(), 2);
@@ -420,7 +421,7 @@ mod tests {
             .build()
             .unwrap();
         let cloned_vertex = vertex;
-        
+
         // Points should be equal but UUIDs should be the same (since we cloned)
         assert_eq!(vertex.point, cloned_vertex.point);
         assert_eq!(vertex.uuid, cloned_vertex.uuid);
@@ -435,7 +436,7 @@ mod tests {
             .point(Point::new([42.0]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [42.0]);
         assert_eq!(vertex.dim(), 1);
         assert!(!vertex.uuid.is_nil());
@@ -449,7 +450,7 @@ mod tests {
             .point(Point::new([1.0, 2.0]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.0, 2.0]);
         assert_eq!(vertex.dim(), 2);
         assert!(!vertex.uuid.is_nil());
@@ -463,7 +464,7 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0, 4.0]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
         assert_eq!(vertex.dim(), 4);
         assert!(!vertex.uuid.is_nil());
@@ -477,7 +478,7 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0, 4.0, 5.0]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0, 5.0]);
         assert_eq!(vertex.dim(), 5);
         assert!(!vertex.uuid.is_nil());
@@ -491,7 +492,7 @@ mod tests {
             .point(Point::new([1.5, 2.5]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.5, 2.5]);
         assert_eq!(vertex.dim(), 2);
         assert!(!vertex.uuid.is_nil());
@@ -503,7 +504,7 @@ mod tests {
             .point(Point::new([1, 2, 3]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1, 2, 3]);
         assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid.is_nil());
@@ -516,7 +517,7 @@ mod tests {
             .data("test_vertex")
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
         assert_eq!(vertex.data.unwrap(), "test_vertex");
         assert_eq!(vertex.dim(), 3);
@@ -529,7 +530,7 @@ mod tests {
             .data(123u32)
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [5.0, 10.0]);
         assert_eq!(vertex.data.unwrap(), 123u32);
         assert_eq!(vertex.dim(), 2);
@@ -542,7 +543,7 @@ mod tests {
             .data((42, 84))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.0, 2.0]);
         assert_eq!(vertex.data.unwrap(), (42, 84));
     }
@@ -555,7 +556,7 @@ mod tests {
             .build()
             .unwrap();
         let debug_str = format!("{:?}", vertex);
-        
+
         assert!(debug_str.contains("Vertex"));
         assert!(debug_str.contains("point"));
         assert!(debug_str.contains("uuid"));
@@ -578,7 +579,7 @@ mod tests {
             .point(Point::new([1.0, 2.0, 4.0]))
             .build()
             .unwrap();
-        
+
         // Test Eq trait (reflexivity, symmetry) - equality is based on point only
         assert_eq!(vertex1, vertex1); // reflexive
         assert_eq!(vertex1, vertex2); // same points
@@ -597,14 +598,26 @@ mod tests {
             .point(Point::new([1.0, 2.0]))
             .build()
             .unwrap();
-        
+
         // Test that equal points result in equal ordering
         assert!(vertex1.partial_cmp(&vertex2) != Some(Ordering::Less));
         assert!(vertex2.partial_cmp(&vertex1) != Some(Ordering::Less));
-        assert!(matches!(vertex1.partial_cmp(&vertex2), Some(Ordering::Less | Ordering::Equal)));
-        assert!(matches!(vertex2.partial_cmp(&vertex1), Some(Ordering::Less | Ordering::Equal)));
-        assert!(matches!(vertex1.partial_cmp(&vertex2), Some(Ordering::Greater | Ordering::Equal)));
-        assert!(matches!(vertex2.partial_cmp(&vertex1), Some(Ordering::Greater | Ordering::Equal)));
+        assert!(matches!(
+            vertex1.partial_cmp(&vertex2),
+            Some(Ordering::Less | Ordering::Equal)
+        ));
+        assert!(matches!(
+            vertex2.partial_cmp(&vertex1),
+            Some(Ordering::Less | Ordering::Equal)
+        ));
+        assert!(matches!(
+            vertex1.partial_cmp(&vertex2),
+            Some(Ordering::Greater | Ordering::Equal)
+        ));
+        assert!(matches!(
+            vertex2.partial_cmp(&vertex1),
+            Some(Ordering::Greater | Ordering::Equal)
+        ));
     }
 
     #[test]
@@ -617,22 +630,24 @@ mod tests {
         let serialized = serde_json::to_string(&vertex_no_data).unwrap();
         let deserialized: Vertex<f64, Option<()>, 3> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(vertex_no_data, deserialized);
-        
+
         let vertex_with_data: Vertex<f64, i32, 2> = VertexBuilder::default()
             .point(Point::new([10.5, -5.3]))
             .data(42)
             .build()
             .unwrap();
         let serialized_data = serde_json::to_string(&vertex_with_data).unwrap();
-        let deserialized_data: Vertex<f64, i32, 2> = serde_json::from_str(&serialized_data).unwrap();
+        let deserialized_data: Vertex<f64, i32, 2> =
+            serde_json::from_str(&serialized_data).unwrap();
         assert_eq!(vertex_with_data, deserialized_data);
-        
+
         let vertex_1d: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
             .point(Point::new([42.0]))
             .build()
             .unwrap();
         let serialized_1d = serde_json::to_string(&vertex_1d).unwrap();
-        let deserialized_1d: Vertex<f64, Option<()>, 1> = serde_json::from_str(&serialized_1d).unwrap();
+        let deserialized_1d: Vertex<f64, Option<()>, 1> =
+            serde_json::from_str(&serialized_1d).unwrap();
         assert_eq!(vertex_1d, deserialized_1d);
     }
 
@@ -642,7 +657,7 @@ mod tests {
             .point(Point::new([-1.0, -2.0, -3.0]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [-1.0, -2.0, -3.0]);
         assert_eq!(vertex.dim(), 3);
     }
@@ -653,12 +668,12 @@ mod tests {
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        
+
         let origin_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::origin())
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point, origin_vertex.point);
     }
 
@@ -668,7 +683,7 @@ mod tests {
             .point(Point::new([1e6, 2e6, 3e6]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1000000.0, 2000000.0, 3000000.0]);
         assert_eq!(vertex.dim(), 3);
     }
@@ -679,7 +694,7 @@ mod tests {
             .point(Point::new([1e-6, 2e-6, 3e-6]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [0.000001, 0.000002, 0.000003]);
         assert_eq!(vertex.dim(), 3);
     }
@@ -688,7 +703,7 @@ mod tests {
     fn vertex_from_points_empty() {
         let points: Vec<Point<f64, 3>> = Vec::new();
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        
+
         assert!(vertices.is_empty());
     }
 
@@ -696,7 +711,7 @@ mod tests {
     fn vertex_from_points_single() {
         let points = vec![Point::new([1.0, 2.0, 3.0])];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        
+
         assert_eq!(vertices.len(), 1);
         assert_eq!(vertices[0].point.coords, [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
@@ -707,7 +722,7 @@ mod tests {
     fn vertex_into_hashmap_empty() {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vec::new();
         let hashmap = Vertex::into_hashmap(vertices);
-        
+
         assert!(hashmap.is_empty());
     }
 
@@ -720,7 +735,7 @@ mod tests {
         let uuid = vertex.uuid;
         let vertices = vec![vertex];
         let hashmap = Vertex::into_hashmap(vertices);
-        
+
         assert_eq!(hashmap.len(), 1);
         assert!(hashmap.contains_key(&uuid));
         assert_eq!(hashmap.get(&uuid).unwrap().point.coords, [1.0, 2.0, 3.0]);
@@ -736,7 +751,7 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        
+
         // Same points but different UUIDs
         assert_ne!(vertex1.uuid, vertex2.uuid);
         assert!(!vertex1.uuid.is_nil());
@@ -749,7 +764,7 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        
+
         assert!(vertex.incident_cell.is_none());
     }
 
@@ -759,7 +774,7 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        
+
         assert!(vertex.data.is_none());
     }
 
@@ -770,7 +785,7 @@ mod tests {
             .data(42)
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.data.unwrap(), 42);
     }
 
@@ -780,7 +795,7 @@ mod tests {
             .point(Point::new([1.0, -2.0, 3.0, -4.0]))
             .build()
             .unwrap();
-        
+
         assert_eq!(vertex.point.coords, [1.0, -2.0, 3.0, -4.0]);
         assert_eq!(vertex.dim(), 4);
     }

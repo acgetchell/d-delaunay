@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn facet_default() {
         let facet: Facet<f64, Option<()>, Option<()>, 3> = Facet::default();
-        
+
         // Default facet should have empty cell and default vertex
         assert_eq!(facet.cell.vertices.len(), 0);
         assert_eq!(facet.vertex.point.coords, [0.0, 0.0, 0.0]);
@@ -374,7 +374,7 @@ mod tests {
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
         let debug_str = format!("{:?}", facet);
-        
+
         assert!(debug_str.contains("Facet"));
         assert!(debug_str.contains("cell"));
         assert!(debug_str.contains("vertex"));
@@ -403,10 +403,10 @@ mod tests {
             .build()
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-        
+
         assert_eq!(facet.cell.data, Some("triangle"));
         assert_eq!(facet.vertex.data, Some(1));
-        
+
         let vertices = facet.vertices();
         assert_eq!(vertices.len(), 2);
         assert!(vertices.iter().any(|v| v.data == Some(2)));
@@ -432,7 +432,7 @@ mod tests {
             .build()
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-        
+
         // Facet of 2D triangle is an edge (1D)
         let vertices = facet.vertices();
         assert_eq!(vertices.len(), 2);
@@ -455,7 +455,7 @@ mod tests {
             .build()
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-        
+
         // Facet of 1D edge is a point (0D)
         let vertices = facet.vertices();
         assert_eq!(vertices.len(), 1);
@@ -489,7 +489,7 @@ mod tests {
             .build()
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-        
+
         // Facet of 4D simplex is a 3D tetrahedron
         let vertices = facet.vertices();
         assert_eq!(vertices.len(), 4);
@@ -522,12 +522,14 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        
+
         let result = Facet::new(cell, vertex_not_in_cell);
         assert!(result.is_err());
-        
+
         let error = result.unwrap_err();
-        assert!(error.to_string().contains("The cell does not contain the vertex!"));
+        assert!(error
+            .to_string()
+            .contains("The cell does not contain the vertex!"));
     }
 
     #[test]
@@ -540,31 +542,39 @@ mod tests {
             .vertices(vec![vertex1])
             .build()
             .unwrap();
-        
+
         let result = Facet::new(cell, vertex1);
         assert!(result.is_err());
-        
+
         let error = result.unwrap_err();
-        assert!(error.to_string().contains("The cell is a 0-simplex with no facet!"));
+        assert!(error
+            .to_string()
+            .contains("The cell is a 0-simplex with no facet!"));
     }
 
     #[test]
     fn facet_error_display() {
         let cell_error = FacetError::CellDoesNotContainVertex;
         let simplex_error = FacetError::CellIsZeroSimplex;
-        
-        assert_eq!(cell_error.to_string(), "The cell does not contain the vertex!");
-        assert_eq!(simplex_error.to_string(), "The cell is a 0-simplex with no facet!");
+
+        assert_eq!(
+            cell_error.to_string(),
+            "The cell does not contain the vertex!"
+        );
+        assert_eq!(
+            simplex_error.to_string(),
+            "The cell is a 0-simplex with no facet!"
+        );
     }
 
     #[test]
     fn facet_error_debug() {
         let cell_error = FacetError::CellDoesNotContainVertex;
         let simplex_error = FacetError::CellIsZeroSimplex;
-        
+
         let cell_debug = format!("{:?}", cell_error);
         let simplex_debug = format!("{:?}", simplex_error);
-        
+
         assert!(cell_debug.contains("CellDoesNotContainVertex"));
         assert!(simplex_debug.contains("CellIsZeroSimplex"));
     }
@@ -577,17 +587,15 @@ mod tests {
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let empty_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![])
-            .build()
-            .unwrap();
-        
+        let empty_cell: Cell<f64, Option<()>, Option<()>, 3> =
+            CellBuilder::default().vertices(vec![]).build().unwrap();
+
         // Create facet directly without using new() to bypass validation
         let facet = Facet {
             cell: empty_cell,
             vertex: vertex1,
         };
-        
+
         let vertices = facet.vertices();
         assert_eq!(vertices.len(), 0);
     }
@@ -611,23 +619,23 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        
+
         // Create 3D cell with exactly 4 vertices (3+1)
         let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
-        
+
         let facet = Facet::new(cell.clone(), vertex3).unwrap();
         let vertices = facet.vertices();
-        
+
         // Should have all vertices except vertex3
         assert_eq!(vertices.len(), 3);
         assert!(vertices.contains(&vertex1));
         assert!(vertices.contains(&vertex2));
         assert!(vertices.contains(&vertex4));
         assert!(!vertices.contains(&vertex3));
-        
+
         // Check ordering is preserved (vertices should appear in same order as in cell)
         assert_eq!(vertices[0], vertex1);
         assert_eq!(vertices[1], vertex2);
@@ -651,19 +659,19 @@ mod tests {
             .data(3u8)
             .build()
             .unwrap();
-        
+
         let cell: Cell<f32, u8, u16, 2> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3])
             .data(100u16)
             .build()
             .unwrap();
-        
+
         let facet = Facet::new(cell, vertex1).unwrap();
         let serialized = serde_json::to_string(&facet).unwrap();
-        
+
         assert!(serialized.contains("1.0"));
         assert!(serialized.contains("0.5"));
-        
+
         let deserialized: Facet<f32, u8, u16, 2> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, facet);
     }
@@ -686,17 +694,17 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        
+
         let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
-        
+
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex2).unwrap();
         let facet3 = Facet::new(cell.clone(), vertex3).unwrap();
         let facet4 = Facet::new(cell.clone(), vertex4).unwrap();
-        
+
         // All facets should be different because they have different opposite vertices
         assert_ne!(facet1, facet2);
         assert_ne!(facet1, facet3);
@@ -720,22 +728,22 @@ mod tests {
             .point(Point::new([0.0, 1.0, 0.0]))
             .build()
             .unwrap();
-        
+
         // Use the same vertices for both cells
         let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        
+
         let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        
+
         let facet1 = Facet::new(cell1, vertex1).unwrap();
         let facet2 = Facet::new(cell2, vertex1).unwrap();
-        
-        // Facets should be equal because cells have the same vertices 
+
+        // Facets should be equal because cells have the same vertices
         // (same UUIDs, same coordinates) and same opposite vertex
         assert_eq!(facet1, facet2);
     }
@@ -754,7 +762,7 @@ mod tests {
             .point(Point::new([0.0, 1.0, 0.0]))
             .build()
             .unwrap();
-        
+
         // Create completely different vertices with different coordinates
         let vertex4 = VertexBuilder::default()
             .point(Point::new([2.0, 0.0, 0.0]))
@@ -768,20 +776,20 @@ mod tests {
             .point(Point::new([2.0, 1.0, 0.0]))
             .build()
             .unwrap();
-        
+
         let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        
+
         let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex4, vertex5, vertex6])
             .build()
             .unwrap();
-        
+
         let facet1 = Facet::new(cell1, vertex1).unwrap();
         let facet2 = Facet::new(cell2, vertex4).unwrap();
-        
+
         // Facets should be different because cells have completely different vertices
         assert_ne!(facet1, facet2);
     }

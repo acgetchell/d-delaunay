@@ -10,6 +10,7 @@ use super::{
     utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
+use anyhow::Error;
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -18,7 +19,6 @@ use std::collections::HashSet;
 use std::ops::{AddAssign, Div, SubAssign};
 use std::{collections::HashMap, hash::Hash, iter::Sum};
 use uuid::Uuid;
-use anyhow::Error;
 
 /// Helper function to check if two facets are adjacent (share the same vertices)
 fn facets_are_adjacent<T, U, V, const D: usize>(
@@ -728,12 +728,16 @@ where
     where
         [T; D]: serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
-        validate_neighbors(self)
+        validate_neighbors(self)?;
+        validate_unique_cells(self)?;
+        Ok(())
     }
 }
 
 /// Helper function to validate neighbor relationships in Tds
-pub fn validate_neighbors<T, U, V, const D: usize>(tds: &Tds<T, U, V, D>) -> Result<(), anyhow::Error>
+pub fn validate_neighbors<T, U, V, const D: usize>(
+    tds: &Tds<T, U, V, D>,
+) -> Result<(), anyhow::Error>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
@@ -766,7 +770,8 @@ where
 
                 // Mutual neighbor check
                 let empty_neighbors = Vec::new();
-                let neighbor_neighbors = neighbor_cell.neighbors.as_ref().unwrap_or(&empty_neighbors);
+                let neighbor_neighbors =
+                    neighbor_cell.neighbors.as_ref().unwrap_or(&empty_neighbors);
                 if !neighbor_neighbors.contains(cell_id) {
                     return Err(anyhow!(
                         "Neighbor relationship not mutual: {:?} → {:?}",
@@ -778,8 +783,7 @@ where
                 // Shared facet check: should share exactly D vertices (i.e., D+1 simplex - 1)
                 let neighbor_vertices: HashSet<_> =
                     neighbor_cell.vertices.iter().map(|v| v.uuid).collect();
-                let shared: HashSet<_> =
-                    this_vertices.intersection(&neighbor_vertices).collect();
+                let shared: HashSet<_> = this_vertices.intersection(&neighbor_vertices).collect();
                 if shared.len() != D {
                     return Err(anyhow!(
                         "Neighbor {:?} does not share a facet with {:?} (shared {} vertices)",
@@ -793,6 +797,65 @@ where
     }
     println!("✓ Neighbor validation passed for all cells");
     println!("✓ Total neighbor links validated: {}", total_neighbor_links);
+    Ok(())
+}
+
+/// Helper that verifies every cell
+///   * has exactly `D+1` vertices (a D‑simplex), **and**
+///   * no two cells share the exact same sorted set of vertex UUIDs.
+///
+/// It also prints a human‑friendly summary of each cell’s vertices.
+///
+/// Returns `Ok(())` on success or an `anyhow::Error` describing the first failure.
+pub fn validate_unique_cells<T, U, V, const D: usize>(
+    tds: &Tds<T, U, V, D>,
+) -> Result<(), anyhow::Error>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + Into<f64>, // for pretty printing
+    U: Clone + Copy + Eq + Hash + Ord,
+    V: Clone + Copy + Eq + Hash + Ord,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize,
+{
+    use anyhow::anyhow;
+
+    println!("--- CELL‑VERTEX VALIDATION (D = {}) ---", D);
+    let mut seen: HashMap<Vec<Uuid>, Uuid> = HashMap::new();
+    let mut idx = 1;
+
+    for (cell_id, cell) in &tds.cells {
+        // 1.  D + 1‑vertex check
+        if cell.vertices.len() != D + 1 {
+            return Err(anyhow!(
+                "Cell {:?} has {} vertices; expected {}",
+                cell_id,
+                cell.vertices.len(),
+                D + 1
+            ));
+        }
+
+        // 2.  Pretty print this cell
+        print!("Cell {:>3} {} vertices:", idx, cell.vertices.len());
+        for v in &cell.vertices {
+            let coords: Vec<f64> = v.point.coords.iter().map(|c| (*c).into()).collect();
+            print!(" {:?}", coords);
+        }
+        println!();
+        idx += 1;
+
+        // 3.  Uniqueness check
+        let mut key: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
+        key.sort_unstable();
+        if let Some(dup_id) = seen.insert(key.clone(), *cell_id) {
+            return Err(anyhow!(
+                "Duplicate cells detected – {:?} and {:?} share vertex set {:?}",
+                cell_id,
+                dup_id,
+                key
+            ));
+        }
+    }
+
+    println!("✓ All {} cells are unique D‑simplices\n", tds.cells.len());
     Ok(())
 }
 
@@ -999,67 +1062,7 @@ mod tests {
         assert_eq!(result.number_of_vertices(), 6);
         assert!(result.number_of_cells() >= 1, "Should have at least 1 cell");
 
-        println!("\n--- CELL DETAILS ---");
-        let mut cell_vertex_sets = Vec::new();
-        for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
-            assert_eq!(
-                cell.vertices.len(),
-                5,
-                "Each 4D cell should have exactly 5 vertices"
-            );
-
-            // Collect and sort vertex coordinates for this cell
-            let mut vertex_coords: Vec<_> = cell.vertices.iter().map(|v| v.point.coords).collect();
-            vertex_coords.sort_by(|a, b| {
-                for dim in 0..4 {
-                    match a[dim].partial_cmp(&b[dim]).unwrap() {
-                        std::cmp::Ordering::Equal => continue,
-                        other => return other,
-                    }
-                }
-                std::cmp::Ordering::Equal
-            });
-
-            println!("Cell {}: {}", i + 1, cell_id);
-            println!("  Vertices (5 total):");
-            for (j, coords) in vertex_coords.iter().enumerate() {
-                println!(
-                    "    {}: [{:.1}, {:.1}, {:.1}, {:.1}]",
-                    j + 1,
-                    coords[0],
-                    coords[1],
-                    coords[2],
-                    coords[3]
-                );
-            }
-            println!();
-
-            cell_vertex_sets.push(vertex_coords);
-        }
-
-        // Verify that cells have different vertex sets (no duplicates)
-        println!("--- UNIQUENESS VERIFICATION ---");
-        for i in 0..cell_vertex_sets.len() {
-            for j in (i + 1)..cell_vertex_sets.len() {
-                assert_ne!(
-                    cell_vertex_sets[i],
-                    cell_vertex_sets[j],
-                    "Cells {} and {} should have different vertex sets",
-                    i + 1,
-                    j + 1
-                );
-            }
-        }
-        println!(
-            "✓ All {} cells have unique vertex sets",
-            cell_vertex_sets.len()
-        );
-
-        // Validate neighbor relationships
-        if result.number_of_cells() > 1 {
-            // unwrap to get the actual error if validation fails
-            result.is_valid().unwrap();
-        }
+        result.is_valid().unwrap();
 
         println!("\n=== 4D TRIANGULATION SUCCESS ===\n");
     }
@@ -1099,68 +1102,6 @@ mod tests {
         // Verify we have the expected number of vertices
         assert_eq!(result.number_of_vertices(), 7);
         assert!(result.number_of_cells() >= 1, "Should have at least 1 cell");
-
-        println!("\n--- CELL DETAILS ---");
-        let mut cell_vertex_sets = Vec::new();
-        for (i, (cell_id, cell)) in result.cells.iter().enumerate() {
-            assert_eq!(
-                cell.vertices.len(),
-                6,
-                "Each 5D cell should have exactly 6 vertices"
-            );
-
-            // Collect and sort vertex coordinates for this cell
-            let mut vertex_coords: Vec<_> = cell.vertices.iter().map(|v| v.point.coords).collect();
-            vertex_coords.sort_by(|a, b| {
-                for dim in 0..5 {
-                    match a[dim].partial_cmp(&b[dim]).unwrap() {
-                        std::cmp::Ordering::Equal => continue,
-                        other => return other,
-                    }
-                }
-                std::cmp::Ordering::Equal
-            });
-
-            println!("Cell {}: {}", i + 1, cell_id);
-            println!("  Vertices (6 total):");
-            for (j, coords) in vertex_coords.iter().enumerate() {
-                println!(
-                    "    {}: [{:.1}, {:.1}, {:.1}, {:.1}, {:.1}]",
-                    j + 1,
-                    coords[0],
-                    coords[1],
-                    coords[2],
-                    coords[3],
-                    coords[4]
-                );
-            }
-            println!();
-
-            cell_vertex_sets.push(vertex_coords);
-        }
-
-        // Verify that cells have different vertex sets (no duplicates)
-        println!("--- UNIQUENESS VERIFICATION ---");
-        for i in 0..cell_vertex_sets.len() {
-            for j in (i + 1)..cell_vertex_sets.len() {
-                assert_ne!(
-                    cell_vertex_sets[i],
-                    cell_vertex_sets[j],
-                    "Cells {} and {} should have different vertex sets",
-                    i + 1,
-                    j + 1
-                );
-            }
-        }
-        println!(
-            "✓ All {} cells have unique vertex sets",
-            cell_vertex_sets.len()
-        );
-
-        // Validate neighbor relationships
-        if result.number_of_cells() > 1 {
-            // unwrap to get the actual error if validation fails
-            result.is_valid().unwrap();
-        }
+        result.is_valid().unwrap();
     }
 }
