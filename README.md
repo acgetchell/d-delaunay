@@ -19,7 +19,7 @@ the [Rust] ecosystem.
 
 ## Features
 
-- [ ]  d-dimensional [Delaunay triangulations]
+- [x]  d-dimensional [Delaunay triangulations] (tested for 3-, 4-, and 5-dimensional triangulations)
 - [x]  Arbitrary data types associated with vertices and cells
 - [x]  Serialization/Deserialization of all data structures to/from [JSON]
 
