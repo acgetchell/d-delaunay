@@ -500,10 +500,13 @@ mod tests {
             supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}!", err));
 
         assert_eq!(unwrapped_supercell.vertices.len(), 4);
+        // With corrected find_extreme_coordinates:
+        // min_coords = [1.0, 2.0, 3.0] - 10.0 = [-9.0, -8.0, -7.0]
+        // max_coords = [10.0, 11.0, 12.0] + 10.0 = [20.0, 21.0, 22.0]
         assert!(unwrapped_supercell
             .vertices
             .iter()
-            .any(|v| { v.point.coords == [-10.0, -10.0, -10.0] }));
+            .any(|v| { v.point.coords == [-9.0, -8.0, -7.0] }));
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", unwrapped_supercell);
@@ -778,16 +781,16 @@ mod tests {
         let supercell = result.unwrap();
         assert_eq!(supercell.vertices.len(), 4);  // 1 min + 3 diagonal vertices
         
-        // Based on the actual output, the min coordinate becomes [1.0-10.0, 2.0-10.0, 3.0-10.0] 
-        // But since min and max are the same for a single point, it uses the min for all dimensions
-        // So min_coords = [1.0, 2.0, 3.0] - 10.0 = [-9.0, -8.0, -7.0] but the actual output shows it uses
-        // the default algorithm which may use min across all dimensions
+        // With corrected find_extreme_coordinates:
+        // For single point [1.0, 2.0, 3.0], min and max are the same: [1.0, 2.0, 3.0]
+        // min_coords = [1.0, 2.0, 3.0] - 10.0 = [-9.0, -8.0, -7.0]
+        // max_coords = [1.0, 2.0, 3.0] + 10.0 = [11.0, 12.0, 13.0]
         let has_min_vertex = supercell.vertices.iter().any(|v| {
-            v.point.coords == [-10.0, -10.0, -10.0]  // This is what's actually output
+            v.point.coords == [-9.0, -8.0, -7.0]
         });
         assert!(has_min_vertex);
         
-        // Check diagonal vertices exist
+        // Check diagonal vertices exist (from diagonal matrix of max_coords)
         let has_diagonal_vertices = supercell.vertices.iter().any(|v| {
             v.point.coords == [11.0, 0.0, 0.0] ||
             v.point.coords == [0.0, 12.0, 0.0] ||
