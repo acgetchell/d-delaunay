@@ -9,7 +9,6 @@ use super::{
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use ordered_float::OrderedFloat;
 use peroxide::fuga::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
@@ -549,84 +548,30 @@ where
 }
 
 /// Custom Hash implementation for Cell
-/// For f64 types, converts coordinates to OrderedFloat for proper hashing
-/// For other types that implement Hash, uses direct hashing
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + 'static,
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Hash, // Add this bound to ensure Point implements Hash
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Hash the UUID first (most unique)
+        // Hash the UUID first
         self.uuid.hash(state);
 
-        // Hash vertices with special handling for f64
-        for vertex in &self.vertices {
-            // Hash the vertex data
-            vertex.data.hash(state);
+        // Sort vertices for consistent hashing regardless of order
+        let mut sorted_vertices = self.vertices.clone();
+        sorted_vertices.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            // Hash coordinates - use a trait-based approach
-            hash_coordinates(&vertex.point.coords, state);
+        // Hash vertices after sorting
+        for vertex in &sorted_vertices {
+            vertex.hash(state);
         }
 
         // Hash neighbors and data
         self.neighbors.hash(state);
         self.data.hash(state);
-    }
-}
-
-/// Helper function to hash coordinates with special handling for f64
-fn hash_coordinates<T, H, const D: usize>(coords: &[T; D], state: &mut H)
-where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + 'static,
-    H: std::hash::Hasher,
-{
-    // Use Any to check the type at runtime (safe alternative to unsafe casting)
-    use std::any::{Any, TypeId};
-
-    if TypeId::of::<T>() == TypeId::of::<f64>() {
-        // Convert through Any trait to avoid unsafe code
-        let any_coords = coords as &dyn Any;
-        if let Some(f64_coords) = any_coords.downcast_ref::<[f64; D]>() {
-            for &coord in f64_coords {
-                OrderedFloat(coord).hash(state);
-            }
-            return;
-        }
-    }
-
-    if TypeId::of::<T>() == TypeId::of::<f32>() {
-        let any_coords = coords as &dyn Any;
-        if let Some(f32_coords) = any_coords.downcast_ref::<[f32; D]>() {
-            for &coord in f32_coords {
-                OrderedFloat(coord).hash(state);
-            }
-            return;
-        }
-    }
-
-    // For other types, try to hash directly if possible
-    let any_coords = coords as &dyn Any;
-    if let Some(i32_coords) = any_coords.downcast_ref::<[i32; D]>() {
-        i32_coords.hash(state);
-    } else if let Some(i64_coords) = any_coords.downcast_ref::<[i64; D]>() {
-        i64_coords.hash(state);
-    } else if let Some(u32_coords) = any_coords.downcast_ref::<[u32; D]>() {
-        u32_coords.hash(state);
-    } else if let Some(u64_coords) = any_coords.downcast_ref::<[u64; D]>() {
-        u64_coords.hash(state);
-    } else {
-        // Fallback: hash the type name and size as a simple approximation
-        // This isn't perfect but avoids unsafe operations
-        std::any::type_name::<T>().hash(state);
-        std::mem::size_of::<T>().hash(state);
-
-        // Hash each coordinate position - this provides some differentiation
-        for (index, _coord) in coords.iter().enumerate() {
-            index.hash(state);
-        }
     }
 }
 
