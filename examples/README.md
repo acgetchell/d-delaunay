@@ -1,4 +1,4 @@
-# Introduction
+#
 
 This document summarizes the refactoring performed to enable implicit
 conversion of `vertex.point.coordinates` to coordinate arrays using Rust's
