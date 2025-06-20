@@ -86,10 +86,7 @@ where
     }
 
     /// The `vertices` method in the [Facet] returns a container of
-    /// Returns the vertices of the facet, excluding the opposite vertex.
-    ///
-    /// # Returns
-    /// A vector containing all vertices of the cell except the vertex opposite to the facet, preserving their order.
+    /// [Vertex] objects that are in the [Facet].
     pub fn vertices(&self) -> Vec<Vertex<T, U, D>> {
         self.cell
             .vertices

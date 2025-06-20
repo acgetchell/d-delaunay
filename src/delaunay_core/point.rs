@@ -95,10 +95,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
-    /// Returns the origin point with all coordinates set to zero.
-    ///
-    /// # Returns
-    /// A `Point` where each coordinate is the zero value for type `T`.
+    /// ```
     pub fn origin() -> Self
     where
         T: num_traits::Zero + Copy,
