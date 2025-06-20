@@ -337,9 +337,11 @@ where
         let mut b = zeros(dim, 1);
         for i in 0..dim {
             // Convert coordinates to f64 arrays before creating na::Point
-            let coords_i_plus_1: [f64; D] =
-                self.vertices[i + 1].point.coordinates().map(|x| x.into());
-            let coords_0: [f64; D] = self.vertices[0].point.coordinates().map(|x| x.into());
+            let convert_to_f64_array = |vertex: &Vertex<T, D>| {
+                vertex.point.coordinates().map(|x| x.into())
+            };
+            let coords_i_plus_1: [f64; D] = convert_to_f64_array(&self.vertices[i + 1]);
+            let coords_0: [f64; D] = convert_to_f64_array(&self.vertices[0]);
             b[(i, 0)] = na::distance_squared(
                 &na::Point::from(coords_i_plus_1),
                 &na::Point::from(coords_0),
