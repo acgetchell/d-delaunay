@@ -114,31 +114,26 @@ where
 {
 }
 
-// Hash implementation for f64 coordinates
-impl<const D: usize> Hash for Point<f64, D>
-where
-    [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            OrderedFloat(*val).hash(state);
-        }
-    }
+// Floating-point Hash implementations using OrderedFloat
+macro_rules! impl_point_hash_for_float {
+    ($($t:ty),*) => {
+        $(
+            impl<const D: usize> Hash for Point<$t, D>
+            where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
+            {
+                fn hash<H: Hasher>(&self, state: &mut H) {
+                    for &val in &self.coords {
+                        OrderedFloat(val).hash(state);
+                    }
+                }
+            }
+        )*
+    };
 }
 
-// Hash implementation for f32 coordinates
-impl<const D: usize> Hash for Point<f32, D>
-where
-    [f32; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            OrderedFloat(*val).hash(state);
-        }
-    }
-}
+impl_point_hash_for_float!(f64, f32);
 
-// Integer-point Hash implementations via macro to avoid overlap
+// Integer Hash implementations
 macro_rules! impl_point_hash_for_int {
     ($($t:ty),*) => {
         $(
