@@ -562,6 +562,8 @@ where
 
         // Sort vertices for consistent hashing regardless of order
         let mut sorted_vertices = self.vertices.clone();
+        // The trait bounds on `V` include both `PartialOrd` and `Ord`, which guarantee a total order for the vertices.
+        // This ensures that `partial_cmp` will always return `Some(Ordering)`, making the use of `unwrap()` safe here.
         sorted_vertices.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         // Hash vertices after sorting
