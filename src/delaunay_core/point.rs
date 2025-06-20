@@ -95,7 +95,10 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
-    /// ```
+    /// Returns the origin point with all coordinates set to zero.
+    ///
+    /// # Returns
+    /// A `Point` where each coordinate is the zero value for type `T`.
     pub fn origin() -> Self
     where
         T: num_traits::Zero + Copy,
@@ -530,6 +533,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that `Point` instances with integer coordinates can be used as keys in a `HashMap` and that hashing and equality behave as expected for integer types.
     fn point_hash_integers() {
         use std::collections::HashMap;
 
@@ -586,6 +590,9 @@ mod tests {
     }
 
     #[test]
+    /// Verifies that hashing for `Point` instances with floating-point coordinates is consistent for identical values.
+    ///
+    /// Ensures that two `Point<f64, D>` or `Point<f32, D>` instances with the same coordinates produce identical hash values, confirming reliable behavior for use in hash-based collections.
     fn point_hash_consistency_floating_point() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -616,6 +623,9 @@ mod tests {
     }
 
     #[test]
+    /// Verifies that hashing is consistent for `Point` instances with integer coordinates.
+    ///
+    /// Ensures that two points with identical integer coordinates produce the same hash value for both signed and unsigned integer types.
     fn point_hash_consistency_integers() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};

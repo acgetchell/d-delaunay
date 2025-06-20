@@ -128,6 +128,9 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
+    /// Checks if two vertices are equal based solely on their coordinates.
+    ///
+    /// Two vertices are considered equal if their `point` fields are equal, regardless of their UUID, incident cell, or associated data.
     fn eq(&self, other: &Self) -> bool {
         self.point == other.point
         // && self.uuid == other.uuid
@@ -154,6 +157,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
+    /// Compares two vertices based on the lexicographic ordering of their coordinates.
+    ///
+    /// # Returns
+    /// An `Option<Ordering>` indicating the ordering of the vertices, or `None` if the coordinates cannot be compared.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.point.partial_cmp(&other.point)
     }
@@ -167,6 +174,9 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
 {
+    /// Feeds the vertex's point, UUID, incident cell, and associated data into the given hasher.
+    ///
+    /// The hash is computed using all fields to ensure uniqueness across vertices with identical coordinates but different metadata.
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.point.hash(state);
         self.uuid.hash(state);
