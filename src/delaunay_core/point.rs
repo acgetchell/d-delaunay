@@ -23,17 +23,17 @@ where
     pub coords: [T; D],
 }
 
-impl<T, const D: usize> From<[T; D]> for Point<f64, D>
+impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
-    T: Clone + Copy + Default + Into<f64> + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
+    U: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
-    f64: From<T>,
+    [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(coords: [T; D]) -> Self {
-        // Convert the `coords` array to `[f64; D]`
-        let coords_f64: [f64; D] = coords.map(|coord| coord.into());
-        Self { coords: coords_f64 }
+        // Convert the `coords` array to `[U; D]`
+        let coords_u: [U; D] = coords.map(|coord| coord.into());
+        Self { coords: coords_u }
     }
 }
 
@@ -183,6 +183,8 @@ mod tests {
         let point_copy = point;
 
         assert_eq!(point, point_copy);
+        assert_eq!(point.coords, point_copy.coords);
+        assert_eq!(point.dim(), point_copy.dim());
     }
 
     #[test]
@@ -262,6 +264,62 @@ mod tests {
     }
 
     #[test]
+    fn point_from_array_same_type() {
+        // Test conversion when source and target types are the same
+        let coords_f32 = [1.0f32, 2.0f32, 3.0f32];
+        let point_f32: Point<f32, 3> = Point::from(coords_f32);
+        assert_eq!(point_f32.coords, [1.0f32, 2.0f32, 3.0f32]);
+
+        let coords_i32 = [1i32, 2i32, 3i32];
+        let point_i32: Point<i32, 3> = Point::from(coords_i32);
+        assert_eq!(point_i32.coords, [1i32, 2i32, 3i32]);
+    }
+
+    #[test]
+    fn point_from_array_integer_to_integer() {
+        // Test conversion from i32 to i64
+        let coords_i32 = [1i32, 2i32, 3i32];
+        let point_i64: Point<i64, 3> = Point::from(coords_i32);
+        assert_eq!(point_i64.coords, [1i64, 2i64, 3i64]);
+
+        // Test conversion from u8 to i32
+        let coords_u8 = [10u8, 20u8, 30u8];
+        let point_i32: Point<i32, 3> = Point::from(coords_u8);
+        assert_eq!(point_i32.coords, [10i32, 20i32, 30i32]);
+
+        // Test conversion from i16 to isize
+        let coords_i16 = [100i16, 200i16];
+        let point_isize: Point<isize, 2> = Point::from(coords_i16);
+        assert_eq!(point_isize.coords, [100isize, 200isize]);
+    }
+
+    #[test]
+    fn point_from_array_float_to_float() {
+        // Test conversion from f32 to f32 (same type)
+        let coords_f32 = [1.5f32, 2.5f32];
+        let point_f32: Point<f32, 2> = Point::from(coords_f32);
+        assert_eq!(point_f32.coords, [1.5f32, 2.5f32]);
+
+        // Test conversion from f32 to f64 (safe upcast)
+        let coords_f32 = [1.5f32, 2.5f32];
+        let point_f64: Point<f64, 2> = Point::from(coords_f32);
+        assert_eq!(point_f64.coords, [1.5f64, 2.5f64]);
+    }
+
+    #[test]
+    fn point_from_array_integer_to_float() {
+        // Test conversion from i32 to f64
+        let coords_i32 = [1i32, 2i32, 3i32];
+        let point_f64: Point<f64, 3> = Point::from(coords_i32);
+        assert_eq!(point_f64.coords, [1.0f64, 2.0f64, 3.0f64]);
+
+        // Test conversion from u8 to f64
+        let coords_u8 = [10u8, 20u8];
+        let point_f64: Point<f64, 2> = Point::from(coords_u8);
+        assert_eq!(point_f64.coords, [10.0f64, 20.0f64]);
+    }
+
+    #[test]
     fn point_hash() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -327,13 +385,37 @@ mod tests {
     }
 
     #[test]
-    fn point_clone() {
-        let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-        let cloned_point = point;
+    fn point_from_complex_conversions() {
+        // Test conversion with mixed type arrays
+        let coords_mixed_i32 = [-100i32, 200i32, 300i32];
+        let point_f64: Point<f64, 3> = Point::from(coords_mixed_i32);
+        assert_eq!(point_f64.coords, [-100.0f64, 200.0f64, 300.0f64]);
 
-        assert_eq!(point, cloned_point);
-        assert_eq!(point.coords, cloned_point.coords);
-        assert_eq!(point.dim(), cloned_point.dim());
+        // Test with larger values
+        let coords_large = [10000i32, 20000i32];
+        let point_f64: Point<f64, 2> = Point::from(coords_large);
+        assert_eq!(point_f64.coords, [10000.0f64, 20000.0f64]);
+
+        // Test with very small values
+        // When converting from f32 to f64, there can be small precision differences
+        // due to how floating point numbers are represented in memory.
+        // Use approximate comparison for these small values.
+        let coords_small_f32 = [0.000001f32, 0.000002f32];
+        let point_f64: Point<f64, 2> = Point::from(coords_small_f32);
+
+        // Use relative comparison with appropriate epsilon for small floating point values
+        let expected = [0.000001f64, 0.000002f64];
+        for (i, (&actual, &expected)) in point_f64.coords.iter().zip(expected.iter()).enumerate() {
+            let rel_diff = (actual - expected).abs() / expected.abs();
+            assert!(
+                rel_diff < 1e-6,
+                "Values differ at index {}: {} vs {} (relative diff: {})",
+                i,
+                actual,
+                expected,
+                rel_diff
+            );
+        }
     }
 
     #[test]
