@@ -175,6 +175,32 @@ where
     }
 }
 
+/// Enable implicit conversion from Vertex to coordinate array
+/// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
+impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(vertex: Vertex<T, U, D>) -> [T; D] {
+        vertex.point.coordinates()
+    }
+}
+
+/// Enable implicit conversion from Vertex reference to coordinate array
+/// This allows `&vertex` to be implicitly converted to `[T; D]` for coordinate access
+impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
+        vertex.point.coordinates()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -806,5 +832,30 @@ mod tests {
 
         assert_eq!(vertex.point.coordinates(), [1.0, -2.0, 3.0, -4.0]);
         assert_eq!(vertex.dim(), 4);
+    }
+
+    #[test]
+    fn vertex_implicit_conversion_to_coordinates() {
+        let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+
+        // Test implicit conversion from owned vertex
+        let coords_owned: [f64; 3] = vertex.into();
+        assert_eq!(coords_owned, [1.0, 2.0, 3.0]);
+
+        // Create a new vertex for reference test
+        let vertex_ref: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([4.0, 5.0, 6.0]))
+            .build()
+            .unwrap();
+
+        // Test implicit conversion from vertex reference
+        let coords_ref: [f64; 3] = (&vertex_ref).into();
+        assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
+
+        // Verify the original vertex is still available after reference conversion
+        assert_eq!(vertex_ref.point.coordinates(), [4.0, 5.0, 6.0]);
     }
 }

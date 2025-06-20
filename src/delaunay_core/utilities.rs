@@ -72,12 +72,12 @@ where
         return [Default::default(); D];
     }
 
-    // Initialize with the first vertex's coordinates
-    let mut extreme_coords = vertices.values().next().unwrap().point.coordinates();
+    // Initialize with the first vertex's coordinates using implicit conversion
+    let mut extreme_coords: [T; D] = vertices.values().next().unwrap().into();
 
     // Compare with remaining vertices
     for vertex in vertices.values().skip(1) {
-        let vertex_coords = vertex.point.coordinates();
+        let vertex_coords: [T; D] = vertex.into();
         for (i, coord) in vertex_coords.iter().enumerate() {
             match ordering {
                 Ordering::Less => {

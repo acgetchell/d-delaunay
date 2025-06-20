@@ -217,7 +217,9 @@ where
     pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str> {
         // Don't add if vertex with that point already exists
         for val in self.vertices.values() {
-            if val.point.coordinates() == vertex.point.coordinates() {
+            let existing_coords: [T; D] = val.into();
+            let new_coords: [T; D] = (&vertex).into();
+            if existing_coords == new_coords {
                 return Err("Vertex already exists!");
             }
         }

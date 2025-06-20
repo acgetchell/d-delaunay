@@ -326,9 +326,9 @@ where
         let mut matrix = zeros(dim, dim);
         for i in 0..dim {
             for j in 0..dim {
-                matrix[(i, j)] = (self.vertices[i + 1].point.coordinates()[j]
-                    - self.vertices[0].point.coordinates()[j])
-                    .into();
+                let coords_i_plus_1: [T; D] = (&self.vertices[i + 1]).into();
+                let coords_0: [T; D] = (&self.vertices[0]).into();
+                matrix[(i, j)] = (coords_i_plus_1[j] - coords_0[j]).into();
             }
         }
 
@@ -336,9 +336,13 @@ where
 
         let mut b = zeros(dim, 1);
         for i in 0..dim {
+            // Convert coordinates to f64 arrays before creating na::Point
+            let coords_i_plus_1: [f64; D] =
+                self.vertices[i + 1].point.coordinates().map(|x| x.into());
+            let coords_0: [f64; D] = self.vertices[0].point.coordinates().map(|x| x.into());
             b[(i, 0)] = na::distance_squared(
-                &na::Point::from(self.vertices[i + 1].point.coordinates()),
-                &na::Point::from(self.vertices[0].point.coordinates()),
+                &na::Point::from(coords_i_plus_1),
+                &na::Point::from(coords_0),
             )
             .into();
         }
@@ -366,11 +370,11 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        // Change the type of vertex to match circumcenter
-        let vertex = Point::<f64, D>::from(self.vertices[0].point.coordinates());
+        // Convert vertex coordinates to f64 for nalgebra operations
+        let vertex_coords: [f64; D] = self.vertices[0].point.coordinates().map(|x| x.into());
         Ok(na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex.coordinates()),
+            &na::Point::<T, D>::from(vertex_coords),
         ))
     }
 
@@ -407,11 +411,11 @@ where
     {
         let circumradius = self.circumradius()?;
         let circumcenter = self.circumcenter()?;
+        // Convert vertex coordinates to f64 for nalgebra operations
+        let vertex_coords: [f64; D] = vertex.point.coordinates().map(|x| x.into());
         let radius = na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(
-                Point::<f64, D>::from(vertex.point.coordinates()).coordinates(),
-            ),
+            &na::Point::<T, D>::from(vertex_coords),
         );
 
         Ok(circumradius >= radius)

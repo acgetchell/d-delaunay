@@ -172,6 +172,30 @@ macro_rules! impl_point_hash_for_int {
 
 impl_point_hash_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
+/// Enable implicit conversion from Point to coordinate array
+/// This allows `point` to be implicitly converted to `[T; D]`
+impl<T, const D: usize> From<Point<T, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(point: Point<T, D>) -> [T; D] {
+        point.coordinates()
+    }
+}
+
+/// Enable implicit conversion from Point reference to coordinate array
+/// This allows `&point` to be implicitly converted to `[T; D]`
+impl<T, const D: usize> From<&Point<T, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(point: &Point<T, D>) -> [T; D] {
+        point.coordinates()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -784,5 +808,24 @@ mod tests {
         // Test points with different values hash differently
         let point_i32_c: Point<i32, 2> = Point::new([2, 3]);
         assert_ne!(get_hash(&point_i32_a), get_hash(&point_i32_c));
+    }
+
+    #[test]
+    fn point_implicit_conversion_to_coordinates() {
+        let point: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
+
+        // Test implicit conversion from owned point
+        let coords_owned: [f64; 3] = point.into();
+        assert_eq!(coords_owned, [1.0, 2.0, 3.0]);
+
+        // Create a new point for reference test
+        let point_ref: Point<f64, 3> = Point::new([4.0, 5.0, 6.0]);
+
+        // Test implicit conversion from point reference
+        let coords_ref: [f64; 3] = (&point_ref).into();
+        assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
+
+        // Verify the original point is still available after reference conversion
+        assert_eq!(point_ref.coordinates(), [4.0, 5.0, 6.0]);
     }
 }
