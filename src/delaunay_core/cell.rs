@@ -350,7 +350,7 @@ where
 
         let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
 
-        Ok(Point::<f64, D>::new(solution_point.coordinates()))
+        Ok(solution_point)
     }
 
     /// The function `circumradius` returns the circumradius of the cell.
@@ -406,8 +406,9 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumradius = self.circumradius()?;
+        let circumcenter = self.circumcenter()?;
         let radius = na::distance(
-            &na::Point::<T, D>::from(self.circumcenter()?.coordinates()),
+            &na::Point::<T, D>::from(circumcenter.coordinates()),
             &na::Point::<T, D>::from(
                 Point::<f64, D>::from(vertex.point.coordinates()).coordinates(),
             ),

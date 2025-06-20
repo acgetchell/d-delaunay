@@ -77,7 +77,8 @@ where
 
     // Compare with remaining vertices
     for vertex in vertices.values().skip(1) {
-        for (i, coord) in vertex.point.coordinates().iter().enumerate() {
+        let vertex_coords = vertex.point.coordinates();
+        for (i, coord) in vertex_coords.iter().enumerate() {
             match ordering {
                 Ordering::Less => {
                     if *coord < extreme_coords[i] {
