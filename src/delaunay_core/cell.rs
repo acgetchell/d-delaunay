@@ -343,8 +343,7 @@ where
             b[(i, 0)] = na::distance_squared(
                 &na::Point::from(coords_i_plus_1),
                 &na::Point::from(coords_0),
-            )
-            .into();
+            );
         }
 
         let solution = a_inv * b * 0.5;
