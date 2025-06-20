@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 use thiserror::Error;
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 /// The [Facet] struct represents a facet of a d-dimensional simplex.
 /// Passing in a [Vertex] and a [Cell] containing that vertex to the
 /// constructor will create a [Facet] struct.
@@ -95,6 +95,18 @@ where
             .cloned()
             .collect()
     }
+}
+
+/// Generic Eq implementation for Facet that requires Hash bounds
+impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Vertex<T, U, D>: Hash,
+    Cell<T, U, V, D>: Hash,
+{
 }
 
 /// Error type for facet operations.

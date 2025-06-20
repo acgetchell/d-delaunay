@@ -1,6 +1,7 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::{point::Point, utilities::make_uuid};
+use derive_builder::Builder;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
@@ -136,12 +137,13 @@ where
     }
 }
 
-/// Eq implementation for Vertex based on point equality
+/// Generic Eq implementation for Vertex based on point equality
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Vertex<T, U, D>: Hash,
 {
 }
 
@@ -158,12 +160,123 @@ where
     }
 }
 
-impl<T, U, const D: usize> Hash for Vertex<T, U, D>
+// Hash implementation for Vertex with f64 coordinates
+impl<U, const D: usize> Hash for Vertex<f64, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    ordered_float::OrderedFloat<f64>: From<T>,
+    [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with f32 coordinates
+impl<U, const D: usize> Hash for Vertex<f32, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [f32; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with i32 coordinates
+impl<U, const D: usize> Hash for Vertex<i32, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [i32; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with i64 coordinates
+impl<U, const D: usize> Hash for Vertex<i64, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [i64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with u32 coordinates
+impl<U, const D: usize> Hash for Vertex<u32, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [u32; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with u64 coordinates
+impl<U, const D: usize> Hash for Vertex<u64, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [u64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with usize coordinates
+impl<U, const D: usize> Hash for Vertex<usize, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [usize; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with isize coordinates
+impl<U, const D: usize> Hash for Vertex<isize, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [isize; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
+// Hash implementation for Vertex with i16 coordinates
+impl<U, const D: usize> Hash for Vertex<i16, U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [i16; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.point.hash(state);
