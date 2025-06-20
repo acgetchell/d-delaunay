@@ -382,7 +382,7 @@ mod tests {
 
         // Default facet should have empty cell and default vertex
         assert_eq!(facet.cell.vertices.len(), 0);
-        assert_eq!(facet.vertex.point.coords, [0.0, 0.0, 0.0]);
+        assert_eq!(facet.vertex.point.coordinates(), [0.0, 0.0, 0.0]);
     }
 
     #[test]

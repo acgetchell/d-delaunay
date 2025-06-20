@@ -73,11 +73,11 @@ where
     }
 
     // Initialize with the first vertex's coordinates
-    let mut extreme_coords = vertices.values().next().unwrap().point.coords;
+    let mut extreme_coords = vertices.values().next().unwrap().point.coordinates();
 
     // Compare with remaining vertices
     for vertex in vertices.values().skip(1) {
-        for (i, coord) in vertex.point.coords.iter().enumerate() {
+        for (i, coord) in vertex.point.coordinates().iter().enumerate() {
             match ordering {
                 Ordering::Less => {
                     if *coord < extreme_coords[i] {

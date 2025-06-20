@@ -326,8 +326,8 @@ where
         let mut matrix = zeros(dim, dim);
         for i in 0..dim {
             for j in 0..dim {
-                matrix[(i, j)] = (self.vertices[i + 1].point.coords[j]
-                    - self.vertices[0].point.coords[j])
+                matrix[(i, j)] = (self.vertices[i + 1].point.coordinates()[j]
+                    - self.vertices[0].point.coordinates()[j])
                     .into();
             }
         }
@@ -337,8 +337,8 @@ where
         let mut b = zeros(dim, 1);
         for i in 0..dim {
             b[(i, 0)] = na::distance_squared(
-                &na::Point::from(self.vertices[i + 1].point.coords),
-                &na::Point::from(self.vertices[0].point.coords),
+                &na::Point::from(self.vertices[i + 1].point.coordinates()),
+                &na::Point::from(self.vertices[0].point.coordinates()),
             )
             .into();
         }
@@ -350,7 +350,7 @@ where
 
         let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
 
-        Ok(Point::<f64, D>::new(solution_point.coords))
+        Ok(Point::<f64, D>::new(solution_point.coordinates()))
     }
 
     /// The function `circumradius` returns the circumradius of the cell.
@@ -367,10 +367,10 @@ where
     {
         let circumcenter = self.circumcenter()?;
         // Change the type of vertex to match circumcenter
-        let vertex = Point::<f64, D>::from(self.vertices[0].point.coords);
+        let vertex = Point::<f64, D>::from(self.vertices[0].point.coordinates());
         Ok(na::distance(
-            &na::Point::<T, D>::from(circumcenter.coords),
-            &na::Point::<T, D>::from(vertex.coords),
+            &na::Point::<T, D>::from(circumcenter.coordinates()),
+            &na::Point::<T, D>::from(vertex.coordinates()),
         ))
     }
 
@@ -407,8 +407,10 @@ where
     {
         let circumradius = self.circumradius()?;
         let radius = na::distance(
-            &na::Point::<T, D>::from(self.circumcenter()?.coords),
-            &na::Point::<T, D>::from(Point::<f64, D>::from(vertex.point.coords).coords),
+            &na::Point::<T, D>::from(self.circumcenter()?.coordinates()),
+            &na::Point::<T, D>::from(
+                Point::<f64, D>::from(vertex.point.coordinates()).coordinates(),
+            ),
         );
 
         Ok(circumradius >= radius)
@@ -456,7 +458,7 @@ where
         // Populate rows with the coordinates of the vertices of the cell
         for (i, v) in self.vertices.iter().enumerate() {
             for j in 0..D {
-                matrix[(i, j)] = v.point.coords[j].into();
+                matrix[(i, j)] = v.point.coordinates()[j].into();
             }
             // Add a one to the last column
             matrix[(i, D)] = T::one().into();
@@ -464,7 +466,7 @@ where
 
         // Add the vertex to the last row of the matrix
         for j in 0..D {
-            matrix[(D, j)] = vertex.point.coords[j].into();
+            matrix[(D, j)] = vertex.point.coordinates()[j].into();
         }
         matrix[(D, D)] = T::one().into();
 
@@ -1838,8 +1840,8 @@ mod tests {
         let circumcenter = cell.circumcenter().unwrap();
 
         // For this triangle, circumcenter should be at (1.0, 0.75)
-        assert!((circumcenter.coords[0] - 1.0).abs() < 1e-10);
-        assert!((circumcenter.coords[1] - 0.75).abs() < 1e-10);
+        assert!((circumcenter.coordinates()[0] - 1.0).abs() < 1e-10);
+        assert!((circumcenter.coordinates()[1] - 0.75).abs() < 1e-10);
     }
 
     #[test]
