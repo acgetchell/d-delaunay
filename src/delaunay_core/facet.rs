@@ -8,7 +8,7 @@
 
 use super::{cell::Cell, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
@@ -107,6 +107,21 @@ where
     Vertex<T, U, D>: Hash,
     Cell<T, U, V, D>: Hash,
 {
+}
+
+impl<T, U, V, const D: usize> Hash for Facet<T, U, V, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Vertex<T, U, D>: Hash,
+    Cell<T, U, V, D>: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cell.hash(state);
+        self.vertex.hash(state);
+    }
 }
 
 /// Error type for facet operations.
@@ -804,5 +819,55 @@ mod tests {
 
         // Facets should be different because cells have completely different vertices
         assert_ne!(facet1, facet2);
+    }
+
+    #[test]
+    fn facet_hash() {
+        use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Create a cell with some vertices
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+            .build()
+            .unwrap();
+
+        // Create two facets that should be equal and hash to the same value
+        let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
+
+        // Create a different facet that should hash to a different value
+        let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
+
+        // Helper function to get hash value
+        fn get_hash<T: Hash>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        // Test that equal facets hash to the same value
+        assert_eq!(get_hash(&facet1), get_hash(&facet2));
+
+        // Test that different facets hash to different values
+        assert_ne!(get_hash(&facet1), get_hash(&facet3));
     }
 }
