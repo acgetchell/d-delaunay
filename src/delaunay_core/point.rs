@@ -138,89 +138,24 @@ where
     }
 }
 
-// Hash implementation for i32 coordinates
-impl<const D: usize> Hash for Point<i32, D>
-where
-    [i32; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
+// Integer-point Hash implementations via macro to avoid overlap
+macro_rules! impl_point_hash_for_int {
+    ($($t:ty),*) => {
+        $(
+            impl<const D: usize> Hash for Point<$t, D>
+            where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
+            {
+                fn hash<H: Hasher>(&self, state: &mut H) {
+                    for &val in &self.coords {
+                        val.hash(state);
+                    }
+                }
+            }
+        )*
+    };
 }
 
-// Hash implementation for i64 coordinates
-impl<const D: usize> Hash for Point<i64, D>
-where
-    [i64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
-}
-
-// Hash implementation for i16 coordinates
-impl<const D: usize> Hash for Point<i16, D>
-where
-    [i16; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
-}
-
-// Hash implementation for u32 coordinates
-impl<const D: usize> Hash for Point<u32, D>
-where
-    [u32; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
-}
-
-// Hash implementation for u64 coordinates
-impl<const D: usize> Hash for Point<u64, D>
-where
-    [u64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
-}
-
-// Hash implementation for usize coordinates
-impl<const D: usize> Hash for Point<usize, D>
-where
-    [usize; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
-}
-
-// Hash implementation for isize coordinates
-impl<const D: usize> Hash for Point<isize, D>
-where
-    [isize; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            val.hash(state);
-        }
-    }
-}
+impl_point_hash_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 #[cfg(test)]
 mod tests {
