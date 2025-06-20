@@ -67,6 +67,7 @@ name = "d-delaunay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "approx",
  "derive_builder",
  "nalgebra",
  "num-traits",

@@ -176,6 +176,7 @@ impl_point_hash_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128
 mod tests {
 
     use super::*;
+    use approx::assert_relative_eq;
 
     #[test]
     fn point_default() {
@@ -425,21 +426,8 @@ mod tests {
 
         // Use relative comparison with appropriate epsilon for small floating point values
         let expected = [0.000001f64, 0.000002f64];
-        for (i, (&actual, &expected)) in point_f64
-            .coordinates()
-            .iter()
-            .zip(expected.iter())
-            .enumerate()
-        {
-            let rel_diff = (actual - expected).abs() / expected.abs();
-            assert!(
-                rel_diff < 1e-6,
-                "Values differ at index {}: {} vs {} (relative diff: {})",
-                i,
-                actual,
-                expected,
-                rel_diff
-            );
+        for (&actual, &expected) in point_f64.coordinates().iter().zip(expected.iter()) {
+            assert_relative_eq!(actual, expected, epsilon = 1e-6, max_relative = 1e-6);
         }
     }
 
