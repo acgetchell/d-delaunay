@@ -136,12 +136,13 @@ where
     }
 }
 
-/// Eq implementation for Vertex based on point equality
+/// Generic Eq implementation for Vertex based on point equality
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Vertex<T, U, D>: Hash,
 {
 }
 
@@ -158,12 +159,13 @@ where
     }
 }
 
+// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
 impl<T, U, const D: usize> Hash for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    ordered_float::OrderedFloat<f64>: From<T>,
+    Point<T, D>: Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.point.hash(state);

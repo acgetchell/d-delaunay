@@ -104,25 +104,53 @@ where
     }
 }
 
+// Generic Eq implementation for Point types that implement Hash
+// This covers all the specific Hash implementations we have above
 impl<T, const D: usize> Eq for Point<T, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Hash,
 {
 }
 
-impl<T, const D: usize> Hash for Point<T, D>
-where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    OrderedFloat<f64>: From<T>,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for val in &self.coords {
-            OrderedFloat::<f64>::from(*val).hash(state);
-        }
-    }
+// Floating-point Hash implementations using OrderedFloat
+macro_rules! impl_point_hash_for_float {
+    ($($t:ty),*) => {
+        $(
+            impl<const D: usize> Hash for Point<$t, D>
+            where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
+            {
+                fn hash<H: Hasher>(&self, state: &mut H) {
+                    for &val in &self.coords {
+                        OrderedFloat(val).hash(state);
+                    }
+                }
+            }
+        )*
+    };
 }
+
+impl_point_hash_for_float!(f64, f32);
+
+// Integer Hash implementations
+macro_rules! impl_point_hash_for_int {
+    ($($t:ty),*) => {
+        $(
+            impl<const D: usize> Hash for Point<$t, D>
+            where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
+            {
+                fn hash<H: Hasher>(&self, state: &mut H) {
+                    for &val in &self.coords {
+                        val.hash(state);
+                    }
+                }
+            }
+        )*
+    };
+}
+
+impl_point_hash_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 #[cfg(test)]
 mod tests {
@@ -482,5 +510,184 @@ mod tests {
         let i16_coords: [i16; 2] = [-1, 32767];
         let point_from_i16: Point<f64, 2> = Point::from(i16_coords);
         assert_eq!(point_from_i16.coords, [-1.0, 32767.0]);
+    }
+
+    #[test]
+    fn point_hash_f32() {
+        use std::collections::HashMap;
+
+        let mut map: HashMap<Point<f32, 2>, i32> = HashMap::new();
+
+        let point1 = Point::new([1.5f32, 2.5f32]);
+        let point2 = Point::new([3.5f32, 4.5f32]);
+        let point3 = Point::new([1.5f32, 2.5f32]); // Same as point1
+
+        map.insert(point1, 10);
+        map.insert(point2, 20);
+
+        assert_eq!(map.get(&point3), Some(&10)); // Should find point1's value
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn point_hash_integers() {
+        use std::collections::HashMap;
+
+        // Test with i32
+        let mut map_i32: HashMap<Point<i32, 3>, &str> = HashMap::new();
+        let point_i32_1 = Point::new([1, 2, 3]);
+        let point_i32_2 = Point::new([4, 5, 6]);
+        let point_i32_3 = Point::new([1, 2, 3]); // Same as point_i32_1
+
+        map_i32.insert(point_i32_1, "first");
+        map_i32.insert(point_i32_2, "second");
+
+        assert_eq!(map_i32.get(&point_i32_3), Some(&"first"));
+        assert_eq!(map_i32.len(), 2);
+
+        // Test with u64
+        let mut map_u64: HashMap<Point<u64, 2>, bool> = HashMap::new();
+        let point_u64_1 = Point::new([100u64, 200u64]);
+        let point_u64_2 = Point::new([300u64, 400u64]);
+        let point_u64_3 = Point::new([100u64, 200u64]); // Same as point_u64_1
+
+        map_u64.insert(point_u64_1, true);
+        map_u64.insert(point_u64_2, false);
+
+        assert_eq!(map_u64.get(&point_u64_3), Some(&true));
+        assert_eq!(map_u64.len(), 2);
+    }
+
+    #[test]
+    fn point_eq_different_types() {
+        // Test Eq for f64
+        let point_f64_1 = Point::new([1.0, 2.0]);
+        let point_f64_2 = Point::new([1.0, 2.0]);
+        let point_f64_3 = Point::new([1.0, 2.1]);
+
+        assert_eq!(point_f64_1, point_f64_2);
+        assert_ne!(point_f64_1, point_f64_3);
+
+        // Test Eq for f32
+        let point_f32_1 = Point::new([1.5f32, 2.5f32]);
+        let point_f32_2 = Point::new([1.5f32, 2.5f32]);
+        let point_f32_3 = Point::new([1.5f32, 2.6f32]);
+
+        assert_eq!(point_f32_1, point_f32_2);
+        assert_ne!(point_f32_1, point_f32_3);
+
+        // Test Eq for i32
+        let point_i32_1 = Point::new([10, 20]);
+        let point_i32_2 = Point::new([10, 20]);
+        let point_i32_3 = Point::new([10, 21]);
+
+        assert_eq!(point_i32_1, point_i32_2);
+        assert_ne!(point_i32_1, point_i32_3);
+    }
+
+    #[test]
+    fn point_hash_consistency_floating_point() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Test that OrderedFloat provides consistent hashing for NaN-free floats
+        let point1 = Point::new([1.0, 2.0, 3.5]);
+        let point2 = Point::new([1.0, 2.0, 3.5]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        point1.hash(&mut hasher1);
+        point2.hash(&mut hasher2);
+
+        assert_eq!(hasher1.finish(), hasher2.finish());
+
+        // Test with f32
+        let point_f32_1 = Point::new([1.5f32, 2.5f32]);
+        let point_f32_2 = Point::new([1.5f32, 2.5f32]);
+
+        let mut hasher_f32_1 = DefaultHasher::new();
+        let mut hasher_f32_2 = DefaultHasher::new();
+
+        point_f32_1.hash(&mut hasher_f32_1);
+        point_f32_2.hash(&mut hasher_f32_2);
+
+        assert_eq!(hasher_f32_1.finish(), hasher_f32_2.finish());
+    }
+
+    #[test]
+    fn point_hash_consistency_integers() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Test integer hashing consistency
+        let point_i32_1 = Point::new([42, -17, 100]);
+        let point_i32_2 = Point::new([42, -17, 100]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        point_i32_1.hash(&mut hasher1);
+        point_i32_2.hash(&mut hasher2);
+
+        assert_eq!(hasher1.finish(), hasher2.finish());
+
+        // Test with u64
+        let point_u64_1 = Point::new([1000u64, 2000u64]);
+        let point_u64_2 = Point::new([1000u64, 2000u64]);
+
+        let mut hasher_u64_1 = DefaultHasher::new();
+        let mut hasher_u64_2 = DefaultHasher::new();
+
+        point_u64_1.hash(&mut hasher_u64_1);
+        point_u64_2.hash(&mut hasher_u64_2);
+
+        assert_eq!(hasher_u64_1.finish(), hasher_u64_2.finish());
+    }
+
+    #[test]
+    fn point_hash_all_primitives() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Function to get hash value for any hashable type
+        fn get_hash<T: Hash>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        // Test all primitive integer types
+        let point_i8: Point<i8, 2> = Point::new([1, 2]);
+        let point_i16: Point<i16, 2> = Point::new([1, 2]);
+        let point_i32: Point<i32, 2> = Point::new([1, 2]);
+        let point_i64: Point<i64, 2> = Point::new([1, 2]);
+        let point_u8: Point<u8, 2> = Point::new([1, 2]);
+        let point_u16: Point<u16, 2> = Point::new([1, 2]);
+        let point_u32: Point<u32, 2> = Point::new([1, 2]);
+        let point_u64: Point<u64, 2> = Point::new([1, 2]);
+        let point_usize: Point<usize, 2> = Point::new([1, 2]);
+        let point_isize: Point<isize, 2> = Point::new([1, 2]);
+
+        // Get hash for each type
+        let _hash_i8 = get_hash(&point_i8);
+        let _hash_i16 = get_hash(&point_i16);
+        let _hash_i32 = get_hash(&point_i32);
+        let _hash_i64 = get_hash(&point_i64);
+        let _hash_u8 = get_hash(&point_u8);
+        let _hash_u16 = get_hash(&point_u16);
+        let _hash_u32 = get_hash(&point_u32);
+        let _hash_u64 = get_hash(&point_u64);
+        let _hash_usize = get_hash(&point_usize);
+        let _hash_isize = get_hash(&point_isize);
+
+        // Verify that equal points of the same type hash to the same value
+        let point_i32_a: Point<i32, 2> = Point::new([1, 2]);
+        let point_i32_b: Point<i32, 2> = Point::new([1, 2]);
+        assert_eq!(get_hash(&point_i32_a), get_hash(&point_i32_b));
+
+        // Test points with different values hash differently
+        let point_i32_c: Point<i32, 2> = Point::new([2, 3]);
+        assert_ne!(get_hash(&point_i32_a), get_hash(&point_i32_c));
     }
 }

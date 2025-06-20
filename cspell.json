@@ -33,6 +33,7 @@
         "nalgebra",
         "nocapture",
         "powi",
+        "profraw",
         "puruspe",
         "rawpointer",
         "rustversion",
