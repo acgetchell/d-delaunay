@@ -644,4 +644,50 @@ mod tests {
 
         assert_eq!(hasher_u64_1.finish(), hasher_u64_2.finish());
     }
+
+    #[test]
+    fn point_hash_all_primitives() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Function to get hash value for any hashable type
+        fn get_hash<T: Hash>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        // Test all primitive integer types
+        let point_i8: Point<i8, 2> = Point::new([1, 2]);
+        let point_i16: Point<i16, 2> = Point::new([1, 2]);
+        let point_i32: Point<i32, 2> = Point::new([1, 2]);
+        let point_i64: Point<i64, 2> = Point::new([1, 2]);
+        let point_u8: Point<u8, 2> = Point::new([1, 2]);
+        let point_u16: Point<u16, 2> = Point::new([1, 2]);
+        let point_u32: Point<u32, 2> = Point::new([1, 2]);
+        let point_u64: Point<u64, 2> = Point::new([1, 2]);
+        let point_usize: Point<usize, 2> = Point::new([1, 2]);
+        let point_isize: Point<isize, 2> = Point::new([1, 2]);
+
+        // Get hash for each type
+        let _hash_i8 = get_hash(&point_i8);
+        let _hash_i16 = get_hash(&point_i16);
+        let _hash_i32 = get_hash(&point_i32);
+        let _hash_i64 = get_hash(&point_i64);
+        let _hash_u8 = get_hash(&point_u8);
+        let _hash_u16 = get_hash(&point_u16);
+        let _hash_u32 = get_hash(&point_u32);
+        let _hash_u64 = get_hash(&point_u64);
+        let _hash_usize = get_hash(&point_usize);
+        let _hash_isize = get_hash(&point_isize);
+
+        // Verify that equal points of the same type hash to the same value
+        let point_i32_a: Point<i32, 2> = Point::new([1, 2]);
+        let point_i32_b: Point<i32, 2> = Point::new([1, 2]);
+        assert_eq!(get_hash(&point_i32_a), get_hash(&point_i32_b));
+
+        // Test points with different values hash differently
+        let point_i32_c: Point<i32, 2> = Point::new([2, 3]);
+        assert_ne!(get_hash(&point_i32_a), get_hash(&point_i32_c));
+    }
 }
