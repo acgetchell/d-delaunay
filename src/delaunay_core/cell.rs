@@ -150,11 +150,31 @@ where
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
-    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([0.0, 0.0, 1.0]))
+    ///     .data(1)
+    ///     .build()
+    ///     .unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([0.0, 1.0, 0.0]))
+    ///     .data(1)
+    ///     .build()
+    ///     .unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, 0.0, 0.0]))
+    ///     .data(1)
+    ///     .build()
+    ///     .unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, 1.0, 1.0]))
+    ///     .data(2)
+    ///     .build()
+    ///     .unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default()
+    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+    ///     .data("three-one cell")
+    ///     .build()
+    ///     .unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
     pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool {
@@ -264,6 +284,10 @@ where
 
     /// The function `circumcenter` returns the circumcenter of the cell.
     ///
+    /// The circumcenter is the unique point equidistant from all vertices of
+    /// the simplex. Returns an error if the cell is not a valid simplex or
+    /// if the computation fails due to degeneracy or numerical issues.
+    ///
     /// Using the approach from:
     ///
     /// Lévy, Bruno, and Yang Liu.
@@ -294,11 +318,9 @@ where
     ///
     /// The resulting vector gives the coordinates of the circumcenter.
     ///
-    /// # Returns:
-    ///
-    /// If the function is successful, it will return an Ok variant containing
-    /// the circumcenter as a Point<f64, D> value. If there is an error, it
-    /// will return an Err variant containing an error message.
+    /// # Returns
+    /// The circumcenter as a Point<f64, D> if successful, or an error if the
+    /// simplex is degenerate or the matrix inversion fails.
     ///
     /// # Example
     ///
@@ -313,7 +335,6 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let circumcenter = cell.circumcenter().unwrap();
     /// assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
-    /// ```
     pub fn circumcenter(&self) -> Result<Point<f64, D>, anyhow::Error>
     where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
