@@ -25,7 +25,9 @@ use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 ///
 /// This function shows various ways to convert vertices and points to coordinate
 /// arrays using the newly implemented `From` traits, which provide more ergonomic
-/// alternatives to explicitly calling `.coordinates()`.
+/// Demonstrates implicit conversion from `Vertex` and `Point` types to coordinate arrays using Rust's `From` trait.
+///
+/// This example shows how to convert owned and referenced `Vertex` and `Point` instances into `[f64; 3]` coordinate arrays using `.into()`, providing ergonomic alternatives to explicit coordinate extraction. It also confirms that original objects remain accessible after reference conversions.
 fn main() {
     // Create a vertex with 3D coordinates
     let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()

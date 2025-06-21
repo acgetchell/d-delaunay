@@ -167,6 +167,9 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
 {
+    /// Feeds the vertex's point, UUID, incident cell, and associated data into the given hasher.
+    ///
+    /// This enables hashing of the vertex based on its coordinates, unique identifier, incident cell, and optional data.
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.point.hash(state);
         self.uuid.hash(state);
@@ -183,6 +186,10 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Converts a vertex into its coordinate array.
+    ///
+    /// # Returns
+    /// The coordinates of the vertex as an array.
     fn from(vertex: Vertex<T, U, D>) -> [T; D] {
         vertex.point.coordinates()
     }
@@ -196,6 +203,10 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Converts a reference to a vertex into its coordinate array.
+    ///
+    /// # Returns
+    /// An array containing the coordinates of the vertex.
     fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
         vertex.point.coordinates()
     }
@@ -242,6 +253,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests building a 3D vertex with associated data using the builder pattern.
+    ///
+    /// Verifies that the vertex is constructed with the correct coordinates, dimensionality, non-nil UUID, no incident cell, and the specified data value.
     fn vertex_builder_with_data() {
         let vertex: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
@@ -565,6 +579,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that a `Vertex` can be constructed with tuple data and verifies its coordinates and associated data.
     fn vertex_with_tuple_data() {
         let vertex: Vertex<f64, (i32, i32), 2> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0]))

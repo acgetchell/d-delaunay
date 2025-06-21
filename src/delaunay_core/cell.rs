@@ -313,7 +313,12 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let circumcenter = cell.circumcenter().unwrap();
     /// assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
-    /// ```
+    /// Computes the circumcenter of the simplex represented by the cell.
+    ///
+    /// The circumcenter is the unique point equidistant from all vertices of the simplex. Returns an error if the cell is not a valid simplex or if the computation fails due to degeneracy or numerical issues.
+    ///
+    /// # Returns
+    /// The circumcenter as a `Point<f64, D>` if successful, or an error if the simplex is degenerate or the matrix inversion fails.
     pub fn circumcenter(&self) -> Result<Point<f64, D>, anyhow::Error>
     where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -365,7 +370,10 @@ where
     /// # Returns:
     ///
     /// If successful, returns an Ok containing the circumradius of the cell,
-    /// otherwise returns an Err with an error message.
+    /// Computes the circumradius of the cell.
+    ///
+    /// # Returns
+    /// The circumradius as the distance from the circumcenter to the first vertex, or an error if the circumcenter cannot be computed.
     fn circumradius(&self) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -381,7 +389,13 @@ where
         ))
     }
 
-    /// Alternative method that accepts precomputed circumcenter
+    /// Computes the circumradius of the cell using a provided circumcenter.
+    ///
+    /// # Parameters
+    /// - `circumcenter`: The precomputed circumcenter of the cell.
+    ///
+    /// # Returns
+    /// The circumradius as the distance from the circumcenter to the first vertex, or an error if the calculation fails.
     fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -421,7 +435,13 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
-    /// ```
+    /// Determines whether a given vertex lies inside or on the circumsphere of the cell.
+    ///
+    /// # Parameters
+    /// - `vertex`: The vertex to test for circumsphere containment.
+    ///
+    /// # Returns
+    /// `Ok(true)` if the vertex is inside or on the circumsphere; `Ok(false)` otherwise. Returns an error if the circumcenter or circumradius cannot be computed.
     pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -467,7 +487,16 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
-    /// ```
+    /// Determines whether a given vertex lies inside or on the circumsphere of the cell using a determinant-based method.
+    ///
+    /// # Parameters
+    /// - `vertex`: The vertex to test for circumsphere containment.
+    ///
+    /// # Returns
+    /// `Ok(true)` if the vertex is inside or on the circumsphere; `Ok(false)` otherwise. Returns an error if the determinant computation fails or is invalid.
+    ///
+    /// # Details
+    /// This method constructs a matrix from the cell's vertices and the test vertex, then evaluates the sign of its determinant for containment. This approach is numerically stable for circumsphere checks in arbitrary dimensions.
     pub fn circumsphere_contains_vertex(
         &self,
         vertex: Vertex<T, U, D>,
@@ -1847,6 +1876,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests that the circumcenter of a 2D triangle cell is computed correctly.
+    ///
+    /// Constructs a triangle with vertices at (0,0), (2,0), and (1,2), then verifies that the computed circumcenter matches the expected coordinates (1.0, 0.75).
     fn cell_circumcenter_2d() {
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0]))
@@ -2006,6 +2038,10 @@ mod tests {
     }
 
     #[test]
+    /// Tests the matrix determinant method for circumsphere containment in a 3D cell.
+    ///
+    /// Constructs a unit tetrahedron and verifies that the `circumsphere_contains_vertex` method
+    /// correctly processes vertices both inside and outside the circumsphere without error.
     fn cell_circumsphere_contains_vertex_determinant() {
         // Test the matrix determinant method for circumsphere containment
         // Use a simple, well-known case: unit tetrahedron
@@ -2093,6 +2129,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that the `circumcenter` method returns an error for degenerate cases, such as when a cell has insufficient vertices to form a valid simplex.
     fn cell_circumcenter_error_cases() {
         // Test circumcenter calculation with degenerate cases
         let vertex1 = VertexBuilder::default()
@@ -2115,6 +2152,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that computing the circumcenter of a cell with collinear points returns an error.
     fn cell_circumcenter_collinear_points() {
         // Test circumcenter with collinear points (should fail)
         let vertex1 = VertexBuilder::default()
@@ -2145,6 +2183,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests that the `circumradius_with_center` method computes the same circumradius as the direct `circumradius` method for a 3D tetrahedral cell.
+    ///
+    /// Verifies that providing a precomputed circumcenter yields a consistent circumradius calculation.
     fn cell_circumradius_with_center() {
         // Test the circumradius_with_center method
         let vertex1 = VertexBuilder::default()
@@ -2177,6 +2218,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that the `facets` method of a 3D `Cell` returns all expected facets, each with the correct number of vertices, and that all original vertices are present in the facets.
     fn cell_facets_completeness() {
         // Test that facets are generated correctly and completely
         let vertex1 = VertexBuilder::default()
@@ -2219,6 +2261,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests the `CellBuilder` for correct validation of vertex count edge cases.
+    ///
+    /// Verifies that building a cell with exactly `D+1` vertices succeeds, while attempting to build with more than `D+1` vertices results in an error.
     fn cell_builder_validation_edge_cases() {
         // Test builder validation with exactly D+1 vertices (should work)
         let vertex1 = VertexBuilder::default()
@@ -2347,6 +2392,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests the construction and properties of a 5-dimensional cell.
+    ///
+    /// Verifies that a cell with six vertices in 5D space is correctly created, has the expected dimension, and generates the correct number of facets.
     fn cell_high_dimensional() {
         // Test with higher dimensions (5D)
         let vertex1 = VertexBuilder::default()
@@ -2416,6 +2464,10 @@ mod tests {
     }
 
     #[test]
+    /// Tests circumsphere containment methods for edge cases in a 2D cell.
+    ///
+    /// Verifies that both distance-based and determinant-based circumsphere containment checks
+    /// run without error and produce consistent results for points inside and far outside the circumsphere.
     fn cell_circumsphere_edge_cases() {
         // Test circumsphere containment with simple cases
         let vertex1 = VertexBuilder::default()

@@ -213,7 +213,9 @@ where
     /// let vertex = VertexBuilder::default().point(point).build().unwrap();
     /// let result = tds.add(vertex);
     /// assert!(result.is_ok());
-    /// ```
+    /// Adds a vertex to the triangulation if its coordinates and UUID are unique.
+    ///
+    /// Returns an error if a vertex with the same coordinates or UUID already exists.
     pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str> {
         // Don't add if vertex with that point already exists
         for val in self.vertices.values() {
@@ -808,7 +810,13 @@ where
 ///
 /// It also prints a human‑friendly summary of each cell’s vertices.
 ///
-/// Returns `Ok(())` on success or an `anyhow::Error` describing the first failure.
+/// Validates that all cells in the triangulation are unique D-simplices.
+///
+/// Checks that each cell contains exactly D+1 vertices and that no two cells share the same set of vertex UUIDs (regardless of order).
+///
+/// # Returns
+/// - `Ok(())` if all cells are valid and unique.
+/// - An error if any cell does not have D+1 vertices or if duplicate cells are found.
 pub fn validate_unique_cells<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
@@ -968,6 +976,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests the creation of a supercell for a set of 3D points.
+    ///
+    /// Verifies that the generated supercell contains the correct number of vertices and prints their coordinates for inspection. Also ensures the supercell forms a valid tetrahedron.
     fn tds_supercell() {
         let points = vec![
             Point::new([1.0, 2.0, 3.0]),

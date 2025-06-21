@@ -33,6 +33,13 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Converts an array of coordinates into a `Point` by converting each element to the target type.
+    ///
+    /// # Parameters
+    /// - `coords`: An array of coordinates to be converted into the point.
+    ///
+    /// # Returns
+    /// A `Point` with each coordinate converted to type `U` using `Into<U>`.
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
         let coords_u: [U; D] = coords.map(|coord| coord.into());
@@ -63,7 +70,13 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
-    /// ```
+    /// Creates a new point with the specified coordinates.
+    ///
+    /// # Parameters
+    /// - `coords`: An array containing the coordinates of the point.
+    ///
+    /// # Returns
+    /// A `Point` instance with the given coordinates.
     pub fn new(coords: [T; D]) -> Self {
         Self { coords }
     }
@@ -81,7 +94,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
-    /// ```
+    /// Returns the dimension of the point.
     pub fn dim(&self) -> usize {
         D
     }
@@ -98,7 +111,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
-    /// ```
+    /// Returns a copy of the point's coordinates as an array.
     pub fn coordinates(&self) -> [T; D] {
         self.coords
     }
@@ -115,7 +128,10 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
-    /// ```
+    /// Returns the origin point with all coordinates set to zero.
+    ///
+    /// # Returns
+    /// A `Point` where each coordinate is the zero value of type `T`. Requires `T` to implement `num_traits::Zero` and `Copy`.
     pub fn origin() -> Self
     where
         T: num_traits::Zero + Copy,
@@ -179,6 +195,7 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Converts a `Point` into its underlying coordinates array.
     fn from(point: Point<T, D>) -> [T; D] {
         point.coordinates()
     }
@@ -191,6 +208,7 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Converts a reference to a `Point` into a copy of its coordinates array.
     fn from(point: &Point<T, D>) -> [T; D] {
         point.coordinates()
     }
@@ -300,6 +318,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests conversion from an array of `f32` values to a `Point<f64, 4>`, verifying coordinate values and dimension.
     fn point_from_array_f32_to_f64() {
         let coords = [1.5f32, 2.5f32, 3.5f32, 4.5f32];
         let point: Point<f64, 4> = Point::from(coords);
@@ -365,6 +384,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that points with identical coordinates produce the same hash value, while points with differing coordinates produce different hash values.
     fn point_hash() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -430,6 +450,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests conversion of arrays with mixed numeric types and magnitudes into `Point<f64, D>`, including large integers and small floating-point values, verifying correctness and precision with approximate equality checks for small values.
     fn point_from_complex_conversions() {
         // Test conversion with mixed type arrays
         let coords_mixed_i32 = [-100i32, 200i32, 300i32];
@@ -579,6 +600,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests that the origin point has all coordinates set to zero and matches a manually constructed zero point.
     fn point_zero_coordinates() {
         let zero_point = Point::new([0.0, 0.0, 0.0]);
         let origin: Point<f64, 3> = Point::origin();
@@ -765,6 +787,9 @@ mod tests {
     }
 
     #[test]
+    /// Tests that `Point` instances with all primitive integer types can be hashed, and verifies hash consistency for equal and unequal points.
+    ///
+    /// Ensures that points with identical coordinates of the same type produce the same hash, while points with different coordinates produce different hashes.
     fn point_hash_all_primitives() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
