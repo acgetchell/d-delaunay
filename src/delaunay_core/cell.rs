@@ -333,14 +333,16 @@ where
         }
 
         let a_inv = invert(&matrix)?;
-
         let mut b = zeros(dim, 1);
+
+        // Precompute coords_0 once to avoid repeated conversion
+        let coords_0: [T; D] = (&self.vertices[0]).into();
+        let coords_0_f64: [f64; D] = coords_0.map(|x| x.into());
+
         for i in 0..dim {
             // Use implicit conversion from vertex to coordinates, then convert to f64
             let coords_i_plus_1: [T; D] = (&self.vertices[i + 1]).into();
-            let coords_0: [T; D] = (&self.vertices[0]).into();
             let coords_i_plus_1_f64: [f64; D] = coords_i_plus_1.map(|x| x.into());
-            let coords_0_f64: [f64; D] = coords_0.map(|x| x.into());
             b[(i, 0)] = na::distance_squared(
                 &na::Point::from(coords_i_plus_1_f64),
                 &na::Point::from(coords_0_f64),
