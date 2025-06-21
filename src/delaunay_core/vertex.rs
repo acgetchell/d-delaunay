@@ -33,7 +33,7 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The coordinates of the vertex in a D-dimensional space.
+    /// The coordinates of the vertex as a D-dimensional Point.
     point: Point<T, D>,
     /// A universally unique identifier for the vertex.
     #[builder(setter(skip), default = "make_uuid()")]
@@ -322,8 +322,8 @@ mod tests {
 
         assert_eq!(values.len(), 3);
 
-        values.sort_by(|a, b| a.uuid().cmp(&b.uuid()));
-        vertices.sort_by(|a, b| a.uuid().cmp(&b.uuid()));
+        values.sort_by_key(|a| a.uuid());
+        vertices.sort_by_key(|a| a.uuid());
 
         assert_eq!(values, vertices);
 

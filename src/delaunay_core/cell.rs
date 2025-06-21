@@ -318,7 +318,7 @@ where
     ///
     /// The resulting vector gives the coordinates of the circumcenter.
     ///
-    /// # Returns
+    /// # Returns:
     /// The circumcenter as a Point<f64, D> if successful, or an error if the
     /// simplex is degenerate or the matrix inversion fails.
     ///
