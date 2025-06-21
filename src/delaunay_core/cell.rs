@@ -313,12 +313,14 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let circumcenter = cell.circumcenter().unwrap();
     /// assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
+    /// ```
+    ///
     /// Computes the circumcenter of the simplex represented by the cell.
     ///
     /// The circumcenter is the unique point equidistant from all vertices of the simplex. Returns an error if the cell is not a valid simplex or if the computation fails due to degeneracy or numerical issues.
     ///
     /// # Returns
-    /// The circumcenter as a `Point<f64, D>` if successful, or an error if the simplex is degenerate or the matrix inversion fails.
+    /// The circumcenter as a Point<f64, D> if successful, or an error if the simplex is degenerate or the matrix inversion fails.
     pub fn circumcenter(&self) -> Result<Point<f64, D>, anyhow::Error>
     where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -369,7 +371,7 @@ where
     ///
     /// # Returns:
     ///
-    /// If successful, returns an Ok containing the circumradius of the cell,
+    /// If successful, returns an Ok containing the circumradius of the cell.
     /// Computes the circumradius of the cell.
     ///
     /// # Returns
@@ -392,7 +394,7 @@ where
     /// Computes the circumradius of the cell using a provided circumcenter.
     ///
     /// # Parameters
-    /// - `circumcenter`: The precomputed circumcenter of the cell.
+    /// - circumcenter: The precomputed circumcenter of the cell.
     ///
     /// # Returns
     /// The circumradius as the distance from the circumcenter to the first vertex, or an error if the calculation fails.
@@ -435,13 +437,14 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
+    /// ```
     /// Determines whether a given vertex lies inside or on the circumsphere of the cell.
     ///
     /// # Parameters
-    /// - `vertex`: The vertex to test for circumsphere containment.
+    /// - vertex: The vertex to test for circumsphere containment.
     ///
     /// # Returns
-    /// `Ok(true)` if the vertex is inside or on the circumsphere; `Ok(false)` otherwise. Returns an error if the circumcenter or circumradius cannot be computed.
+    /// Ok(true) if the vertex is inside or on the circumsphere; Ok(false) otherwise. Returns an error if the circumcenter or circumradius cannot be computed.
     pub fn circumsphere_contains(&self, vertex: Vertex<T, U, D>) -> Result<bool, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -487,16 +490,17 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let origin: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::origin()).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
+    /// ```
     /// Determines whether a given vertex lies inside or on the circumsphere of the cell using a determinant-based method.
     ///
     /// # Parameters
-    /// - `vertex`: The vertex to test for circumsphere containment.
+    /// - vertex: The vertex to test for circumsphere containment.
     ///
     /// # Returns
-    /// `Ok(true)` if the vertex is inside or on the circumsphere; `Ok(false)` otherwise. Returns an error if the determinant computation fails or is invalid.
+    /// Ok(true) if the vertex is inside or on the circumsphere; Ok(false) otherwise. Returns an error if the determinant computation fails or is invalid.
     ///
     /// # Details
-    /// This method constructs a matrix from the cell's vertices and the test vertex, then evaluates the sign of its determinant for containment. This approach is numerically stable for circumsphere checks in arbitrary dimensions.
+    /// This method constructs a matrix from the cell vertices and the test vertex, then evaluates the sign of its determinant for containment. This approach is numerically stable for circumsphere checks in arbitrary dimensions.
     pub fn circumsphere_contains_vertex(
         &self,
         vertex: Vertex<T, U, D>,

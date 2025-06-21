@@ -58,13 +58,14 @@ pub fn make_uuid() -> Uuid {
 /// let hashmap = Vertex::into_hashmap(vertices);
 /// let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
 /// assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
+/// ```
 /// Returns the extreme coordinates (minimum or maximum per dimension) among all vertices based on the specified ordering.
 ///
-/// If the input map is empty, returns an array of default values. For `Ordering::Less`, finds the minimum coordinate in each dimension; for `Ordering::Greater`, finds the maximum. For `Ordering::Equal`, returns the coordinates of the first vertex found.
+/// If the input map is empty, returns an array of default values. For Ordering::Less, finds the minimum coordinate in each dimension; for Ordering::Greater, finds the maximum. For Ordering::Equal, returns the coordinates of the first vertex found.
 ///
 /// # Parameters
-/// - `vertices`: A map of vertices keyed by UUID.
-/// - `ordering`: Determines whether to find minimum, maximum, or simply return the first vertex's coordinates.
+/// - vertices: A map of vertices keyed by UUID.
+/// - ordering: Determines whether to find minimum, maximum, or simply return the first vertex coordinates.
 ///
 /// # Returns
 /// An array containing the extreme coordinates per dimension according to the specified ordering. If no vertices are present, returns an array of default values.

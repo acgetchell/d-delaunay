@@ -70,6 +70,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+    /// ```
     /// Creates a new point with the specified coordinates.
     ///
     /// # Parameters
@@ -94,6 +95,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
+    /// ```
     /// Returns the dimension of the point.
     pub fn dim(&self) -> usize {
         D
@@ -111,6 +113,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+    /// ```
     /// Returns a copy of the point's coordinates as an array.
     pub fn coordinates(&self) -> [T; D] {
         self.coords
@@ -128,6 +131,7 @@ where
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
+    /// ```
     /// Returns the origin point with all coordinates set to zero.
     ///
     /// # Returns

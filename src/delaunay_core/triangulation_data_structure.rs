@@ -213,6 +213,7 @@ where
     /// let vertex = VertexBuilder::default().point(point).build().unwrap();
     /// let result = tds.add(vertex);
     /// assert!(result.is_ok());
+    /// ```
     /// Adds a vertex to the triangulation if its coordinates and UUID are unique.
     ///
     /// Returns an error if a vertex with the same coordinates or UUID already exists.
