@@ -66,7 +66,6 @@ where
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
-        // points.into_iter().map(|p| Self::new(p)).collect()
         points
             .into_iter()
             .map(|p| VertexBuilder::default().point(p).build().unwrap())
@@ -94,6 +93,17 @@ where
     /// # Returns
     ///
     /// A reference to the Point representing the vertex's coordinates.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// let retrieved_point = vertex.point();
+    /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
+    /// ```
     pub fn point(&self) -> &Point<T, D> {
         &self.point
     }
@@ -103,6 +113,23 @@ where
     /// # Returns
     ///
     /// The Uuid uniquely identifying this vertex.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use uuid::Uuid;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// let vertex_uuid = vertex.uuid();
+    /// // UUID should be valid and unique
+    /// assert_ne!(vertex_uuid, Uuid::nil());
+    ///
+    /// // Creating another vertex should have a different UUID
+    /// let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// assert_ne!(vertex.uuid(), another_vertex.uuid());
+    /// ```
     pub fn uuid(&self) -> Uuid {
         self.uuid
     }

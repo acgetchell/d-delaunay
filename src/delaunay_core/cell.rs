@@ -205,6 +205,7 @@ where
     /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
     /// let cell2: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
     /// assert!(cell.contains_vertex_of(&cell2));
+    /// ```
     pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
@@ -246,6 +247,7 @@ where
     /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
     /// assert!(new_cell.vertices.contains(&vertex5));
+    /// ```
     pub fn from_facet_and_vertex(
         facet: Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
@@ -335,6 +337,7 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let circumcenter = cell.circumcenter().unwrap();
     /// assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
+    /// ```
     pub fn circumcenter(&self) -> Result<Point<f64, D>, anyhow::Error>
     where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -542,6 +545,7 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let facets = cell.facets();
     /// assert_eq!(facets.len(), 4);
+    /// ```
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
         let mut facets: Vec<Facet<T, U, V, D>> = Vec::new();
         for vertex in self.vertices.iter() {
