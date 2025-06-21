@@ -5,7 +5,6 @@
 [![codecov](https://codecov.io/gh/acgetchell/d-delaunay/graph/badge.svg?token=WT7qZGT9bO)](https://codecov.io/gh/acgetchell/d-delaunay)
 [![Audit dependencies](https://github.com/acgetchell/d-delaunay/actions/workflows/audit.yml/badge.svg)](https://github.com/acgetchell/d-delaunay/actions/workflows/audit.yml)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/3cad94f994f5434d877ae77f0daee692)](https://app.codacy.com/gh/acgetchell/d-delaunay/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/acgetchell/d-delaunay?utm_source=oss&utm_medium=github&utm_campaign=acgetchell%2Fd-delaunay&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 D-dimensional Delaunay triangulations in [Rust], inspired by [CGAL].
 

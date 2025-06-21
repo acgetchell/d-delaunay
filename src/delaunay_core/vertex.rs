@@ -175,6 +175,32 @@ where
     }
 }
 
+/// Enable implicit conversion from Vertex to coordinate array
+/// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
+impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(vertex: Vertex<T, U, D>) -> [T; D] {
+        vertex.point.coordinates()
+    }
+}
+
+/// Enable implicit conversion from Vertex reference to coordinate array
+/// This allows `&vertex` to be implicitly converted to `[T; D]` for coordinate access
+impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
+        vertex.point.coordinates()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -184,7 +210,7 @@ mod tests {
     fn vertex_default() {
         let vertex: Vertex<f64, Option<()>, 3> = Default::default();
 
-        assert_eq!(vertex.point.coords, [0.0, 0.0, 0.0]);
+        assert_eq!(vertex.point.coordinates(), [0.0, 0.0, 0.0]);
         assert_eq!(vertex.dim(), 3);
         assert!(vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -201,7 +227,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -223,7 +249,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -254,11 +280,11 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
-        assert_eq!(vertices[0].point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertices[0].point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
-        assert_eq!(vertices[1].point.coords, [4.0, 5.0, 6.0]);
+        assert_eq!(vertices[1].point.coordinates(), [4.0, 5.0, 6.0]);
         assert_eq!(vertices[1].dim(), 3);
-        assert_eq!(vertices[2].point.coords, [7.0, 8.0, 9.0]);
+        assert_eq!(vertices[2].point.coordinates(), [7.0, 8.0, 9.0]);
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
@@ -439,7 +465,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [42.0]);
+        assert_eq!(vertex.point.coordinates(), [42.0]);
         assert_eq!(vertex.dim(), 1);
         assert!(!vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -453,7 +479,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0]);
         assert_eq!(vertex.dim(), 2);
         assert!(!vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -467,7 +493,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
         assert_eq!(vertex.dim(), 4);
         assert!(!vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -481,7 +507,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
         assert_eq!(vertex.dim(), 5);
         assert!(!vertex.uuid.is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -495,7 +521,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.5, 2.5]);
+        assert_eq!(vertex.point.coordinates(), [1.5, 2.5]);
         assert_eq!(vertex.dim(), 2);
         assert!(!vertex.uuid.is_nil());
     }
@@ -507,7 +533,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1, 2, 3]);
+        assert_eq!(vertex.point.coordinates(), [1, 2, 3]);
         assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid.is_nil());
     }
@@ -520,7 +546,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.data.unwrap(), "test_vertex");
         assert_eq!(vertex.dim(), 3);
     }
@@ -533,7 +559,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [5.0, 10.0]);
+        assert_eq!(vertex.point.coordinates(), [5.0, 10.0]);
         assert_eq!(vertex.data.unwrap(), 123u32);
         assert_eq!(vertex.dim(), 2);
     }
@@ -546,7 +572,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, 2.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, 2.0]);
         assert_eq!(vertex.data.unwrap(), (42, 84));
     }
 
@@ -660,7 +686,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [-1.0, -2.0, -3.0]);
+        assert_eq!(vertex.point.coordinates(), [-1.0, -2.0, -3.0]);
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -686,7 +712,10 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1000000.0, 2000000.0, 3000000.0]);
+        assert_eq!(
+            vertex.point.coordinates(),
+            [1000000.0, 2000000.0, 3000000.0]
+        );
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -697,7 +726,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [0.000001, 0.000002, 0.000003]);
+        assert_eq!(vertex.point.coordinates(), [0.000001, 0.000002, 0.000003]);
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -715,7 +744,7 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
         assert_eq!(vertices.len(), 1);
-        assert_eq!(vertices[0].point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(vertices[0].point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
         assert!(!vertices[0].uuid.is_nil());
     }
@@ -740,7 +769,10 @@ mod tests {
 
         assert_eq!(hashmap.len(), 1);
         assert!(hashmap.contains_key(&uuid));
-        assert_eq!(hashmap.get(&uuid).unwrap().point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(
+            hashmap.get(&uuid).unwrap().point.coordinates(),
+            [1.0, 2.0, 3.0]
+        );
     }
 
     #[test]
@@ -798,7 +830,32 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coords, [1.0, -2.0, 3.0, -4.0]);
+        assert_eq!(vertex.point.coordinates(), [1.0, -2.0, 3.0, -4.0]);
         assert_eq!(vertex.dim(), 4);
+    }
+
+    #[test]
+    fn vertex_implicit_conversion_to_coordinates() {
+        let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+
+        // Test implicit conversion from owned vertex
+        let coords_owned: [f64; 3] = vertex.into();
+        assert_eq!(coords_owned, [1.0, 2.0, 3.0]);
+
+        // Create a new vertex for reference test
+        let vertex_ref: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([4.0, 5.0, 6.0]))
+            .build()
+            .unwrap();
+
+        // Test implicit conversion from vertex reference
+        let coords_ref: [f64; 3] = (&vertex_ref).into();
+        assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
+
+        // Verify the original vertex is still available after reference conversion
+        assert_eq!(vertex_ref.point.coordinates(), [4.0, 5.0, 6.0]);
     }
 }

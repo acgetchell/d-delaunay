@@ -217,7 +217,9 @@ where
     pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str> {
         // Don't add if vertex with that point already exists
         for val in self.vertices.values() {
-            if val.point.coords == vertex.point.coords {
+            let existing_coords: [T; D] = val.into();
+            let new_coords: [T; D] = (&vertex).into();
+            if existing_coords == new_coords {
                 return Err("Vertex already exists!");
             }
         }
@@ -836,7 +838,7 @@ where
         // 2.  Pretty print this cell
         print!("Cell {:>3} {} vertices:", idx, cell.vertices.len());
         for v in &cell.vertices {
-            let coords: Vec<f64> = v.point.coords.iter().map(|c| (*c).into()).collect();
+            let coords: Vec<f64> = v.point.coordinates().iter().map(|c| (*c).into()).collect();
             print!(" {:?}", coords);
         }
         println!();
@@ -983,7 +985,7 @@ mod tests {
         // Debug: Print actual supercell coordinates
         println!("Actual supercell vertices:");
         for (i, vertex) in unwrapped_supercell.vertices.iter().enumerate() {
-            println!("  Vertex {}: {:?}", i, vertex.point.coords);
+            println!("  Vertex {}: {:?}", i, vertex.point.coordinates());
         }
 
         // The supercell should contain all input points

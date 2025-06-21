@@ -10,30 +10,33 @@ use std::hash::{Hash, Hasher};
 ///
 /// # Properties:
 ///
-/// * `coords`: `coords` is a public property of the [Point]. It is an array of
+/// * `coords`: `coords` is a private property of the [Point]. It is an array of
 ///   type `T` with a length of `D`. The type `T` is a generic type parameter,
 ///   which means it can be any type. The length `D` is a constant unsigned
 ///   integer known at compile time.
+///
+/// Points are intended to be immutable once created, so the `coords` field is private to prevent
+/// modification after instantiation.
 pub struct Point<T, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
-    pub coords: [T; D],
+    coords: [T; D],
 }
 
-impl<T, const D: usize> From<[T; D]> for Point<f64, D>
+impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
-    T: Clone + Copy + Default + Into<f64> + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
+    U: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
-    f64: From<T>,
+    [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(coords: [T; D]) -> Self {
-        // Convert the `coords` array to `[f64; D]`
-        let coords_f64: [f64; D] = coords.map(|coord| coord.into());
-        Self { coords: coords_f64 }
+        // Convert the `coords` array to `[U; D]`
+        let coords_u: [U; D] = coords.map(|coord| coord.into());
+        Self { coords: coords_u }
     }
 }
 
@@ -59,7 +62,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-    /// assert_eq!(point.coords, [1.0, 2.0, 3.0, 4.0]);
+    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
     pub fn new(coords: [T; D]) -> Self {
         Self { coords }
@@ -83,6 +86,23 @@ where
         D
     }
 
+    /// Returns a copy of the coordinates of the point.
+    ///
+    /// # Returns:
+    ///
+    /// The `coordinates` function returns a copy of the coordinates array.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
+    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+    /// ```
+    pub fn coordinates(&self) -> [T; D] {
+        self.coords
+    }
+
     /// The `origin` function returns the origin [Point].
     ///
     /// # Returns:
@@ -94,7 +114,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
-    /// assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
+    /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
     /// ```
     pub fn origin() -> Self
     where
@@ -122,7 +142,7 @@ macro_rules! impl_point_hash_for_float {
             where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
             {
                 fn hash<H: Hasher>(&self, state: &mut H) {
-                    for &val in &self.coords {
+                    for &val in &self.coordinates() {
                         OrderedFloat(val).hash(state);
                     }
                 }
@@ -141,7 +161,7 @@ macro_rules! impl_point_hash_for_int {
             where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
             {
                 fn hash<H: Hasher>(&self, state: &mut H) {
-                    for &val in &self.coords {
+                    for &val in &self.coordinates() {
                         val.hash(state);
                     }
                 }
@@ -152,16 +172,41 @@ macro_rules! impl_point_hash_for_int {
 
 impl_point_hash_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
+/// Enable implicit conversion from Point to coordinate array
+/// This allows `point` to be implicitly converted to `[T; D]`
+impl<T, const D: usize> From<Point<T, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(point: Point<T, D>) -> [T; D] {
+        point.coordinates()
+    }
+}
+
+/// Enable implicit conversion from Point reference to coordinate array
+/// This allows `&point` to be implicitly converted to `[T; D]`
+impl<T, const D: usize> From<&Point<T, D>> for [T; D]
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn from(point: &Point<T, D>) -> [T; D] {
+        point.coordinates()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use approx::assert_relative_eq;
 
     #[test]
     fn point_default() {
         let point: Point<f64, 4> = Default::default();
 
-        assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Default: {:?}", point);
@@ -171,7 +216,7 @@ mod tests {
     fn point_new() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
 
-        assert_eq!(point.coords, [1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Point: {:?}", point);
@@ -183,6 +228,8 @@ mod tests {
         let point_copy = point;
 
         assert_eq!(point, point_copy);
+        assert_eq!(point.coordinates(), point_copy.coordinates());
+        assert_eq!(point.dim(), point_copy.dim());
     }
 
     #[test]
@@ -199,7 +246,7 @@ mod tests {
     fn point_origin() {
         let point: Point<f64, 4> = Point::origin();
 
-        assert_eq!(point.coords, [0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Origin: {:?} is {}-D", point, point.dim());
@@ -248,7 +295,7 @@ mod tests {
         let coords = [1i32, 2i32, 3i32];
         let point: Point<f64, 3> = Point::from(coords);
 
-        assert_eq!(point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(point.dim(), 3);
     }
 
@@ -257,8 +304,64 @@ mod tests {
         let coords = [1.5f32, 2.5f32, 3.5f32, 4.5f32];
         let point: Point<f64, 4> = Point::from(coords);
 
-        assert_eq!(point.coords, [1.5, 2.5, 3.5, 4.5]);
+        assert_eq!(point.coordinates(), [1.5, 2.5, 3.5, 4.5]);
         assert_eq!(point.dim(), 4);
+    }
+
+    #[test]
+    fn point_from_array_same_type() {
+        // Test conversion when source and target types are the same
+        let coords_f32 = [1.0f32, 2.0f32, 3.0f32];
+        let point_f32: Point<f32, 3> = Point::from(coords_f32);
+        assert_eq!(point_f32.coordinates(), [1.0f32, 2.0f32, 3.0f32]);
+
+        let coords_i32 = [1i32, 2i32, 3i32];
+        let point_i32: Point<i32, 3> = Point::from(coords_i32);
+        assert_eq!(point_i32.coordinates(), [1i32, 2i32, 3i32]);
+    }
+
+    #[test]
+    fn point_from_array_integer_to_integer() {
+        // Test conversion from i32 to i64
+        let coords_i32 = [1i32, 2i32, 3i32];
+        let point_i64: Point<i64, 3> = Point::from(coords_i32);
+        assert_eq!(point_i64.coordinates(), [1i64, 2i64, 3i64]);
+
+        // Test conversion from u8 to i32
+        let coords_u8 = [10u8, 20u8, 30u8];
+        let point_i32: Point<i32, 3> = Point::from(coords_u8);
+        assert_eq!(point_i32.coordinates(), [10i32, 20i32, 30i32]);
+
+        // Test conversion from i16 to isize
+        let coords_i16 = [100i16, 200i16];
+        let point_isize: Point<isize, 2> = Point::from(coords_i16);
+        assert_eq!(point_isize.coordinates(), [100isize, 200isize]);
+    }
+
+    #[test]
+    fn point_from_array_float_to_float() {
+        // Test conversion from f32 to f32 (same type)
+        let coords_f32 = [1.5f32, 2.5f32];
+        let point_f32: Point<f32, 2> = Point::from(coords_f32);
+        assert_eq!(point_f32.coordinates(), [1.5f32, 2.5f32]);
+
+        // Test conversion from f32 to f64 (safe upcast)
+        let coords_f32 = [1.5f32, 2.5f32];
+        let point_f64: Point<f64, 2> = Point::from(coords_f32);
+        assert_eq!(point_f64.coordinates(), [1.5f64, 2.5f64]);
+    }
+
+    #[test]
+    fn point_from_array_integer_to_float() {
+        // Test conversion from i32 to f64
+        let coords_i32 = [1i32, 2i32, 3i32];
+        let point_f64: Point<f64, 3> = Point::from(coords_i32);
+        assert_eq!(point_f64.coordinates(), [1.0f64, 2.0f64, 3.0f64]);
+
+        // Test conversion from u8 to f64
+        let coords_u8 = [10u8, 20u8];
+        let point_f64: Point<f64, 2> = Point::from(coords_u8);
+        assert_eq!(point_f64.coordinates(), [10.0f64, 20.0f64]);
     }
 
     #[test]
@@ -327,79 +430,95 @@ mod tests {
     }
 
     #[test]
-    fn point_clone() {
-        let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-        let cloned_point = point;
+    fn point_from_complex_conversions() {
+        // Test conversion with mixed type arrays
+        let coords_mixed_i32 = [-100i32, 200i32, 300i32];
+        let point_f64: Point<f64, 3> = Point::from(coords_mixed_i32);
+        assert_eq!(point_f64.coordinates(), [-100.0f64, 200.0f64, 300.0f64]);
 
-        assert_eq!(point, cloned_point);
-        assert_eq!(point.coords, cloned_point.coords);
-        assert_eq!(point.dim(), cloned_point.dim());
+        // Test with larger values
+        let coords_large = [10000i32, 20000i32];
+        let point_f64: Point<f64, 2> = Point::from(coords_large);
+        assert_eq!(point_f64.coordinates(), [10000.0f64, 20000.0f64]);
+
+        // Test with very small values
+        // When converting from f32 to f64, there can be small precision differences
+        // due to how floating point numbers are represented in memory.
+        // Use approximate comparison for these small values.
+        let coords_small_f32 = [0.000001f32, 0.000002f32];
+        let point_f64: Point<f64, 2> = Point::from(coords_small_f32);
+
+        // Use relative comparison with appropriate epsilon for small floating point values
+        let expected = [0.000001f64, 0.000002f64];
+        for (&actual, &expected) in point_f64.coordinates().iter().zip(expected.iter()) {
+            assert_relative_eq!(actual, expected, epsilon = 1e-6, max_relative = 1e-6);
+        }
     }
 
     #[test]
     fn point_1d() {
         let point: Point<f64, 1> = Point::new([42.0]);
 
-        assert_eq!(point.coords, [42.0]);
+        assert_eq!(point.coordinates(), [42.0]);
         assert_eq!(point.dim(), 1);
 
         let origin: Point<f64, 1> = Point::origin();
-        assert_eq!(origin.coords, [0.0]);
+        assert_eq!(origin.coordinates(), [0.0]);
     }
 
     #[test]
     fn point_2d() {
         let point: Point<f64, 2> = Point::new([1.0, 2.0]);
 
-        assert_eq!(point.coords, [1.0, 2.0]);
+        assert_eq!(point.coordinates(), [1.0, 2.0]);
         assert_eq!(point.dim(), 2);
 
         let origin: Point<f64, 2> = Point::origin();
-        assert_eq!(origin.coords, [0.0, 0.0]);
+        assert_eq!(origin.coordinates(), [0.0, 0.0]);
     }
 
     #[test]
     fn point_3d() {
         let point: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
 
-        assert_eq!(point.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(point.dim(), 3);
 
         let origin: Point<f64, 3> = Point::origin();
-        assert_eq!(origin.coords, [0.0, 0.0, 0.0]);
+        assert_eq!(origin.coordinates(), [0.0, 0.0, 0.0]);
     }
 
     #[test]
     fn point_5d() {
         let point: Point<f64, 5> = Point::new([1.0, 2.0, 3.0, 4.0, 5.0]);
 
-        assert_eq!(point.coords, [1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
         assert_eq!(point.dim(), 5);
 
         let origin: Point<f64, 5> = Point::origin();
-        assert_eq!(origin.coords, [0.0, 0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(origin.coordinates(), [0.0, 0.0, 0.0, 0.0, 0.0]);
     }
 
     #[test]
     fn point_with_integers() {
         let point: Point<i32, 3> = Point::new([1, 2, 3]);
 
-        assert_eq!(point.coords, [1, 2, 3]);
+        assert_eq!(point.coordinates(), [1, 2, 3]);
         assert_eq!(point.dim(), 3);
 
         let origin: Point<i32, 3> = Point::origin();
-        assert_eq!(origin.coords, [0, 0, 0]);
+        assert_eq!(origin.coordinates(), [0, 0, 0]);
     }
 
     #[test]
     fn point_with_f32() {
         let point: Point<f32, 2> = Point::new([1.5, 2.5]);
 
-        assert_eq!(point.coords, [1.5, 2.5]);
+        assert_eq!(point.coordinates(), [1.5, 2.5]);
         assert_eq!(point.dim(), 2);
 
         let origin: Point<f32, 2> = Point::origin();
-        assert_eq!(origin.coords, [0.0, 0.0]);
+        assert_eq!(origin.coordinates(), [0.0, 0.0]);
     }
 
     #[test]
@@ -451,12 +570,12 @@ mod tests {
     fn point_negative_coordinates() {
         let point = Point::new([-1.0, -2.0, -3.0]);
 
-        assert_eq!(point.coords, [-1.0, -2.0, -3.0]);
+        assert_eq!(point.coordinates(), [-1.0, -2.0, -3.0]);
         assert_eq!(point.dim(), 3);
 
         // Test with mixed positive/negative
         let mixed_point = Point::new([1.0, -2.0, 3.0, -4.0]);
-        assert_eq!(mixed_point.coords, [1.0, -2.0, 3.0, -4.0]);
+        assert_eq!(mixed_point.coordinates(), [1.0, -2.0, 3.0, -4.0]);
     }
 
     #[test]
@@ -465,14 +584,14 @@ mod tests {
         let origin: Point<f64, 3> = Point::origin();
 
         assert_eq!(zero_point, origin);
-        assert_eq!(zero_point.coords, [0.0, 0.0, 0.0]);
+        assert_eq!(zero_point.coordinates(), [0.0, 0.0, 0.0]);
     }
 
     #[test]
     fn point_large_coordinates() {
         let large_point = Point::new([1e6, 2e6, 3e6]);
 
-        assert_eq!(large_point.coords, [1000000.0, 2000000.0, 3000000.0]);
+        assert_eq!(large_point.coordinates(), [1000000.0, 2000000.0, 3000000.0]);
         assert_eq!(large_point.dim(), 3);
     }
 
@@ -480,7 +599,7 @@ mod tests {
     fn point_small_coordinates() {
         let small_point = Point::new([1e-6, 2e-6, 3e-6]);
 
-        assert_eq!(small_point.coords, [0.000001, 0.000002, 0.000003]);
+        assert_eq!(small_point.coordinates(), [0.000001, 0.000002, 0.000003]);
         assert_eq!(small_point.dim(), 3);
     }
 
@@ -505,11 +624,11 @@ mod tests {
         // Test conversion from different integer types
         let u8_coords: [u8; 3] = [1, 2, 3];
         let point_from_u8: Point<f64, 3> = Point::from(u8_coords);
-        assert_eq!(point_from_u8.coords, [1.0, 2.0, 3.0]);
+        assert_eq!(point_from_u8.coordinates(), [1.0, 2.0, 3.0]);
 
         let i16_coords: [i16; 2] = [-1, 32767];
         let point_from_i16: Point<f64, 2> = Point::from(i16_coords);
-        assert_eq!(point_from_i16.coords, [-1.0, 32767.0]);
+        assert_eq!(point_from_i16.coordinates(), [-1.0, 32767.0]);
     }
 
     #[test]
@@ -689,5 +808,24 @@ mod tests {
         // Test points with different values hash differently
         let point_i32_c: Point<i32, 2> = Point::new([2, 3]);
         assert_ne!(get_hash(&point_i32_a), get_hash(&point_i32_c));
+    }
+
+    #[test]
+    fn point_implicit_conversion_to_coordinates() {
+        let point: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
+
+        // Test implicit conversion from owned point
+        let coords_owned: [f64; 3] = point.into();
+        assert_eq!(coords_owned, [1.0, 2.0, 3.0]);
+
+        // Create a new point for reference test
+        let point_ref: Point<f64, 3> = Point::new([4.0, 5.0, 6.0]);
+
+        // Test implicit conversion from point reference
+        let coords_ref: [f64; 3] = (&point_ref).into();
+        assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
+
+        // Verify the original point is still available after reference conversion
+        assert_eq!(point_ref.coordinates(), [4.0, 5.0, 6.0]);
     }
 }
