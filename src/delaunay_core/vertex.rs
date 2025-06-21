@@ -33,11 +33,11 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The coordinates of the vertex in a D-dimensional space.
-    pub point: Point<T, D>,
+    /// The coordinates of the vertex as a D-dimensional Point.
+    point: Point<T, D>,
     /// A universally unique identifier for the vertex.
     #[builder(setter(skip), default = "make_uuid()")]
-    pub uuid: Uuid,
+    uuid: Uuid,
     /// The [Uuid] of the `Cell` that the vertex is incident to.
     #[builder(setter(skip), default = "None")]
     pub incident_cell: Option<Uuid>,
@@ -66,7 +66,6 @@ where
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
-        // points.into_iter().map(|p| Self::new(p)).collect()
         points
             .into_iter()
             .map(|p| VertexBuilder::default().point(p).build().unwrap())
@@ -86,7 +85,53 @@ where
     /// [Uuid] and the value type [Vertex], i.e.
     /// `std::collections::HashMap<Uuid, Vertex<T, U, D>`.
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
-        vertices.into_iter().map(|v| (v.uuid, v)).collect()
+        vertices.into_iter().map(|v| (v.uuid(), v)).collect()
+    }
+
+    /// Returns the point coordinates of the vertex.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the Point representing the vertex's coordinates.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// let retrieved_point = vertex.point();
+    /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
+    /// ```
+    pub fn point(&self) -> &Point<T, D> {
+        &self.point
+    }
+
+    /// Returns the UUID of the vertex.
+    ///
+    /// # Returns
+    ///
+    /// The Uuid uniquely identifying this vertex.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use uuid::Uuid;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// let vertex_uuid = vertex.uuid();
+    /// // UUID should be valid and unique
+    /// assert_ne!(vertex_uuid, Uuid::nil());
+    ///
+    /// // Creating another vertex should have a different UUID
+    /// let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// assert_ne!(vertex.uuid(), another_vertex.uuid());
+    /// ```
+    pub fn uuid(&self) -> Uuid {
+        self.uuid
     }
 
     /// The `dim` function returns the dimensionality of the [Vertex].
@@ -184,7 +229,7 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(vertex: Vertex<T, U, D>) -> [T; D] {
-        vertex.point.coordinates()
+        vertex.point().coordinates()
     }
 }
 
@@ -197,7 +242,7 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
-        vertex.point.coordinates()
+        vertex.point().coordinates()
     }
 }
 
@@ -210,9 +255,9 @@ mod tests {
     fn vertex_default() {
         let vertex: Vertex<f64, Option<()>, 3> = Default::default();
 
-        assert_eq!(vertex.point.coordinates(), [0.0, 0.0, 0.0]);
+        assert_eq!(vertex.point().coordinates(), [0.0, 0.0, 0.0]);
         assert_eq!(vertex.dim(), 3);
-        assert!(vertex.uuid.is_nil());
+        assert!(vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
 
@@ -227,9 +272,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
 
@@ -249,9 +294,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert_eq!(vertex.data.unwrap(), 1);
 
@@ -280,11 +325,11 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
-        assert_eq!(vertices[0].point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
-        assert_eq!(vertices[1].point.coordinates(), [4.0, 5.0, 6.0]);
+        assert_eq!(vertices[1].point().coordinates(), [4.0, 5.0, 6.0]);
         assert_eq!(vertices[1].dim(), 3);
-        assert_eq!(vertices[2].point.coordinates(), [7.0, 8.0, 9.0]);
+        assert_eq!(vertices[2].point().coordinates(), [7.0, 8.0, 9.0]);
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
@@ -304,8 +349,8 @@ mod tests {
 
         assert_eq!(values.len(), 3);
 
-        values.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-        vertices.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+        values.sort_by_key(|a| a.uuid());
+        vertices.sort_by_key(|a| a.uuid());
 
         assert_eq!(values, vertices);
 
@@ -451,8 +496,8 @@ mod tests {
         let cloned_vertex = vertex;
 
         // Points should be equal but UUIDs should be the same (since we cloned)
-        assert_eq!(vertex.point, cloned_vertex.point);
-        assert_eq!(vertex.uuid, cloned_vertex.uuid);
+        assert_eq!(vertex.point(), cloned_vertex.point());
+        assert_eq!(vertex.uuid(), cloned_vertex.uuid());
         assert_eq!(vertex.incident_cell, cloned_vertex.incident_cell);
         assert_eq!(vertex.data, cloned_vertex.data);
         assert_eq!(vertex.dim(), cloned_vertex.dim());
@@ -465,9 +510,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [42.0]);
+        assert_eq!(vertex.point().coordinates(), [42.0]);
         assert_eq!(vertex.dim(), 1);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -479,9 +524,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0]);
         assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -493,9 +538,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0, 4.0]);
         assert_eq!(vertex.dim(), 4);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -507,9 +552,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
         assert_eq!(vertex.dim(), 5);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -521,9 +566,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.5, 2.5]);
+        assert_eq!(vertex.point().coordinates(), [1.5, 2.5]);
         assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
     }
 
     #[test]
@@ -533,9 +578,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1, 2, 3]);
+        assert_eq!(vertex.point().coordinates(), [1, 2, 3]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
     }
 
     #[test]
@@ -546,7 +591,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.data.unwrap(), "test_vertex");
         assert_eq!(vertex.dim(), 3);
     }
@@ -559,7 +604,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [5.0, 10.0]);
+        assert_eq!(vertex.point().coordinates(), [5.0, 10.0]);
         assert_eq!(vertex.data.unwrap(), 123u32);
         assert_eq!(vertex.dim(), 2);
     }
@@ -572,7 +617,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0]);
         assert_eq!(vertex.data.unwrap(), (42, 84));
     }
 
@@ -686,7 +731,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [-1.0, -2.0, -3.0]);
+        assert_eq!(vertex.point().coordinates(), [-1.0, -2.0, -3.0]);
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -702,7 +747,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point, origin_vertex.point);
+        assert_eq!(vertex.point(), origin_vertex.point());
     }
 
     #[test]
@@ -713,7 +758,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            vertex.point.coordinates(),
+            vertex.point().coordinates(),
             [1000000.0, 2000000.0, 3000000.0]
         );
         assert_eq!(vertex.dim(), 3);
@@ -726,7 +771,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [0.000001, 0.000002, 0.000003]);
+        assert_eq!(vertex.point().coordinates(), [0.000001, 0.000002, 0.000003]);
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -744,9 +789,9 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
         assert_eq!(vertices.len(), 1);
-        assert_eq!(vertices[0].point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
-        assert!(!vertices[0].uuid.is_nil());
+        assert!(!vertices[0].uuid().is_nil());
     }
 
     #[test]
@@ -763,14 +808,14 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        let uuid = vertex.uuid;
+        let uuid = vertex.uuid();
         let vertices = vec![vertex];
         let hashmap = Vertex::into_hashmap(vertices);
 
         assert_eq!(hashmap.len(), 1);
         assert!(hashmap.contains_key(&uuid));
         assert_eq!(
-            hashmap.get(&uuid).unwrap().point.coordinates(),
+            hashmap.get(&uuid).unwrap().point().coordinates(),
             [1.0, 2.0, 3.0]
         );
     }
@@ -787,9 +832,9 @@ mod tests {
             .unwrap();
 
         // Same points but different UUIDs
-        assert_ne!(vertex1.uuid, vertex2.uuid);
-        assert!(!vertex1.uuid.is_nil());
-        assert!(!vertex2.uuid.is_nil());
+        assert_ne!(vertex1.uuid(), vertex2.uuid());
+        assert!(!vertex1.uuid().is_nil());
+        assert!(!vertex2.uuid().is_nil());
     }
 
     #[test]
@@ -830,7 +875,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, -2.0, 3.0, -4.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, -2.0, 3.0, -4.0]);
         assert_eq!(vertex.dim(), 4);
     }
 
@@ -856,6 +901,6 @@ mod tests {
         assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
 
         // Verify the original vertex is still available after reference conversion
-        assert_eq!(vertex_ref.point.coordinates(), [4.0, 5.0, 6.0]);
+        assert_eq!(vertex_ref.point().coordinates(), [4.0, 5.0, 6.0]);
     }
 }

@@ -34,7 +34,7 @@ fn main() {
         .unwrap();
 
     // Before: You had to call .coordinates() explicitly
-    let coords_explicit: [f64; 3] = vertex.point.coordinates();
+    let coords_explicit: [f64; 3] = vertex.point().coordinates();
     println!("Explicit coordinates: {:?}", coords_explicit);
 
     // After: You can now use implicit conversion from the vertex
@@ -55,7 +55,7 @@ fn main() {
     );
     println!(
         "Original vertex still available: {:?}",
-        another_vertex.point.coordinates()
+        another_vertex.point().coordinates()
     );
 
     // Point implicit conversion also works

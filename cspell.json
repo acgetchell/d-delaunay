@@ -15,6 +15,7 @@
         "CGAL",
         "chacha",
         "circumcenter",
+        "circumcircle",
         "circumradius",
         "circumsphere",
         "clippy",
