@@ -336,14 +336,14 @@ where
 
         let mut b = zeros(dim, 1);
         for i in 0..dim {
-            // Convert coordinates to f64 arrays before creating na::Point
-            let convert_to_f64_array =
-                |vertex: &Vertex<T, U, D>| vertex.point.coordinates().map(|x| x.into());
-            let coords_i_plus_1: [f64; D] = convert_to_f64_array(&self.vertices[i + 1]);
-            let coords_0: [f64; D] = convert_to_f64_array(&self.vertices[0]);
+            // Use implicit conversion from vertex to coordinates, then convert to f64
+            let coords_i_plus_1: [T; D] = (&self.vertices[i + 1]).into();
+            let coords_0: [T; D] = (&self.vertices[0]).into();
+            let coords_i_plus_1_f64: [f64; D] = coords_i_plus_1.map(|x| x.into());
+            let coords_0_f64: [f64; D] = coords_0.map(|x| x.into());
             b[(i, 0)] = na::distance_squared(
-                &na::Point::from(coords_i_plus_1),
-                &na::Point::from(coords_0),
+                &na::Point::from(coords_i_plus_1_f64),
+                &na::Point::from(coords_0_f64),
             );
         }
 
@@ -370,11 +370,27 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        // Convert vertex coordinates to f64 for nalgebra operations
-        let vertex_coords: [f64; D] = self.vertices[0].point.coordinates().map(|x| x.into());
+        // Use implicit conversion from vertex to coordinates, then convert to f64
+        let vertex_coords: [T; D] = (&self.vertices[0]).into();
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
         Ok(na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords),
+            &na::Point::<T, D>::from(vertex_coords_f64),
+        ))
+    }
+
+    /// Alternative method that accepts precomputed circumcenter
+    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
+    where
+        OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        // Use implicit conversion from vertex to coordinates, then convert to f64
+        let vertex_coords: [T; D] = (&self.vertices[0]).into();
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
+        Ok(na::distance(
+            &na::Point::<T, D>::from(circumcenter.coordinates()),
+            &na::Point::<T, D>::from(vertex_coords_f64),
         ))
     }
 
@@ -409,13 +425,14 @@ where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let circumradius = self.circumradius()?;
         let circumcenter = self.circumcenter()?;
-        // Convert vertex coordinates to f64 for nalgebra operations
-        let vertex_coords: [f64; D] = vertex.point.coordinates().map(|x| x.into());
+        let circumradius = self.circumradius_with_center(&circumcenter)?;
+        // Use implicit conversion from vertex to coordinates, then convert to f64
+        let vertex_coords: [T; D] = (&vertex).into();
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
         let radius = na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords),
+            &na::Point::<T, D>::from(vertex_coords_f64),
         );
 
         Ok(circumradius >= radius)
@@ -462,16 +479,20 @@ where
 
         // Populate rows with the coordinates of the vertices of the cell
         for (i, v) in self.vertices.iter().enumerate() {
+            // Use implicit conversion from vertex to coordinates
+            let vertex_coords: [T; D] = v.into();
             for j in 0..D {
-                matrix[(i, j)] = v.point.coordinates()[j].into();
+                matrix[(i, j)] = vertex_coords[j].into();
             }
             // Add a one to the last column
             matrix[(i, D)] = T::one().into();
         }
 
         // Add the vertex to the last row of the matrix
+        // Use implicit conversion from vertex to coordinates
+        let test_vertex_coords: [T; D] = (&vertex).into();
         for j in 0..D {
-            matrix[(D, j)] = vertex.point.coordinates()[j].into();
+            matrix[(D, j)] = test_vertex_coords[j].into();
         }
         matrix[(D, D)] = T::one().into();
 

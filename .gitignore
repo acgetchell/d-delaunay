@@ -6,4 +6,4 @@
 /*.html
 /coverage
 /*.profraw
-cobertura.xml
+/cobertura.xml
