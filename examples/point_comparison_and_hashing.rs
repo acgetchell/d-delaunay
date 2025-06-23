@@ -73,8 +73,14 @@ fn nan_comparison_demo() {
 
     // Standard IEEE 754 behavior for comparison
     let nan_val = f64::NAN;
-    println!("Standard IEEE 754: NaN == NaN is {}", nan_val.is_nan() && nan_val.is_nan());
-    println!("Standard IEEE 754: NaN != NaN is {}", !nan_val.is_nan() || !nan_val.is_nan());
+    println!(
+        "Standard IEEE 754: NaN == NaN is {}",
+        nan_val.is_nan() && nan_val.is_nan()
+    );
+    println!(
+        "Standard IEEE 754: NaN != NaN is {}",
+        !nan_val.is_nan() || !nan_val.is_nan()
+    );
 
     println!("\nOur Point implementation:");
 
@@ -120,8 +126,8 @@ fn nan_comparison_demo() {
 
     // Multiple ways to create NaN should be equal
     let nan1 = f64::NAN;
-    let nan2 = f64::NAN;  // Use f64::NAN instead of division
-    let nan3 = f64::NAN;  // Use f64::NAN instead of subtraction
+    let nan2 = f64::NAN; // Use f64::NAN instead of division
+    let nan3 = f64::NAN; // Use f64::NAN instead of subtraction
 
     let point_nan_variant1 = Point::new([nan1, 1.0]);
     let point_nan_variant2 = Point::new([nan2, 1.0]);

@@ -130,6 +130,7 @@ where
     /// let retrieved_point = vertex.point();
     /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
+    #[inline]
     pub fn point(&self) -> &Point<T, D> {
         &self.point
     }
@@ -156,6 +157,7 @@ where
     /// let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_ne!(vertex.uuid(), another_vertex.uuid());
     /// ```
+    #[inline]
     pub fn uuid(&self) -> Uuid {
         self.uuid
     }

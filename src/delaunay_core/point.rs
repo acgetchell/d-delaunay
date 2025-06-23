@@ -85,6 +85,7 @@ where
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
+    #[inline]
     pub fn coordinates(&self) -> [T; D] {
         self.coords
     }
