@@ -65,6 +65,7 @@ where
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
+    #[inline]
     pub fn new(coords: [T; D]) -> Self {
         Self { coords }
     }
@@ -83,6 +84,7 @@ where
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
     /// ```
+    #[inline]
     pub fn dim(&self) -> usize {
         D
     }
@@ -159,8 +161,9 @@ pub trait FiniteCheck {
     fn is_finite_generic(&self) -> bool;
 }
 
-macro_rules! impl_finite_check_for_float {
-    ($($t:ty),*) => {
+// Unified macro for implementing FiniteCheck
+macro_rules! impl_finite_check {
+    (float: $($t:ty),*) => {
         $(
             impl FiniteCheck for $t {
                 #[inline(always)]
@@ -170,12 +173,7 @@ macro_rules! impl_finite_check_for_float {
             }
         )*
     };
-}
-impl_finite_check_for_float!(f32, f64);
-
-// Integers are always finite
-macro_rules! impl_finite_check_for_int {
-    ($($t:ty),*) => {
+    (int: $($t:ty),*) => {
         $(
             impl FiniteCheck for $t {
                 #[inline(always)]
@@ -186,7 +184,9 @@ macro_rules! impl_finite_check_for_int {
         )*
     };
 }
-impl_finite_check_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+impl_finite_check!(float: f32, f64);
+impl_finite_check!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 /// Helper trait for hashing individual coordinates for non-hashable types
 /// like f32 and f64.
@@ -194,8 +194,9 @@ trait HashCoordinate {
     fn hash_coord<H: Hasher>(&self, state: &mut H);
 }
 
-macro_rules! impl_hash_coordinate_for_float {
-    ($($t:ty),*) => {
+// Unified macro for implementing HashCoordinate
+macro_rules! impl_hash_coordinate {
+    (float: $($t:ty),*) => {
         $(
             impl HashCoordinate for $t {
                 #[inline(always)]
@@ -205,26 +206,10 @@ macro_rules! impl_hash_coordinate_for_float {
             }
         )*
     };
-}
-impl_hash_coordinate_for_float!(f32, f64);
-
-impl<T, const D: usize> Hash for Point<T, D>
-where
-    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for &coord in &self.coords {
-            coord.hash_coord(state);
-        }
-    }
-}
-
-// For integer types and other types that implement Hash
-macro_rules! impl_hash_coordinate_for_integers {
-    ($($t:ty),*) => {
+    (int: $($t:ty),*) => {
         $(
             impl HashCoordinate for $t {
+                #[inline(always)]
                 fn hash_coord<H: Hasher>(&self, state: &mut H) {
                     self.hash(state);
                 }
@@ -233,7 +218,21 @@ macro_rules! impl_hash_coordinate_for_integers {
     };
 }
 
-impl_hash_coordinate_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+impl_hash_coordinate!(float: f32, f64);
+impl_hash_coordinate!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+impl<T, const D: usize> Hash for Point<T, D>
+where
+    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for &coord in &self.coords {
+            coord.hash_coord(state);
+        }
+    }
+}
 
 /// Helper trait for OrderedFloat-based equality comparison that handles NaN properly
 pub trait OrderedEq {
@@ -254,8 +253,9 @@ pub trait OrderedEq {
     fn ordered_eq(&self, other: &Self) -> bool;
 }
 
-macro_rules! impl_ordered_eq_for_float {
-    ($($t:ty),*) => {
+// Unified macro for implementing OrderedEq
+macro_rules! impl_ordered_eq {
+    (float: $($t:ty),*) => {
         $(
             impl OrderedEq for $t {
                 #[inline(always)]
@@ -265,14 +265,10 @@ macro_rules! impl_ordered_eq_for_float {
             }
         )*
     };
-}
-impl_ordered_eq_for_float!(f32, f64);
-
-// For integer types and other types that implement Eq, use regular equality
-macro_rules! impl_ordered_eq_for_integers {
-    ($($t:ty),*) => {
+    (int: $($t:ty),*) => {
         $(
             impl OrderedEq for $t {
+                #[inline(always)]
                 fn ordered_eq(&self, other: &Self) -> bool {
                     self == other
                 }
@@ -281,7 +277,8 @@ macro_rules! impl_ordered_eq_for_integers {
     };
 }
 
-impl_ordered_eq_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+impl_ordered_eq!(float: f32, f64);
+impl_ordered_eq!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 impl<T, const D: usize> PartialEq for Point<T, D>
@@ -333,6 +330,7 @@ where
     /// let point: Point<f64, 3> = Point::from(coords);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
+    #[inline]
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
         let coords_u: [U; D] = coords.map(|coord| coord.into());
@@ -355,6 +353,7 @@ where
     /// let coords: [f64; 2] = point.into();
     /// assert_eq!(coords, [1.0, 2.0]);
     /// ```
+    #[inline]
     fn from(point: Point<T, D>) -> [T; D] {
         point.coordinates()
     }
@@ -373,6 +372,7 @@ where
     /// let coords: [i32; 2] = (&point).into();
     /// assert_eq!(coords, [3, 4]);
     /// ```
+    #[inline]
     fn from(point: &Point<T, D>) -> [T; D] {
         point.coordinates()
     }
