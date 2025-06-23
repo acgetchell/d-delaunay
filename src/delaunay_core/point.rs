@@ -159,17 +159,18 @@ pub trait FiniteCheck {
     fn is_finite_generic(&self) -> bool;
 }
 
-impl FiniteCheck for f32 {
-    fn is_finite_generic(&self) -> bool {
-        // FloatCore::is_finite checks both not NaN and not infinite
-        self.is_finite()
-    }
+macro_rules! impl_finite_check_for_float {
+    ($($t:ty),*) => {
+        $(
+            impl FiniteCheck for $t {
+                fn is_finite_generic(&self) -> bool {
+                    self.is_finite()
+                }
+            }
+        )*
+    };
 }
-impl FiniteCheck for f64 {
-    fn is_finite_generic(&self) -> bool {
-        self.is_finite()
-    }
-}
+impl_finite_check_for_float!(f32, f64);
 
 // Integers are always finite
 macro_rules! impl_finite_check_for_int {
@@ -191,16 +192,18 @@ trait HashCoordinate {
     fn hash_coord<H: Hasher>(&self, state: &mut H);
 }
 
-impl HashCoordinate for f32 {
-    fn hash_coord<H: Hasher>(&self, state: &mut H) {
-        OrderedFloat(*self).hash(state);
-    }
+macro_rules! impl_hash_coordinate_for_float {
+    ($($t:ty),*) => {
+        $(
+            impl HashCoordinate for $t {
+                fn hash_coord<H: Hasher>(&self, state: &mut H) {
+                    OrderedFloat(*self).hash(state);
+                }
+            }
+        )*
+    };
 }
-impl HashCoordinate for f64 {
-    fn hash_coord<H: Hasher>(&self, state: &mut H) {
-        OrderedFloat(*self).hash(state);
-    }
-}
+impl_hash_coordinate_for_float!(f32, f64);
 
 impl<T, const D: usize> Hash for Point<T, D>
 where
@@ -248,17 +251,18 @@ pub trait OrderedEq {
     fn ordered_eq(&self, other: &Self) -> bool;
 }
 
-impl OrderedEq for f32 {
-    fn ordered_eq(&self, other: &Self) -> bool {
-        OrderedFloat(*self) == OrderedFloat(*other)
-    }
+macro_rules! impl_ordered_eq_for_float {
+    ($($t:ty),*) => {
+        $(
+            impl OrderedEq for $t {
+                fn ordered_eq(&self, other: &Self) -> bool {
+                    OrderedFloat(*self) == OrderedFloat(*other)
+                }
+            }
+        )*
+    };
 }
-
-impl OrderedEq for f64 {
-    fn ordered_eq(&self, other: &Self) -> bool {
-        OrderedFloat(*self) == OrderedFloat(*other)
-    }
-}
+impl_ordered_eq_for_float!(f32, f64);
 
 // For integer types and other types that implement Eq, use regular equality
 macro_rules! impl_ordered_eq_for_integers {
@@ -297,6 +301,7 @@ where
 {
 }
 
+/// From trait implementations for Point conversions
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
     T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
@@ -331,8 +336,8 @@ where
     }
 }
 
-/// Enable implicit conversion from Point to coordinate array
-/// This allows `point` to be implicitly converted to `[T; D]`
+/// Enable conversions from Point to coordinate arrays
+/// This allows `point` and `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -351,8 +356,6 @@ where
     }
 }
 
-/// Enable implicit conversion from Point reference to coordinate array
-/// This allows `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
