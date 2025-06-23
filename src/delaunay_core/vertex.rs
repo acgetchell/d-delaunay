@@ -186,24 +186,40 @@ where
     /// # Returns:
     ///
     /// True if the [Vertex] is valid; the [Point] is correct, the [Uuid] is
-    /// valid and unique, and the `incident_cell` contains the [Uuid] of a
+    /// valid and not nil, and the `incident_cell` contains the [Uuid] of a
     /// `Cell` that contains the [Vertex].
     ///
     /// # Example:
     ///
-    /// ```ignore
+    /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
     ///     .point(Point::new([1.0, 2.0, 3.0]))
     ///     .build()
     ///     .unwrap();
-    /// // is_valid is unimplemented and will panic at runtime
-    /// // but this example shows intended usage once implemented
-    /// // assert!(vertex.is_valid());
+    /// assert!(vertex.is_valid());
+    ///
+    /// let invalid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, f64::NAN, 3.0]))
+    ///     .build()
+    ///     .unwrap();
+    /// assert!(!invalid_vertex.is_valid());
     /// ```
-    pub fn is_valid(self) -> bool {
-        todo!("Implement is_valid for Vertex")
+    pub fn is_valid(self) -> bool
+    where
+        T: super::point::FiniteCheck + Copy,
+    {
+        // Check if the point is valid (all coordinates are finite)
+        let point_valid = self.point.is_valid();
+
+        // Check if UUID is not nil
+        let uuid_valid = !self.uuid.is_nil();
+
+        point_valid && uuid_valid
+        // TODO: Additional validation can be added here:
+        // - Validate incident_cell reference if present
+        // - Validate data if needed
     }
 }
 
@@ -944,5 +960,184 @@ mod tests {
 
         // Verify the original vertex is still available after reference conversion
         assert_eq!(vertex_ref.point().coordinates(), [4.0, 5.0, 6.0]);
+    }
+
+    #[test]
+    fn vertex_is_valid_f64() {
+        // Test valid vertex with finite coordinates
+        let valid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        assert!(valid_vertex.is_valid());
+
+        // Test valid vertex with negative coordinates
+        let valid_negative: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([-1.0, -2.0, -3.0]))
+            .build()
+            .unwrap();
+        assert!(valid_negative.is_valid());
+
+        // Test valid vertex with zero coordinates
+        let valid_zero: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        assert!(valid_zero.is_valid());
+
+        // Test invalid vertex with NaN coordinate
+        let invalid_nan: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, f64::NAN, 3.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_nan.is_valid());
+
+        // Test invalid vertex with all NaN coordinates
+        let invalid_all_nan: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([f64::NAN, f64::NAN, f64::NAN]))
+            .build()
+            .unwrap();
+        assert!(!invalid_all_nan.is_valid());
+
+        // Test invalid vertex with positive infinity
+        let invalid_pos_inf: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, f64::INFINITY, 3.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_pos_inf.is_valid());
+
+        // Test invalid vertex with negative infinity
+        let invalid_neg_inf: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, f64::NEG_INFINITY, 3.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_neg_inf.is_valid());
+
+        // Test invalid vertex with mixed NaN and infinity
+        let invalid_mixed: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([f64::NAN, f64::INFINITY, 1.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_mixed.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_f32() {
+        // Test valid f32 vertex
+        let valid_vertex: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([1.5f32, 2.5f32]))
+            .build()
+            .unwrap();
+        assert!(valid_vertex.is_valid());
+
+        // Test invalid f32 vertex with NaN
+        let invalid_nan: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([1.0f32, f32::NAN]))
+            .build()
+            .unwrap();
+        assert!(!invalid_nan.is_valid());
+
+        // Test invalid f32 vertex with infinity
+        let invalid_inf: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([f32::INFINITY, 2.0f32]))
+            .build()
+            .unwrap();
+        assert!(!invalid_inf.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_integers() {
+        // Integer vertices should always be valid
+        let valid_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1, 2, 3]))
+            .build()
+            .unwrap();
+        assert!(valid_i32.is_valid());
+
+        let valid_negative_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([-1, -2, -3]))
+            .build()
+            .unwrap();
+        assert!(valid_negative_i32.is_valid());
+
+        let valid_zero_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([0, 0, 0]))
+            .build()
+            .unwrap();
+        assert!(valid_zero_i32.is_valid());
+
+        let valid_u64: Vertex<u64, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([u64::MAX, u64::MIN]))
+            .build()
+            .unwrap();
+        assert!(valid_u64.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_different_dimensions() {
+        // Test 1D vertex
+        let valid_1d: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
+            .point(Point::new([42.0]))
+            .build()
+            .unwrap();
+        assert!(valid_1d.is_valid());
+
+        let invalid_1d: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
+            .point(Point::new([f64::NAN]))
+            .build()
+            .unwrap();
+        assert!(!invalid_1d.is_valid());
+
+        // Test 5D vertex
+        let valid_5d: Vertex<f64, Option<()>, 5> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0, 4.0, 5.0]))
+            .build()
+            .unwrap();
+        assert!(valid_5d.is_valid());
+
+        let invalid_5d: Vertex<f64, Option<()>, 5> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, f64::NAN, 4.0, 5.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_5d.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_uuid_check() {
+        // Test that vertex with valid point and UUID is valid
+        let valid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        assert!(valid_vertex.is_valid());
+        assert!(!valid_vertex.uuid().is_nil());
+
+        // Test that default vertex (which has nil UUID) is invalid
+        let default_vertex: Vertex<f64, Option<()>, 3> = Default::default();
+        assert!(!default_vertex.is_valid()); // Should be invalid due to nil UUID
+        assert!(default_vertex.uuid().is_nil());
+        assert!(default_vertex.point().is_valid()); // Point itself is valid (zeros)
+
+        // Create a vertex with valid point but manually set nil UUID to test UUID validation
+        let invalid_uuid_vertex: Vertex<f64, Option<()>, 3> = Vertex {
+            point: Point::new([1.0, 2.0, 3.0]),
+            uuid: uuid::Uuid::nil(),
+            incident_cell: None,
+            data: None,
+        };
+        assert!(!invalid_uuid_vertex.is_valid()); // Should be invalid due to nil UUID
+        assert!(invalid_uuid_vertex.point().is_valid()); // Point is valid
+        assert!(invalid_uuid_vertex.uuid().is_nil()); // UUID is nil
+
+        // Test vertex with both invalid point and nil UUID
+        let invalid_both: Vertex<f64, Option<()>, 3> = Vertex {
+            point: Point::new([f64::NAN, 2.0, 3.0]),
+            uuid: uuid::Uuid::nil(),
+            incident_cell: None,
+            data: None,
+        };
+        assert!(!invalid_both.is_valid()); // Should be invalid due to both issues
+        assert!(!invalid_both.point().is_valid()); // Point is invalid
+        assert!(invalid_both.uuid().is_nil()); // UUID is nil
     }
 }
