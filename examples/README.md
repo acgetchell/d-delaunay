@@ -1,24 +1,33 @@
 # Examples
 
-This directory contains examples demonstrating various features and capabilities of the d-delaunay library.
+This directory contains examples demonstrating various features and
+capabilities of the d-delaunay library.
 
 ## Available Examples
 
 ### 1. Point Comparison and Hashing (`point_comparison_and_hashing.rs`)
 
-Demonstrates the robust comparison and hashing behavior of the Point struct, with special emphasis on handling of NaN (Not a Number) and infinity values.
+Demonstrates the robust comparison and hashing behavior of the Point struct,
+with special emphasis on handling of NaN (Not a Number) and infinity values.
 
 **Key Features:**
-- **NaN-aware equality**: Unlike IEEE 754 standard where NaN ≠ NaN, our Point implementation treats NaN values as equal to themselves for consistent behavior in data structures.
-- **Consistent hashing**: Points with identical coordinates (including NaN) produce the same hash value, enabling reliable use in HashMap and HashSet.
-- **Mathematical properties**: Equality satisfies reflexivity, symmetry, and transitivity.
-- **Special value handling**: Proper comparison of infinity, negative infinity, and zero values.
+
+- **NaN-aware equality**: Unlike IEEE 754 standard where NaN ≠ NaN, our Point
+  implementation treats NaN values as equal to themselves for consistent
+  behavior in data structures.
+- **Consistent hashing**: Points with identical coordinates (including NaN)
+  produce the same hash value, enabling reliable use in HashMap and HashSet.
+- **Mathematical properties**: Equality satisfies reflexivity, symmetry, and
+  transitivity.
+- **Special value handling**: Proper comparison of infinity, negative infinity,
+  and zero values.
 
 **Run with:** `cargo run --example point_comparison_and_hashing`
 
 ### 2. Implicit Conversion Example (`implicit_conversion.rs`)
 
-This example summarizes the refactoring performed to enable implicit conversion of `vertex.point.coordinates()` to coordinate arrays using Rust's `From` trait.
+This example summarizes the refactoring performed to enable implicit conversion
+of `vertex.point.coordinates()` to coordinate arrays using Rust's `From` trait.
 
 ## Overview
 
@@ -142,7 +151,8 @@ The implicit conversions are fully type-safe:
 
 - **Zero runtime cost**: Conversions are handled at compile time
 - **No allocations**: Direct access to underlying coordinate arrays
-- **Inlined**: Conversion functions are trivial and will be inlined by the compiler
+- **Inlined**: Conversion functions are trivial and will be inlined by the
+  compiler
 
 ## Conclusion
 
