@@ -12,9 +12,9 @@ with special emphasis on handling of NaN (Not a Number) and infinity values.
 
 **Key Features:**
 
-- **NaN-aware equality**: Unlike IEEE 754 standard where NaN ≠ NaN, our Point
-  implementation treats NaN values as equal to themselves for consistent
-  behavior in data structures.
+- **NaN-aware equality**: Unlike the IEEE 754 standard where NaN ≠ NaN, our
+  Point implementation treats NaN values as equal to themselves for
+  consistent behavior in data structures.
 - **Consistent hashing**: Points with identical coordinates (including NaN)
   produce the same hash value, enabling reliable use in HashMap and HashSet.
 - **Mathematical properties**: Equality satisfies reflexivity, symmetry, and
@@ -119,7 +119,7 @@ let coords: [f64; 3] = (&vertex).into();
 // From owned point
 let coords: [f64; 3] = point.into();
 
-// From point reference (preserves original)  
+// From point reference (preserves original)
 let coords: [f64; 3] = (&point).into();
 ```
 
