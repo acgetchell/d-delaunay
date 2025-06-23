@@ -7,13 +7,13 @@ use thiserror::Error;
 /// Inverts a matrix.
 ///
 /// # Arguments
-///     
+///
 /// * `matrix` - A matrix to invert.
-///     
+///
 /// # Returns
-///     
+///
 /// The inverted matrix.
-///     
+///
 /// # Example
 ///
 /// ```
@@ -23,7 +23,7 @@ use thiserror::Error;
 ///
 /// let matrix = matrix(c!(1, 2, 3, 4), 2, 2, Row);
 /// let inverted_matrix = invert(&matrix);
-///     
+///
 /// assert_eq!(inverted_matrix.unwrap().data, vec![-2.0, 1.0, 1.5, -0.5]);
 /// ```
 pub fn invert(matrix: &Matrix) -> Result<Matrix, anyhow::Error> {

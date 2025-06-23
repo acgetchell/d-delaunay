@@ -1,6 +1,6 @@
 //! Utility functions
 
-use super::vertex::Vertex;
+use super::{point::OrderedEq, vertex::Vertex};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
@@ -29,9 +29,9 @@ pub fn make_uuid() -> Uuid {
 ///
 /// # Arguments:
 ///
-/// * `vertices`: A [HashMap] containing [Vertex] objects, where the key is a
+/// - `vertices`: A [HashMap] containing [Vertex] objects, where the key is a
 ///   [Uuid] and the value is a [Vertex].
-/// * `ordering`: The `ordering` parameter is of type [Ordering] and is used to
+/// - `ordering`: The `ordering` parameter is of type [Ordering] and is used to
 ///   specify whether the function should find the minimum or maximum
 ///   coordinates. [Ordering] is an enum with three possible values: `Less`,
 ///   `Equal`, and `Greater`.
@@ -64,7 +64,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize>(
     ordering: Ordering,
 ) -> [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
