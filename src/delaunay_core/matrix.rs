@@ -14,7 +14,7 @@ use thiserror::Error;
 ///
 /// The inverted matrix.
 ///
-/// # Example
+/// # Example:
 ///
 /// ```
 /// use peroxide::fuga::*;

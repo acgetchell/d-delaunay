@@ -95,7 +95,7 @@ where
     ///
     /// The `coordinates` function returns a copy of the coordinates array.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -246,7 +246,7 @@ pub trait OrderedEq {
     ///
     /// * `other` - The other value to compare with
     ///
-    /// # Returns
+    /// # Returns:
     ///
     /// Returns `true` if the values are equal according to ordered comparison,
     /// `false` otherwise.

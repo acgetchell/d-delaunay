@@ -12,7 +12,7 @@ use uuid::Uuid;
 /// a randomly generated [Uuid] (Universally Unique Identifier) using the
 /// `new_v4` method from the [Uuid] struct.
 ///
-/// # Example
+/// # Example:
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::make_uuid;
@@ -41,7 +41,7 @@ pub fn make_uuid() -> Uuid {
 /// an array of type `T` with length `D` containing the minimum or maximum
 /// coordinate for each dimension.
 ///
-/// # Example
+/// # Example:
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
@@ -103,7 +103,7 @@ where
 
 /// The function `vec_to_array` converts a [Vec] to an array of f64
 ///
-/// # Example
+/// # Example:
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::vec_to_array;

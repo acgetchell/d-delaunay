@@ -93,7 +93,7 @@ where
     ///
     /// The number of vertices in the [Cell].
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -116,7 +116,7 @@ where
     /// The `dim` function returns the dimension, which is calculated by
     /// subtracting 1 from the number of vertices in the [Cell].
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -144,7 +144,7 @@ where
     /// Returns `true` if the given [Vertex] is present in the [Cell], and
     /// `false` otherwise.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -191,7 +191,7 @@ where
     ///
     /// Returns `true` if the given [Cell] has any [Vertex] in common with the [Cell].
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -238,7 +238,7 @@ where
     ///
     /// A [Result] type containing the new [Cell] or an error message.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -331,7 +331,7 @@ where
     /// The circumcenter as a Point<f64, D> if successful, or an error if the
     /// simplex is degenerate or the matrix inversion fails.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -439,7 +439,7 @@ where
     /// Returns `true` if the given [Vertex] is contained in the circumsphere
     /// of the [Cell], and `false` otherwise.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -485,7 +485,8 @@ where
     ///
     /// Returns `true` if the given [Vertex] is contained in the circumsphere
     /// of the [Cell], and `false` otherwise.
-    /// /// # Example
+    ///
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -538,7 +539,7 @@ where
 
     /// The function `facets` returns the [Facet]s of the [Cell].
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};

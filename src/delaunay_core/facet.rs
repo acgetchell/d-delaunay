@@ -53,12 +53,12 @@ where
     /// - `cell`: The [Cell] that contains the [Facet].
     /// - `vertex`: The [Vertex] opposite to the [Facet].
     ///
-    /// # Returns
+    /// # Returns:
     ///
     /// A [Result] containing a [Facet] or an error message as to why
     /// the [Facet] could not be created.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
