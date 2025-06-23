@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialOrd, Serialize)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///
@@ -19,7 +19,7 @@ use std::hash::{Hash, Hasher};
 /// private to prevent modification after instantiation.
 pub struct Point<T, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
@@ -28,7 +28,7 @@ where
 
 impl<T, const D: usize> Point<T, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new instance of a [Point] with the given
@@ -116,7 +116,7 @@ where
     ///
     /// # Returns:
     ///
-    /// The `is_valid` function returns a boolean indicating whether the
+    /// The `is_valid()` function returns a boolean indicating whether the
     /// point is valid, meaning all coordinates are finite.
     ///
     /// # Example:
@@ -188,7 +188,7 @@ impl HashCoordinate for f64 {
 
 impl<T, const D: usize> Hash for Point<T, D>
 where
-    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd,
+    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -213,11 +213,70 @@ macro_rules! impl_hash_coordinate_for_integers {
 
 impl_hash_coordinate_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
-// Manual implementation of Eq for Point
-// This is safe because we assume our coordinates don't contain NaN values
+/// Helper trait for OrderedFloat-based equality comparison that handles NaN properly
+pub trait OrderedEq {
+    /// Compares two values for equality using ordered comparison semantics.
+    ///
+    /// This method provides a way to compare floating-point numbers that treats
+    /// NaN values as equal to themselves, which is different from the default
+    /// floating-point equality comparison where NaN != NaN.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other value to compare with
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the values are equal according to ordered comparison,
+    /// `false` otherwise.
+    fn ordered_eq(&self, other: &Self) -> bool;
+}
+
+impl OrderedEq for f32 {
+    fn ordered_eq(&self, other: &Self) -> bool {
+        OrderedFloat(*self) == OrderedFloat(*other)
+    }
+}
+
+impl OrderedEq for f64 {
+    fn ordered_eq(&self, other: &Self) -> bool {
+        OrderedFloat(*self) == OrderedFloat(*other)
+    }
+}
+
+// For integer types and other types that implement Eq, use regular equality
+macro_rules! impl_ordered_eq_for_integers {
+    ($($t:ty),*) => {
+        $(
+            impl OrderedEq for $t {
+                fn ordered_eq(&self, other: &Self) -> bool {
+                    self == other
+                }
+            }
+        )*
+    };
+}
+
+impl_ordered_eq_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+// Custom PartialEq implementation using OrderedFloat for consistent NaN handling
+impl<T, const D: usize> PartialEq for Point<T, D>
+where
+    T: Clone + Copy + Default + PartialOrd + OrderedEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.coords
+            .iter()
+            .zip(other.coords.iter())
+            .all(|(a, b)| a.ordered_eq(b))
+    }
+}
+
+// Manual implementation of Eq for Point using OrderedFloat for proper NaN handling
 impl<T, const D: usize> Eq for Point<T, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
 }
@@ -225,7 +284,7 @@ where
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
     T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
-    U: Clone + Copy + Default + PartialEq + PartialOrd,
+    U: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -260,7 +319,7 @@ where
 /// This allows `point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// # Example:
@@ -280,7 +339,7 @@ where
 /// This allows `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// # Example:
@@ -1110,5 +1169,383 @@ mod tests {
         // All coordinates must be valid for point to be valid
         let one_invalid = Point::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, f64::INFINITY]);
         assert!(!one_invalid.is_valid());
+    }
+
+    #[test]
+    fn point_nan_hash_consistency() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Test that OrderedFloat provides consistent hashing for NaN values
+        // Note: Equality comparison for NaN still follows IEEE standard (NaN != NaN)
+        // but hashing uses OrderedFloat which treats all NaN values as equivalent
+
+        let point_nan1 = Point::new([f64::NAN, 2.0]);
+        let point_nan2 = Point::new([f64::NAN, 2.0]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        point_nan1.hash(&mut hasher1);
+        point_nan2.hash(&mut hasher2);
+
+        // NaN points with same structure should hash to same value
+        assert_eq!(hasher1.finish(), hasher2.finish());
+
+        // Test with f32 NaN
+        let point_f32_nan1 = Point::new([f32::NAN, 1.0f32]);
+        let point_f32_nan2 = Point::new([f32::NAN, 1.0f32]);
+
+        let mut hasher_f32_1 = DefaultHasher::new();
+        let mut hasher_f32_2 = DefaultHasher::new();
+
+        point_f32_nan1.hash(&mut hasher_f32_1);
+        point_f32_nan2.hash(&mut hasher_f32_2);
+
+        assert_eq!(hasher_f32_1.finish(), hasher_f32_2.finish());
+    }
+
+    #[test]
+    fn point_infinity_hash_consistency() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Test that OrderedFloat provides consistent hashing for infinity values
+        let point_pos_inf1 = Point::new([f64::INFINITY, 2.0]);
+        let point_pos_inf2 = Point::new([f64::INFINITY, 2.0]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        point_pos_inf1.hash(&mut hasher1);
+        point_pos_inf2.hash(&mut hasher2);
+
+        // Same infinity points should hash to same value
+        assert_eq!(hasher1.finish(), hasher2.finish());
+
+        // Test negative infinity
+        let point_neg_inf1 = Point::new([f64::NEG_INFINITY, 2.0]);
+        let point_neg_inf2 = Point::new([f64::NEG_INFINITY, 2.0]);
+
+        let mut hasher_neg1 = DefaultHasher::new();
+        let mut hasher_neg2 = DefaultHasher::new();
+
+        point_neg_inf1.hash(&mut hasher_neg1);
+        point_neg_inf2.hash(&mut hasher_neg2);
+
+        assert_eq!(hasher_neg1.finish(), hasher_neg2.finish());
+
+        // Positive and negative infinity should hash differently
+        assert_ne!(hasher1.finish(), hasher_neg1.finish());
+    }
+
+    #[test]
+    fn point_nan_infinity_hash_consistency() {
+        use std::collections::HashMap;
+
+        // Test that points with NaN can be used as HashMap keys
+        let mut map: HashMap<Point<f64, 2>, i32> = HashMap::new();
+
+        let point_nan1 = Point::new([f64::NAN, 2.0]);
+        let point_nan2 = Point::new([f64::NAN, 2.0]); // Should be equal to point_nan1
+        let point_inf = Point::new([f64::INFINITY, 2.0]);
+
+        map.insert(point_nan1, 100);
+        map.insert(point_inf, 200);
+
+        // Should be able to retrieve using equivalent NaN point
+        assert_eq!(map.get(&point_nan2), Some(&100));
+        assert_eq!(map.len(), 2);
+
+        // Test with f32
+        let mut map_f32: HashMap<Point<f32, 1>, i32> = HashMap::new();
+
+        let point_f32_nan1 = Point::new([f32::NAN]);
+        let point_f32_nan2 = Point::new([f32::NAN]);
+
+        map_f32.insert(point_f32_nan1, 300);
+        assert_eq!(map_f32.get(&point_f32_nan2), Some(&300));
+    }
+
+    #[test]
+    fn point_nan_equality_comparison() {
+        // Test that NaN == NaN using our OrderedEq implementation
+        // This is different from IEEE 754 standard where NaN != NaN
+
+        // f64 NaN comparisons
+        let point_nan1 = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_nan2 = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_nan3 = Point::new([f64::NAN, f64::NAN, f64::NAN]);
+        let point_nan4 = Point::new([f64::NAN, f64::NAN, f64::NAN]);
+
+        // Points with NaN should be equal when all coordinates match
+        assert_eq!(point_nan1, point_nan2);
+        assert_eq!(point_nan3, point_nan4);
+
+        // Points with different NaN positions should not be equal
+        let point_nan_diff1 = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_nan_diff2 = Point::new([1.0, f64::NAN, 3.0]);
+        assert_ne!(point_nan_diff1, point_nan_diff2);
+
+        // f32 NaN comparisons
+        let point_f32_nan1 = Point::new([f32::NAN, 1.5f32]);
+        let point_f32_nan2 = Point::new([f32::NAN, 1.5f32]);
+        assert_eq!(point_f32_nan1, point_f32_nan2);
+
+        // Mixed NaN and normal values
+        let point_mixed1 = Point::new([1.0, f64::NAN, 3.0, 4.0]);
+        let point_mixed2 = Point::new([1.0, f64::NAN, 3.0, 4.0]);
+        let point_mixed3 = Point::new([1.0, f64::NAN, 3.0, 5.0]); // Different last coordinate
+
+        assert_eq!(point_mixed1, point_mixed2);
+        assert_ne!(point_mixed1, point_mixed3);
+    }
+
+    #[test]
+    fn point_nan_vs_normal_comparison() {
+        // Test that NaN points are not equal to points with normal values
+
+        let point_normal = Point::new([1.0, 2.0, 3.0]);
+        let point_nan = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_nan_all = Point::new([f64::NAN, f64::NAN, f64::NAN]);
+
+        // NaN points should not equal normal points
+        assert_ne!(point_normal, point_nan);
+        assert_ne!(point_normal, point_nan_all);
+        assert_ne!(point_nan, point_normal);
+        assert_ne!(point_nan_all, point_normal);
+
+        // Test with f32
+        let point_f32_normal = Point::new([1.0f32, 2.0f32]);
+        let point_f32_nan = Point::new([f32::NAN, 2.0f32]);
+
+        assert_ne!(point_f32_normal, point_f32_nan);
+        assert_ne!(point_f32_nan, point_f32_normal);
+    }
+
+    #[test]
+    fn point_infinity_comparison() {
+        // Test comparison behavior with infinity values
+
+        // Positive infinity comparisons
+        let point_pos_inf1 = Point::new([f64::INFINITY, 2.0]);
+        let point_pos_inf2 = Point::new([f64::INFINITY, 2.0]);
+        assert_eq!(point_pos_inf1, point_pos_inf2);
+
+        // Negative infinity comparisons
+        let point_neg_inf1 = Point::new([f64::NEG_INFINITY, 2.0]);
+        let point_neg_inf2 = Point::new([f64::NEG_INFINITY, 2.0]);
+        assert_eq!(point_neg_inf1, point_neg_inf2);
+
+        // Positive vs negative infinity should not be equal
+        assert_ne!(point_pos_inf1, point_neg_inf1);
+
+        // Infinity vs normal values should not be equal
+        let point_normal = Point::new([1.0, 2.0]);
+        assert_ne!(point_pos_inf1, point_normal);
+        assert_ne!(point_neg_inf1, point_normal);
+
+        // Test with f32
+        let point_f32_pos_inf1 = Point::new([f32::INFINITY]);
+        let point_f32_pos_inf2 = Point::new([f32::INFINITY]);
+        let point_f32_neg_inf = Point::new([f32::NEG_INFINITY]);
+
+        assert_eq!(point_f32_pos_inf1, point_f32_pos_inf2);
+        assert_ne!(point_f32_pos_inf1, point_f32_neg_inf);
+    }
+
+    #[test]
+    fn point_nan_infinity_mixed_comparison() {
+        // Test comparisons with mixed NaN and infinity values
+
+        let point_nan_inf1 = Point::new([f64::NAN, f64::INFINITY, 1.0]);
+        let point_nan_inf2 = Point::new([f64::NAN, f64::INFINITY, 1.0]);
+        let point_nan_inf3 = Point::new([f64::NAN, f64::NEG_INFINITY, 1.0]);
+
+        // Same NaN/infinity pattern should be equal
+        assert_eq!(point_nan_inf1, point_nan_inf2);
+
+        // Different infinity signs should not be equal
+        assert_ne!(point_nan_inf1, point_nan_inf3);
+
+        // Test various combinations
+        let point_all_special = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::NAN]);
+        let point_all_special_copy =
+            Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::NAN]);
+        let point_all_special_diff =
+            Point::new([f64::NAN, f64::NEG_INFINITY, f64::INFINITY, f64::NAN]);
+
+        assert_eq!(point_all_special, point_all_special_copy);
+        assert_ne!(point_all_special, point_all_special_diff);
+    }
+
+    #[test]
+    fn point_nan_reflexivity() {
+        // Test that NaN points are equal to themselves (reflexivity)
+
+        let point_nan = Point::new([f64::NAN, f64::NAN, f64::NAN]);
+        assert_eq!(point_nan, point_nan);
+
+        let point_mixed = Point::new([1.0, f64::NAN, 3.0, f64::INFINITY]);
+        assert_eq!(point_mixed, point_mixed);
+
+        // Test with f32
+        let point_f32_nan = Point::new([f32::NAN, f32::NAN]);
+        assert_eq!(point_f32_nan, point_f32_nan);
+    }
+
+    #[test]
+    fn point_nan_symmetry() {
+        // Test that NaN equality is symmetric (if a == b, then b == a)
+
+        let point_a = Point::new([f64::NAN, 2.0, f64::INFINITY]);
+        let point_b = Point::new([f64::NAN, 2.0, f64::INFINITY]);
+
+        assert_eq!(point_a, point_b);
+        assert_eq!(point_b, point_a); // Should be symmetric
+
+        // Test with f32
+        let point_f32_a = Point::new([f32::NAN, 1.0f32, f32::NEG_INFINITY]);
+        let point_f32_b = Point::new([f32::NAN, 1.0f32, f32::NEG_INFINITY]);
+
+        assert_eq!(point_f32_a, point_f32_b);
+        assert_eq!(point_f32_b, point_f32_a);
+    }
+
+    #[test]
+    fn point_nan_transitivity() {
+        // Test that NaN equality is transitive (if a == b and b == c, then a == c)
+
+        let point_a = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_b = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_c = Point::new([f64::NAN, 2.0, 3.0]);
+
+        assert_eq!(point_a, point_b);
+        assert_eq!(point_b, point_c);
+        assert_eq!(point_a, point_c); // Should be transitive
+
+        // Test with complex special values
+        let point_complex_a = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0]);
+        let point_complex_b = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0]);
+        let point_complex_c = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0]);
+
+        assert_eq!(point_complex_a, point_complex_b);
+        assert_eq!(point_complex_b, point_complex_c);
+        assert_eq!(point_complex_a, point_complex_c);
+    }
+
+    #[test]
+    fn point_nan_different_bit_patterns() {
+        // Test that different NaN bit patterns are considered equal
+        // Note: Rust's f64::NAN is a specific bit pattern, but there are many possible NaN values
+
+        // Create different NaN values
+        let nan1 = f64::NAN;
+        let nan2 = 0.0f64 / 0.0f64; // Another way to create NaN
+        let nan3 = f64::INFINITY - f64::INFINITY; // Yet another way
+
+        // Verify they are all NaN
+        assert!(nan1.is_nan());
+        assert!(nan2.is_nan());
+        assert!(nan3.is_nan());
+
+        // Points with different NaN bit patterns should be equal
+        let point1 = Point::new([nan1, 1.0]);
+        let point2 = Point::new([nan2, 1.0]);
+        let point3 = Point::new([nan3, 1.0]);
+
+        assert_eq!(point1, point2);
+        assert_eq!(point2, point3);
+        assert_eq!(point1, point3);
+
+        // Test with f32 as well
+        let f32_nan1 = f32::NAN;
+        let f32_nan2 = 0.0f32 / 0.0f32;
+
+        let point_f32_1 = Point::new([f32_nan1]);
+        let point_f32_2 = Point::new([f32_nan2]);
+
+        assert_eq!(point_f32_1, point_f32_2);
+    }
+
+    #[test]
+    fn point_nan_in_different_dimensions() {
+        // Test NaN behavior across different dimensionalities
+
+        // 1D
+        let point_1d_a = Point::new([f64::NAN]);
+        let point_1d_b = Point::new([f64::NAN]);
+        assert_eq!(point_1d_a, point_1d_b);
+
+        // 2D
+        let point_2d_a = Point::new([f64::NAN, f64::NAN]);
+        let point_2d_b = Point::new([f64::NAN, f64::NAN]);
+        assert_eq!(point_2d_a, point_2d_b);
+
+        // 3D
+        let point_3d_a = Point::new([f64::NAN, 1.0, f64::NAN]);
+        let point_3d_b = Point::new([f64::NAN, 1.0, f64::NAN]);
+        assert_eq!(point_3d_a, point_3d_b);
+
+        // 5D
+        let point_5d_a = Point::new([f64::NAN, 1.0, f64::NAN, f64::INFINITY, f64::NAN]);
+        let point_5d_b = Point::new([f64::NAN, 1.0, f64::NAN, f64::INFINITY, f64::NAN]);
+        assert_eq!(point_5d_a, point_5d_b);
+
+        // 10D with mixed special values
+        let point_10d_a = Point::new([
+            f64::NAN,
+            1.0,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            0.0,
+            -0.0,
+            f64::NAN,
+            42.0,
+            f64::NAN,
+        ]);
+        let point_10d_b = Point::new([
+            f64::NAN,
+            1.0,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            0.0,
+            -0.0,
+            f64::NAN,
+            42.0,
+            f64::NAN,
+        ]);
+        assert_eq!(point_10d_a, point_10d_b);
+    }
+
+    #[test]
+    fn point_nan_zero_comparison() {
+        // Test comparison between NaN, positive zero, and negative zero
+
+        let point_nan = Point::new([f64::NAN, f64::NAN]);
+        let point_pos_zero = Point::new([0.0, 0.0]);
+        let point_neg_zero = Point::new([-0.0, -0.0]);
+        let point_mixed_zero = Point::new([0.0, -0.0]);
+
+        // NaN should not equal any zero
+        assert_ne!(point_nan, point_pos_zero);
+        assert_ne!(point_nan, point_neg_zero);
+        assert_ne!(point_nan, point_mixed_zero);
+
+        // Different zeros should be equal (0.0 == -0.0 in IEEE 754)
+        assert_eq!(point_pos_zero, point_neg_zero);
+        assert_eq!(point_pos_zero, point_mixed_zero);
+        assert_eq!(point_neg_zero, point_mixed_zero);
+
+        // Test with f32
+        let point_f32_nan = Point::new([f32::NAN]);
+        let point_f32_zero = Point::new([0.0f32]);
+        let point_f32_neg_zero = Point::new([-0.0f32]);
+
+        assert_ne!(point_f32_nan, point_f32_zero);
+        assert_ne!(point_f32_nan, point_f32_neg_zero);
+        assert_eq!(point_f32_zero, point_f32_neg_zero);
     }
 }

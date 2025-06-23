@@ -1,6 +1,6 @@
 //! Utility functions
 
-use super::vertex::Vertex;
+use super::{point::OrderedEq, vertex::Vertex};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
@@ -64,7 +64,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize>(
     ordering: Ordering,
 ) -> [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {

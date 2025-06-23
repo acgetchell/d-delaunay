@@ -6,7 +6,7 @@
 use super::{
     cell::{Cell, CellBuilder},
     facet::Facet,
-    point::Point,
+    point::{OrderedEq, Point},
     utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
@@ -26,7 +26,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -50,7 +50,7 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -128,7 +128,7 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -158,7 +158,8 @@ where
         + PartialEq
         + PartialOrd
         + SubAssign<f64>
-        + Sum,
+        + Sum
+        + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -742,7 +743,7 @@ pub fn validate_neighbors<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -814,7 +815,7 @@ pub fn validate_unique_cells<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + Into<f64>, // for pretty printing
+    T: Clone + Copy + Default + PartialEq + PartialOrd + Into<f64> + OrderedEq, // for pretty printing
     U: Clone + Copy + Eq + Hash + Ord,
     V: Clone + Copy + Eq + Hash + Ord,
     [T; D]: Copy + Default + DeserializeOwned + Serialize,

@@ -3,7 +3,7 @@
 use super::{
     facet::Facet,
     matrix::invert,
-    point::Point,
+    point::{OrderedEq, Point},
     utilities::{make_uuid, vec_to_array},
     vertex::Vertex,
 };
@@ -36,7 +36,7 @@ use uuid::Uuid;
 ///   the data must implement [Eq], [Hash], [Ord], [PartialEq], and [PartialOrd].
 pub struct Cell<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -56,7 +56,7 @@ where
 
 impl<T, U, V, const D: usize> CellBuilder<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -82,7 +82,7 @@ where
 // Basic implementation block for simpler methods that don't require ComplexField
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -214,7 +214,14 @@ where
 // Advanced implementation block for methods that require ComplexField
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone + ComplexField<RealField = T> + Copy + Default + PartialEq + PartialOrd + Sum,
+    T: Clone
+        + ComplexField<RealField = T>
+        + Copy
+        + Default
+        + PartialEq
+        + PartialOrd
+        + OrderedEq
+        + Sum,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -559,7 +566,7 @@ where
 /// Equality of cells is based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -577,7 +584,7 @@ where
 /// Eq implementation for Cell based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -587,7 +594,7 @@ where
 /// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -605,7 +612,7 @@ where
 /// Custom Hash implementation for Cell
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
