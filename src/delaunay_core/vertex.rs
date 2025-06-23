@@ -65,6 +65,17 @@ where
     /// is the type of the coordinates of the [Vertex], `U` is the type of the
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let points = vec![Point::new([1.0, 2.0, 3.0])];
+    /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points.clone());
+    /// assert_eq!(vertices.len(), 1);
+    /// assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
+    /// ```
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
         points
             .into_iter()
@@ -82,19 +93,31 @@ where
     /// # Returns:
     ///
     /// The function `into_hashmap` returns a [HashMap] with the key type
-    /// [Uuid] and the value type [Vertex], i.e.
-    /// `std::collections::HashMap<Uuid, Vertex<T, U, D>`.
+    /// [Uuid] and the value type [Vertex], i.e. `std::collections::HashMap<Uuid, Vertex<T, U, D>>`.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
+    /// let vertices = Vertex::<f64, Option<()>, 2>::from_points(points.clone());
+    /// let map: HashMap<_, _> = Vertex::into_hashmap(vertices);
+    /// assert_eq!(map.len(), 2);
+    /// assert!(map.values().all(|v| v.dim() == 2));
+    /// ```
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
         vertices.into_iter().map(|v| (v.uuid(), v)).collect()
     }
 
     /// Returns the point coordinates of the vertex.
     ///
-    /// # Returns
+    /// # Returns:
     ///
     /// A reference to the Point representing the vertex's coordinates.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -110,11 +133,11 @@ where
 
     /// Returns the UUID of the vertex.
     ///
-    /// # Returns
+    /// # Returns:
     ///
     /// The Uuid uniquely identifying this vertex.
     ///
-    /// # Example
+    /// # Example:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -160,6 +183,20 @@ where
     /// True if the [Vertex] is valid; the [Point] is correct, the [Uuid] is
     /// valid and unique, and the `incident_cell` contains the [Uuid] of a
     /// `Cell` that contains the [Vertex].
+    ///
+    /// # Example:
+    ///
+    /// ```ignore
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, 2.0, 3.0]))
+    ///     .build()
+    ///     .unwrap();
+    /// // is_valid is unimplemented and will panic at runtime
+    /// // but this example shows intended usage once implemented
+    /// // assert!(vertex.is_valid());
+    /// ```
     pub fn is_valid(self) -> bool {
         todo!("Implement is_valid for Vertex")
     }

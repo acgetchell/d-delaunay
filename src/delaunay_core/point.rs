@@ -15,8 +15,8 @@ use std::hash::{Hash, Hasher};
 ///   which means it can be any type. The length `D` is a constant unsigned
 ///   integer known at compile time.
 ///
-/// Points are intended to be immutable once created, so the `coords` field is private to prevent
-/// modification after instantiation.
+/// Points are intended to be immutable once created, so the `coords` field is
+/// private to prevent modification after instantiation.
 pub struct Point<T, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
@@ -24,20 +24,6 @@ where
 {
     /// The coordinates of the point.
     coords: [T; D],
-}
-
-impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
-where
-    T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
-    U: Clone + Copy + Default + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn from(coords: [T; D]) -> Self {
-        // Convert the `coords` array to `[U; D]`
-        let coords_u: [U; D] = coords.map(|coord| coord.into());
-        Self { coords: coords_u }
-    }
 }
 
 impl<T, const D: usize> Point<T, D>
@@ -57,9 +43,9 @@ where
     ///
     /// The `new` function returns an instance of the [Point].
     ///
-    /// # Example
+    /// # Example:
     ///
-    /// ```
+    /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
@@ -75,9 +61,9 @@ where
     /// The `dim` function returns the value of `D`, which the number of
     /// coordinates.
     ///
-    /// # Example
+    /// # Example:
     ///
-    /// ```
+    /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
@@ -94,7 +80,7 @@ where
     ///
     /// # Example
     ///
-    /// ```
+    /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
@@ -110,8 +96,9 @@ where
     /// The `origin()` function returns a D-dimensional origin point
     /// in Cartesian coordinates.
     ///
-    /// # Example
-    /// ```
+    /// # Example:
+    ///
+    /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
@@ -122,55 +109,152 @@ where
     {
         Self::new([T::zero(); D])
     }
+
+    /// Check if all coordinates are finite (no NaN or infinite values).
+    /// The Rust type system guarantees that the number of coordinates
+    /// matches the dimensionality `D`.
+    ///
+    /// # Returns:
+    ///
+    /// The `is_valid` function returns a boolean indicating whether the
+    /// point is valid, meaning all coordinates are finite.
+    ///
+    /// # Example:
+    ///
+    /// ```rust
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// assert!(point.is_valid());
+    /// let invalid_point = Point::new([1.0, f64::NAN, 3.0]);
+    /// assert!(!invalid_point.is_valid());
+    /// ```
+    pub fn is_valid(&self) -> bool
+    where
+        T: FiniteCheck + Copy,
+    {
+        // Verify all coordinates are finite
+        self.coords.iter().all(|&coord| coord.is_finite_generic())
+    }
 }
 
-// Generic Eq implementation for Point types that implement Hash
-// This covers all the specific Hash implementations we have above
+/// Helper trait for checking finiteness of coordinates.
+pub trait FiniteCheck {
+    /// Returns true if the value is finite (not NaN or infinite).
+    fn is_finite_generic(&self) -> bool;
+}
+
+impl FiniteCheck for f32 {
+    fn is_finite_generic(&self) -> bool {
+        // FloatCore::is_finite checks both not NaN and not infinite
+        self.is_finite()
+    }
+}
+impl FiniteCheck for f64 {
+    fn is_finite_generic(&self) -> bool {
+        self.is_finite()
+    }
+}
+
+// Integers are always finite
+macro_rules! impl_finite_check_for_int {
+    ($($t:ty),*) => {
+        $(
+            impl FiniteCheck for $t {
+                fn is_finite_generic(&self) -> bool {
+                    true
+                }
+            }
+        )*
+    };
+}
+impl_finite_check_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+/// Helper trait for hashing individual coordinates for non-hashable types
+/// like f32 and f64.
+trait HashCoordinate {
+    fn hash_coord<H: Hasher>(&self, state: &mut H);
+}
+
+impl HashCoordinate for f32 {
+    fn hash_coord<H: Hasher>(&self, state: &mut H) {
+        OrderedFloat(*self).hash(state);
+    }
+}
+impl HashCoordinate for f64 {
+    fn hash_coord<H: Hasher>(&self, state: &mut H) {
+        OrderedFloat(*self).hash(state);
+    }
+}
+
+impl<T, const D: usize> Hash for Point<T, D>
+where
+    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for &coord in &self.coords {
+            coord.hash_coord(state);
+        }
+    }
+}
+
+// For integer types and other types that implement Hash
+macro_rules! impl_hash_coordinate_for_integers {
+    ($($t:ty),*) => {
+        $(
+            impl HashCoordinate for $t {
+                fn hash_coord<H: Hasher>(&self, state: &mut H) {
+                    self.hash(state);
+                }
+            }
+        )*
+    };
+}
+
+impl_hash_coordinate_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+// Manual implementation of Eq for Point
+// This is safe because we assume our coordinates don't contain NaN values
 impl<T, const D: usize> Eq for Point<T, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Hash,
 {
 }
 
-// Floating-point Hash implementations using OrderedFloat
-macro_rules! impl_point_hash_for_float {
-    ($($t:ty),*) => {
-        $(
-            impl<const D: usize> Hash for Point<$t, D>
-            where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
-            {
-                fn hash<H: Hasher>(&self, state: &mut H) {
-                    for &val in &self.coordinates() {
-                        OrderedFloat(val).hash(state);
-                    }
-                }
-            }
-        )*
-    };
+impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
+where
+    T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
+    U: Clone + Copy + Default + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    /// Create a new [Point] from an array of coordinates of type `T`.
+    ///
+    /// # Arguments:
+    ///
+    /// * `coords`: An array of type `T` with a length of `D`, representing the
+    ///   coordinates of the point.
+    ///
+    /// # Returns:
+    ///
+    /// The function returns a new instance of the [Point] struct with the
+    /// coordinates converted to type `U`.
+    ///
+    /// # Example:
+    ///
+    /// ```rust
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let coords = [1, 2, 3];
+    /// let point: Point<f64, 3> = Point::from(coords);
+    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
+    /// ```
+    fn from(coords: [T; D]) -> Self {
+        // Convert the `coords` array to `[U; D]`
+        let coords_u: [U; D] = coords.map(|coord| coord.into());
+        Self { coords: coords_u }
+    }
 }
-
-impl_point_hash_for_float!(f64, f32);
-
-// Integer Hash implementations
-macro_rules! impl_point_hash_for_int {
-    ($($t:ty),*) => {
-        $(
-            impl<const D: usize> Hash for Point<$t, D>
-            where [$t; D]: Copy + Default + DeserializeOwned + Serialize + Sized
-            {
-                fn hash<H: Hasher>(&self, state: &mut H) {
-                    for &val in &self.coordinates() {
-                        val.hash(state);
-                    }
-                }
-            }
-        )*
-    };
-}
-
-impl_point_hash_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 /// Enable implicit conversion from Point to coordinate array
 /// This allows `point` to be implicitly converted to `[T; D]`
@@ -179,6 +263,14 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// # Example:
+    ///
+    /// ```rust
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0]);
+    /// let coords: [f64; 2] = point.into();
+    /// assert_eq!(coords, [1.0, 2.0]);
+    /// ```
     fn from(point: Point<T, D>) -> [T; D] {
         point.coordinates()
     }
@@ -191,6 +283,14 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// # Example:
+    ///
+    /// ```rust
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([3, 4]);
+    /// let coords: [i32; 2] = (&point).into();
+    /// assert_eq!(coords, [3, 4]);
+    /// ```
     fn from(point: &Point<T, D>) -> [T; D] {
         point.coordinates()
     }
@@ -442,13 +542,14 @@ mod tests {
         assert_eq!(point_f64.coordinates(), [10000.0f64, 20000.0f64]);
 
         // Test with very small values
-        // When converting from f32 to f64, there can be small precision differences
-        // due to how floating point numbers are represented in memory.
-        // Use approximate comparison for these small values.
+        // When converting from f32 to f64, there can be small precision
+        // differences due to how floating point numbers are represented in
+        // memory. Use approximate comparison for these small values.
         let coords_small_f32 = [0.000001f32, 0.000002f32];
         let point_f64: Point<f64, 2> = Point::from(coords_small_f32);
 
-        // Use relative comparison with appropriate epsilon for small floating point values
+        // Use relative comparison with appropriate epsilon for small floating
+        // point values
         let expected = [0.000001f64, 0.000002f64];
         for (&actual, &expected) in point_f64.coordinates().iter().zip(expected.iter()) {
             assert_relative_eq!(actual, expected, epsilon = 1e-6, max_relative = 1e-6);
@@ -827,5 +928,187 @@ mod tests {
 
         // Verify the original point is still available after reference conversion
         assert_eq!(point_ref.coordinates(), [4.0, 5.0, 6.0]);
+    }
+
+    #[test]
+    fn point_is_valid_f64() {
+        // Test valid f64 points
+        let valid_point = Point::new([1.0, 2.0, 3.0]);
+        assert!(valid_point.is_valid());
+
+        let valid_negative = Point::new([-1.0, -2.0, -3.0]);
+        assert!(valid_negative.is_valid());
+
+        let valid_zero = Point::new([0.0, 0.0, 0.0]);
+        assert!(valid_zero.is_valid());
+
+        let valid_mixed = Point::new([1.0, -2.5, 0.0, 42.7]);
+        assert!(valid_mixed.is_valid());
+
+        // Test invalid f64 points with NaN
+        let invalid_nan_single = Point::new([1.0, f64::NAN, 3.0]);
+        assert!(!invalid_nan_single.is_valid());
+
+        let invalid_nan_all = Point::new([f64::NAN, f64::NAN, f64::NAN]);
+        assert!(!invalid_nan_all.is_valid());
+
+        let invalid_nan_first = Point::new([f64::NAN, 2.0, 3.0]);
+        assert!(!invalid_nan_first.is_valid());
+
+        let invalid_nan_last = Point::new([1.0, 2.0, f64::NAN]);
+        assert!(!invalid_nan_last.is_valid());
+
+        // Test invalid f64 points with infinity
+        let invalid_pos_inf = Point::new([1.0, f64::INFINITY, 3.0]);
+        assert!(!invalid_pos_inf.is_valid());
+
+        let invalid_neg_inf = Point::new([1.0, f64::NEG_INFINITY, 3.0]);
+        assert!(!invalid_neg_inf.is_valid());
+
+        let invalid_both_inf = Point::new([f64::INFINITY, f64::NEG_INFINITY]);
+        assert!(!invalid_both_inf.is_valid());
+
+        // Test mixed invalid cases
+        let invalid_nan_and_inf = Point::new([f64::NAN, f64::INFINITY, 1.0]);
+        assert!(!invalid_nan_and_inf.is_valid());
+    }
+
+    #[test]
+    fn point_is_valid_f32() {
+        // Test valid f32 points
+        let valid_point = Point::new([1.0f32, 2.0f32, 3.0f32]);
+        assert!(valid_point.is_valid());
+
+        let valid_negative = Point::new([-1.5f32, -2.5f32]);
+        assert!(valid_negative.is_valid());
+
+        let valid_zero = Point::new([0.0f32]);
+        assert!(valid_zero.is_valid());
+
+        // Test invalid f32 points with NaN
+        let invalid_nan = Point::new([1.0f32, f32::NAN]);
+        assert!(!invalid_nan.is_valid());
+
+        let invalid_all_nan = Point::new([f32::NAN, f32::NAN, f32::NAN, f32::NAN]);
+        assert!(!invalid_all_nan.is_valid());
+
+        // Test invalid f32 points with infinity
+        let invalid_pos_inf = Point::new([f32::INFINITY, 2.0f32]);
+        assert!(!invalid_pos_inf.is_valid());
+
+        let invalid_neg_inf = Point::new([1.0f32, f32::NEG_INFINITY]);
+        assert!(!invalid_neg_inf.is_valid());
+
+        // Test edge cases with very small and large values (but finite)
+        let valid_small = Point::new([f32::MIN_POSITIVE, -f32::MIN_POSITIVE]);
+        assert!(valid_small.is_valid());
+
+        let valid_large = Point::new([f32::MAX, -f32::MAX]);
+        assert!(valid_large.is_valid());
+    }
+
+    #[test]
+    fn point_is_valid_integers() {
+        // All integer types should always be valid (no NaN or infinity)
+        let valid_i32 = Point::new([1i32, 2i32, 3i32]);
+        assert!(valid_i32.is_valid());
+
+        let valid_negative_i32 = Point::new([-1i32, -2i32, -3i32]);
+        assert!(valid_negative_i32.is_valid());
+
+        let valid_zero_i32 = Point::new([0i32, 0i32]);
+        assert!(valid_zero_i32.is_valid());
+
+        let valid_u64 = Point::new([u64::MAX, u64::MIN, 42u64]);
+        assert!(valid_u64.is_valid());
+
+        let valid_i8 = Point::new([i8::MAX, i8::MIN, 0i8, -1i8]);
+        assert!(valid_i8.is_valid());
+
+        let valid_isize = Point::new([isize::MAX, isize::MIN]);
+        assert!(valid_isize.is_valid());
+
+        // Test with various integer types
+        let valid_u8 = Point::new([255u8, 0u8, 128u8]);
+        assert!(valid_u8.is_valid());
+
+        let valid_i16 = Point::new([32767i16, -32768i16, 0i16]);
+        assert!(valid_i16.is_valid());
+
+        let valid_u32 = Point::new([u32::MAX, 0u32, 42u32]);
+        assert!(valid_u32.is_valid());
+    }
+
+    #[test]
+    fn point_is_valid_different_dimensions() {
+        // Test 1D points
+        let valid_1d_f64 = Point::new([42.0]);
+        assert!(valid_1d_f64.is_valid());
+
+        let invalid_1d_nan = Point::new([f64::NAN]);
+        assert!(!invalid_1d_nan.is_valid());
+
+        let valid_1d_int = Point::new([42i32]);
+        assert!(valid_1d_int.is_valid());
+
+        // Test 2D points
+        let valid_2d = Point::new([1.0, 2.0]);
+        assert!(valid_2d.is_valid());
+
+        let invalid_2d = Point::new([1.0, f64::INFINITY]);
+        assert!(!invalid_2d.is_valid());
+
+        // Test higher dimensional points
+        let valid_5d = Point::new([1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert!(valid_5d.is_valid());
+
+        let invalid_5d = Point::new([1.0, 2.0, f64::NAN, 4.0, 5.0]);
+        assert!(!invalid_5d.is_valid());
+
+        // Test 10D point
+        let valid_10d = Point::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]);
+        assert!(valid_10d.is_valid());
+
+        let invalid_10d = Point::new([
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            f64::NEG_INFINITY,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+        ]);
+        assert!(!invalid_10d.is_valid());
+    }
+
+    #[test]
+    fn point_is_valid_edge_cases() {
+        // Test with very small finite values
+        let tiny_valid = Point::new([f64::MIN_POSITIVE, -f64::MIN_POSITIVE, 0.0]);
+        assert!(tiny_valid.is_valid());
+
+        // Test with very large finite values
+        let large_valid = Point::new([f64::MAX, -f64::MAX]);
+        assert!(large_valid.is_valid());
+
+        // Test subnormal numbers (should be valid)
+        let subnormal = f64::MIN_POSITIVE / 2.0;
+        let subnormal_point = Point::new([subnormal, -subnormal]);
+        assert!(subnormal_point.is_valid());
+
+        // Test zero and negative zero
+        let zero_point = Point::new([0.0, -0.0]);
+        assert!(zero_point.is_valid());
+
+        // Mixed valid and invalid in same point should be invalid
+        let mixed_invalid = Point::new([1.0, 2.0, 3.0, f64::NAN, 5.0]);
+        assert!(!mixed_invalid.is_valid());
+
+        // All coordinates must be valid for point to be valid
+        let one_invalid = Point::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, f64::INFINITY]);
+        assert!(!one_invalid.is_valid());
     }
 }
