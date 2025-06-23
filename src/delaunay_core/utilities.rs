@@ -29,9 +29,9 @@ pub fn make_uuid() -> Uuid {
 ///
 /// # Arguments:
 ///
-/// * `vertices`: A [HashMap] containing [Vertex] objects, where the key is a
+/// - `vertices`: A [HashMap] containing [Vertex] objects, where the key is a
 ///   [Uuid] and the value is a [Vertex].
-/// * `ordering`: The `ordering` parameter is of type [Ordering] and is used to
+/// - `ordering`: The `ordering` parameter is of type [Ordering] and is used to
 ///   specify whether the function should find the minimum or maximum
 ///   coordinates. [Ordering] is an enum with three possible values: `Less`,
 ///   `Equal`, and `Greater`.

@@ -104,10 +104,10 @@ where
 ///
 /// # Properties:
 ///
-/// * `vertices`: A [HashMap] that stores vertices with their corresponding
+/// - `vertices`: A [HashMap] that stores vertices with their corresponding
 ///   [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
 ///   U, and a constant D representing the dimension.
-/// * `cells`: The `cells` property is a [HashMap] that stores [Cell] objects.
+/// - `cells`: The `cells` property is a [HashMap] that stores [Cell] objects.
 ///   Each [Cell] has one or more [Vertex] objects with cell data of type V.
 ///   Note the dimensionality of the cell may differ from D, though the [Tds]
 ///   only stores cells of maximal dimensionality D and infers other lower
@@ -115,12 +115,12 @@ where
 ///
 /// For example, in 3 dimensions:
 ///
-/// * A 0-dimensional cell is a [Vertex].
-/// * A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
+/// - A 0-dimensional cell is a [Vertex].
+/// - A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
 ///   [Vertex] endpoints.
-/// * A 2-dimensional cell is a [Facet] given by the `Tetrahedron` and the
+/// - A 2-dimensional cell is a [Facet] given by the `Tetrahedron` and the
 ///   opposite [Vertex].
-/// * A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
+/// - A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
 ///
 /// A similar pattern holds for higher dimensions.
 ///
@@ -805,8 +805,8 @@ where
 }
 
 /// Helper that verifies every cell
-///   * has exactly `D+1` vertices (a D‑simplex), **and**
-///   * no two cells share the exact same sorted set of vertex UUIDs.
+///   - has exactly `D+1` vertices (a D‑simplex), **and**
+///   - no two cells share the exact same sorted set of vertex UUIDs.
 ///
 /// It also prints a human‑friendly summary of each cell’s vertices.
 ///

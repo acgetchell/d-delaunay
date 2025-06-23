@@ -22,16 +22,16 @@ use uuid::Uuid;
 ///
 /// # Properties:
 ///
-/// * `vertices`: A container of vertices. Each [Vertex] has a type T, optional
+/// - `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 ///   data U, and a constant D representing the number of dimensions.
-/// * `uuid`: The `uuid` property is of type [Uuid] and represents a
+/// - `uuid`: The `uuid` property is of type [Uuid] and represents a
 ///   universally unique identifier for a [Cell] in order to identify
 ///   each instance.
-/// * `neighbors`: The `neighbors` property is an optional container of [Uuid]
+/// - `neighbors`: The `neighbors` property is an optional container of [Uuid]
 ///   values. It represents the [Uuid]s of the neighboring cells that are connected
 ///   to the current [Cell], indexed such that the `i-th` neighbor is opposite the
 ///   `i-th`` [Vertex].
-/// * `data`: The `data` property is an optional field that can hold a value of
+/// - `data`: The `data` property is an optional field that can hold a value of
 ///   type `V`. It allows storage of additional data associated with the [Cell];
 ///   the data must implement [Eq], [Hash], [Ord], [PartialEq], and [PartialOrd].
 pub struct Cell<T, U, V, const D: usize>
@@ -231,8 +231,8 @@ where
     ///
     /// # Arguments:
     ///
-    /// * `facet`: The [Facet] to be used to create the [Cell].
-    /// * `vertex`: The [Vertex] to be added to the [Cell].
+    /// - `facet`: The [Facet] to be used to create the [Cell].
+    /// - `vertex`: The [Vertex] to be added to the [Cell].
     ///
     /// # Returns:
     ///

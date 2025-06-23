@@ -1,4 +1,19 @@
 //! Data and operations on d-dimensional points.
+//!
+//! # Special Floating-Point Equality Semantics
+//!
+//! This module implements custom equality semantics for floating-point coordinates
+//! that differ from the IEEE 754 standard. Specifically, `NaN` values are treated
+//! as equal to themselves to satisfy the requirements of the `Eq` trait and enable
+//! Points to be used as keys in hash-based collections.
+//!
+//! This means that for Points containing floating-point coordinates:
+//! - `Point::new([f64::NAN]) == Point::new([f64::NAN])` returns `true`
+//! - Points with NaN values can be used as HashMap keys
+//! - All NaN bit patterns are considered equal
+//!
+//! If you need standard IEEE 754 equality semantics, compare the coordinates
+//! directly instead of using Point equality.
 
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

@@ -18,8 +18,8 @@ use thiserror::Error;
 ///
 /// # Properties
 ///
-/// * `cell` - The [Cell] that contains this facet.
-/// * `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].
+/// - `cell` - The [Cell] that contains this facet.
+/// - `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].
 ///
 /// Note that `D` is the dimensionality of the [Cell] and [Vertex];
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
@@ -50,8 +50,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `cell`: The [Cell] that contains the [Facet].
-    /// * `vertex`: The [Vertex] opposite to the [Facet].
+    /// - `cell`: The [Cell] that contains the [Facet].
+    /// - `vertex`: The [Vertex] opposite to the [Facet].
     ///
     /// # Returns
     ///
