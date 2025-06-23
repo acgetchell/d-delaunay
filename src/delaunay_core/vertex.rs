@@ -1,6 +1,9 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
-use super::{point::Point, utilities::make_uuid};
+use super::{
+    point::{OrderedEq, Point},
+    utilities::make_uuid,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
@@ -12,15 +15,15 @@ use uuid::Uuid;
 ///
 /// # Properties:
 ///
-/// * `point`: A generic [Point] representing the coordinates of
+/// - `point`: A generic [Point] representing the coordinates of
 ///   the vertex in a D-dimensional space.
-/// * `uuid`: A [Uuid] representing a universally unique identifier for the
+/// - `uuid`: A [Uuid] representing a universally unique identifier for the
 ///   for the [Vertex]. This can be used to uniquely
 ///   identify the vertex in a graph or any other data structure.
-/// * `incident_cell`: The `incident_cell` property is an optional [Uuid] that
+/// - `incident_cell`: The `incident_cell` property is an optional [Uuid] that
 ///   represents a `Cell` containing the [Vertex]. This is
 ///   calculated by the `delaunay_core::triangulation_data_structure::Tds`.
-/// * `data`: The `data` property is an optional field that can hold any
+/// - `data`: The `data` property is an optional field that can hold any
 ///   type `U`. It is used to store additional data associated with the vertex.
 ///
 /// Data type T is in practice f64 which does not implement Eq, Hash, or Ord.
@@ -29,15 +32,15 @@ use uuid::Uuid;
 /// implements Eq, Hash, Ord, PartialEq, and PartialOrd.
 pub struct Vertex<T, U, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The coordinates of the vertex in a D-dimensional space.
-    pub point: Point<T, D>,
+    /// The coordinates of the vertex as a D-dimensional Point.
+    point: Point<T, D>,
     /// A universally unique identifier for the vertex.
     #[builder(setter(skip), default = "make_uuid()")]
-    pub uuid: Uuid,
+    uuid: Uuid,
     /// The [Uuid] of the `Cell` that the vertex is incident to.
     #[builder(setter(skip), default = "None")]
     pub incident_cell: Option<Uuid>,
@@ -48,7 +51,7 @@ where
 
 impl<T, U, const D: usize> Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -65,8 +68,18 @@ where
     /// is the type of the coordinates of the [Vertex], `U` is the type of the
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let points = vec![Point::new([1.0, 2.0, 3.0])];
+    /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points.clone());
+    /// assert_eq!(vertices.len(), 1);
+    /// assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
+    /// ```
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
-        // points.into_iter().map(|p| Self::new(p)).collect()
         points
             .into_iter()
             .map(|p| VertexBuilder::default().point(p).build().unwrap())
@@ -83,10 +96,70 @@ where
     /// # Returns:
     ///
     /// The function `into_hashmap` returns a [HashMap] with the key type
-    /// [Uuid] and the value type [Vertex], i.e.
-    /// `std::collections::HashMap<Uuid, Vertex<T, U, D>`.
+    /// [Uuid] and the value type [Vertex], i.e. `std::collections::HashMap<Uuid, Vertex<T, U, D>>`.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
+    /// let vertices = Vertex::<f64, Option<()>, 2>::from_points(points.clone());
+    /// let map: HashMap<_, _> = Vertex::into_hashmap(vertices);
+    /// assert_eq!(map.len(), 2);
+    /// assert!(map.values().all(|v| v.dim() == 2));
+    /// ```
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
-        vertices.into_iter().map(|v| (v.uuid, v)).collect()
+        vertices.into_iter().map(|v| (v.uuid(), v)).collect()
+    }
+
+    /// Returns the point coordinates of the vertex.
+    ///
+    /// # Returns:
+    ///
+    /// A reference to the Point representing the vertex's coordinates.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// let retrieved_point = vertex.point();
+    /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
+    /// ```
+    #[inline]
+    pub fn point(&self) -> &Point<T, D> {
+        &self.point
+    }
+
+    /// Returns the UUID of the vertex.
+    ///
+    /// # Returns:
+    ///
+    /// The Uuid uniquely identifying this vertex.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use uuid::Uuid;
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// let vertex_uuid = vertex.uuid();
+    /// // UUID should be valid and unique
+    /// assert_ne!(vertex_uuid, Uuid::nil());
+    ///
+    /// // Creating another vertex should have a different UUID
+    /// let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
+    /// assert_ne!(vertex.uuid(), another_vertex.uuid());
+    /// ```
+    #[inline]
+    pub fn uuid(&self) -> Uuid {
+        self.uuid
     }
 
     /// The `dim` function returns the dimensionality of the [Vertex].
@@ -113,17 +186,47 @@ where
     /// # Returns:
     ///
     /// True if the [Vertex] is valid; the [Point] is correct, the [Uuid] is
-    /// valid and unique, and the `incident_cell` contains the [Uuid] of a
+    /// valid and not nil, and the `incident_cell` contains the [Uuid] of a
     /// `Cell` that contains the [Vertex].
-    pub fn is_valid(self) -> bool {
-        todo!("Implement is_valid for Vertex")
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, 2.0, 3.0]))
+    ///     .build()
+    ///     .unwrap();
+    /// assert!(vertex.is_valid());
+    ///
+    /// let invalid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, f64::NAN, 3.0]))
+    ///     .build()
+    ///     .unwrap();
+    /// assert!(!invalid_vertex.is_valid());
+    /// ```
+    pub fn is_valid(self) -> bool
+    where
+        T: super::point::FiniteCheck + Copy,
+    {
+        // Check if the point is valid (all coordinates are finite)
+        let point_valid = self.point.is_valid();
+
+        // Check if UUID is not nil
+        let uuid_valid = !self.uuid.is_nil();
+
+        point_valid && uuid_valid
+        // TODO: Additional validation can be added here:
+        // - Validate incident_cell reference if present
+        // - Validate data if needed
     }
 }
 
 /// Equality of vertices is based on equality of elements in vector of coords.
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -139,7 +242,7 @@ where
 /// Generic Eq implementation for Vertex based on point equality
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Vertex<T, U, D>: Hash,
@@ -149,7 +252,7 @@ where
 /// Order of vertices is based on lexicographic order of elements in vector of coords.
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -162,7 +265,7 @@ where
 // Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
 impl<T, U, const D: usize> Hash for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
@@ -179,12 +282,12 @@ where
 /// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
 impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(vertex: Vertex<T, U, D>) -> [T; D] {
-        vertex.point.coordinates()
+        vertex.point().coordinates()
     }
 }
 
@@ -192,12 +295,12 @@ where
 /// This allows `&vertex` to be implicitly converted to `[T; D]` for coordinate access
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
-        vertex.point.coordinates()
+        vertex.point().coordinates()
     }
 }
 
@@ -210,9 +313,9 @@ mod tests {
     fn vertex_default() {
         let vertex: Vertex<f64, Option<()>, 3> = Default::default();
 
-        assert_eq!(vertex.point.coordinates(), [0.0, 0.0, 0.0]);
+        assert_eq!(vertex.point().coordinates(), [0.0, 0.0, 0.0]);
         assert_eq!(vertex.dim(), 3);
-        assert!(vertex.uuid.is_nil());
+        assert!(vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
 
@@ -227,9 +330,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
 
@@ -249,9 +352,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert_eq!(vertex.data.unwrap(), 1);
 
@@ -280,11 +383,11 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
-        assert_eq!(vertices[0].point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
-        assert_eq!(vertices[1].point.coordinates(), [4.0, 5.0, 6.0]);
+        assert_eq!(vertices[1].point().coordinates(), [4.0, 5.0, 6.0]);
         assert_eq!(vertices[1].dim(), 3);
-        assert_eq!(vertices[2].point.coordinates(), [7.0, 8.0, 9.0]);
+        assert_eq!(vertices[2].point().coordinates(), [7.0, 8.0, 9.0]);
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
@@ -304,8 +407,8 @@ mod tests {
 
         assert_eq!(values.len(), 3);
 
-        values.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-        vertices.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+        values.sort_by_key(|a| a.uuid());
+        vertices.sort_by_key(|a| a.uuid());
 
         assert_eq!(values, vertices);
 
@@ -451,8 +554,8 @@ mod tests {
         let cloned_vertex = vertex;
 
         // Points should be equal but UUIDs should be the same (since we cloned)
-        assert_eq!(vertex.point, cloned_vertex.point);
-        assert_eq!(vertex.uuid, cloned_vertex.uuid);
+        assert_eq!(vertex.point(), cloned_vertex.point());
+        assert_eq!(vertex.uuid(), cloned_vertex.uuid());
         assert_eq!(vertex.incident_cell, cloned_vertex.incident_cell);
         assert_eq!(vertex.data, cloned_vertex.data);
         assert_eq!(vertex.dim(), cloned_vertex.dim());
@@ -465,9 +568,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [42.0]);
+        assert_eq!(vertex.point().coordinates(), [42.0]);
         assert_eq!(vertex.dim(), 1);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -479,9 +582,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0]);
         assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -493,9 +596,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0, 4.0]);
         assert_eq!(vertex.dim(), 4);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -507,9 +610,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
         assert_eq!(vertex.dim(), 5);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
     }
@@ -521,9 +624,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.5, 2.5]);
+        assert_eq!(vertex.point().coordinates(), [1.5, 2.5]);
         assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
     }
 
     #[test]
@@ -533,9 +636,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1, 2, 3]);
+        assert_eq!(vertex.point().coordinates(), [1, 2, 3]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid.is_nil());
+        assert!(!vertex.uuid().is_nil());
     }
 
     #[test]
@@ -546,7 +649,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertex.data.unwrap(), "test_vertex");
         assert_eq!(vertex.dim(), 3);
     }
@@ -559,7 +662,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [5.0, 10.0]);
+        assert_eq!(vertex.point().coordinates(), [5.0, 10.0]);
         assert_eq!(vertex.data.unwrap(), 123u32);
         assert_eq!(vertex.dim(), 2);
     }
@@ -572,7 +675,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, 2.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, 2.0]);
         assert_eq!(vertex.data.unwrap(), (42, 84));
     }
 
@@ -686,7 +789,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [-1.0, -2.0, -3.0]);
+        assert_eq!(vertex.point().coordinates(), [-1.0, -2.0, -3.0]);
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -702,7 +805,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point, origin_vertex.point);
+        assert_eq!(vertex.point(), origin_vertex.point());
     }
 
     #[test]
@@ -713,7 +816,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            vertex.point.coordinates(),
+            vertex.point().coordinates(),
             [1000000.0, 2000000.0, 3000000.0]
         );
         assert_eq!(vertex.dim(), 3);
@@ -726,7 +829,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [0.000001, 0.000002, 0.000003]);
+        assert_eq!(vertex.point().coordinates(), [0.000001, 0.000002, 0.000003]);
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -744,9 +847,9 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
         assert_eq!(vertices.len(), 1);
-        assert_eq!(vertices[0].point.coordinates(), [1.0, 2.0, 3.0]);
+        assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
         assert_eq!(vertices[0].dim(), 3);
-        assert!(!vertices[0].uuid.is_nil());
+        assert!(!vertices[0].uuid().is_nil());
     }
 
     #[test]
@@ -763,14 +866,14 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        let uuid = vertex.uuid;
+        let uuid = vertex.uuid();
         let vertices = vec![vertex];
         let hashmap = Vertex::into_hashmap(vertices);
 
         assert_eq!(hashmap.len(), 1);
         assert!(hashmap.contains_key(&uuid));
         assert_eq!(
-            hashmap.get(&uuid).unwrap().point.coordinates(),
+            hashmap.get(&uuid).unwrap().point().coordinates(),
             [1.0, 2.0, 3.0]
         );
     }
@@ -787,9 +890,9 @@ mod tests {
             .unwrap();
 
         // Same points but different UUIDs
-        assert_ne!(vertex1.uuid, vertex2.uuid);
-        assert!(!vertex1.uuid.is_nil());
-        assert!(!vertex2.uuid.is_nil());
+        assert_ne!(vertex1.uuid(), vertex2.uuid());
+        assert!(!vertex1.uuid().is_nil());
+        assert!(!vertex2.uuid().is_nil());
     }
 
     #[test]
@@ -830,7 +933,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point.coordinates(), [1.0, -2.0, 3.0, -4.0]);
+        assert_eq!(vertex.point().coordinates(), [1.0, -2.0, 3.0, -4.0]);
         assert_eq!(vertex.dim(), 4);
     }
 
@@ -856,6 +959,185 @@ mod tests {
         assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
 
         // Verify the original vertex is still available after reference conversion
-        assert_eq!(vertex_ref.point.coordinates(), [4.0, 5.0, 6.0]);
+        assert_eq!(vertex_ref.point().coordinates(), [4.0, 5.0, 6.0]);
+    }
+
+    #[test]
+    fn vertex_is_valid_f64() {
+        // Test valid vertex with finite coordinates
+        let valid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        assert!(valid_vertex.is_valid());
+
+        // Test valid vertex with negative coordinates
+        let valid_negative: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([-1.0, -2.0, -3.0]))
+            .build()
+            .unwrap();
+        assert!(valid_negative.is_valid());
+
+        // Test valid vertex with zero coordinates
+        let valid_zero: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        assert!(valid_zero.is_valid());
+
+        // Test invalid vertex with NaN coordinate
+        let invalid_nan: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, f64::NAN, 3.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_nan.is_valid());
+
+        // Test invalid vertex with all NaN coordinates
+        let invalid_all_nan: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([f64::NAN, f64::NAN, f64::NAN]))
+            .build()
+            .unwrap();
+        assert!(!invalid_all_nan.is_valid());
+
+        // Test invalid vertex with positive infinity
+        let invalid_pos_inf: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, f64::INFINITY, 3.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_pos_inf.is_valid());
+
+        // Test invalid vertex with negative infinity
+        let invalid_neg_inf: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, f64::NEG_INFINITY, 3.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_neg_inf.is_valid());
+
+        // Test invalid vertex with mixed NaN and infinity
+        let invalid_mixed: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([f64::NAN, f64::INFINITY, 1.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_mixed.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_f32() {
+        // Test valid f32 vertex
+        let valid_vertex: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([1.5f32, 2.5f32]))
+            .build()
+            .unwrap();
+        assert!(valid_vertex.is_valid());
+
+        // Test invalid f32 vertex with NaN
+        let invalid_nan: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([1.0f32, f32::NAN]))
+            .build()
+            .unwrap();
+        assert!(!invalid_nan.is_valid());
+
+        // Test invalid f32 vertex with infinity
+        let invalid_inf: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([f32::INFINITY, 2.0f32]))
+            .build()
+            .unwrap();
+        assert!(!invalid_inf.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_integers() {
+        // Integer vertices should always be valid
+        let valid_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1, 2, 3]))
+            .build()
+            .unwrap();
+        assert!(valid_i32.is_valid());
+
+        let valid_negative_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([-1, -2, -3]))
+            .build()
+            .unwrap();
+        assert!(valid_negative_i32.is_valid());
+
+        let valid_zero_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([0, 0, 0]))
+            .build()
+            .unwrap();
+        assert!(valid_zero_i32.is_valid());
+
+        let valid_u64: Vertex<u64, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([u64::MAX, u64::MIN]))
+            .build()
+            .unwrap();
+        assert!(valid_u64.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_different_dimensions() {
+        // Test 1D vertex
+        let valid_1d: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
+            .point(Point::new([42.0]))
+            .build()
+            .unwrap();
+        assert!(valid_1d.is_valid());
+
+        let invalid_1d: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
+            .point(Point::new([f64::NAN]))
+            .build()
+            .unwrap();
+        assert!(!invalid_1d.is_valid());
+
+        // Test 5D vertex
+        let valid_5d: Vertex<f64, Option<()>, 5> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0, 4.0, 5.0]))
+            .build()
+            .unwrap();
+        assert!(valid_5d.is_valid());
+
+        let invalid_5d: Vertex<f64, Option<()>, 5> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, f64::NAN, 4.0, 5.0]))
+            .build()
+            .unwrap();
+        assert!(!invalid_5d.is_valid());
+    }
+
+    #[test]
+    fn vertex_is_valid_uuid_check() {
+        // Test that vertex with valid point and UUID is valid
+        let valid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+        assert!(valid_vertex.is_valid());
+        assert!(!valid_vertex.uuid().is_nil());
+
+        // Test that default vertex (which has nil UUID) is invalid
+        let default_vertex: Vertex<f64, Option<()>, 3> = Default::default();
+        assert!(!default_vertex.is_valid()); // Should be invalid due to nil UUID
+        assert!(default_vertex.uuid().is_nil());
+        assert!(default_vertex.point().is_valid()); // Point itself is valid (zeros)
+
+        // Create a vertex with valid point but manually set nil UUID to test UUID validation
+        let invalid_uuid_vertex: Vertex<f64, Option<()>, 3> = Vertex {
+            point: Point::new([1.0, 2.0, 3.0]),
+            uuid: uuid::Uuid::nil(),
+            incident_cell: None,
+            data: None,
+        };
+        assert!(!invalid_uuid_vertex.is_valid()); // Should be invalid due to nil UUID
+        assert!(invalid_uuid_vertex.point().is_valid()); // Point is valid
+        assert!(invalid_uuid_vertex.uuid().is_nil()); // UUID is nil
+
+        // Test vertex with both invalid point and nil UUID
+        let invalid_both: Vertex<f64, Option<()>, 3> = Vertex {
+            point: Point::new([f64::NAN, 2.0, 3.0]),
+            uuid: uuid::Uuid::nil(),
+            incident_cell: None,
+            data: None,
+        };
+        assert!(!invalid_both.is_valid()); // Should be invalid due to both issues
+        assert!(!invalid_both.point().is_valid()); // Point is invalid
+        assert!(invalid_both.uuid().is_nil()); // UUID is nil
     }
 }

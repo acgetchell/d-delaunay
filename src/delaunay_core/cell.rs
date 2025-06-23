@@ -3,7 +3,7 @@
 use super::{
     facet::Facet,
     matrix::invert,
-    point::Point,
+    point::{OrderedEq, Point},
     utilities::{make_uuid, vec_to_array},
     vertex::Vertex,
 };
@@ -22,21 +22,21 @@ use uuid::Uuid;
 ///
 /// # Properties:
 ///
-/// * `vertices`: A container of vertices. Each [Vertex] has a type T, optional
+/// - `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 ///   data U, and a constant D representing the number of dimensions.
-/// * `uuid`: The `uuid` property is of type [Uuid] and represents a
+/// - `uuid`: The `uuid` property is of type [Uuid] and represents a
 ///   universally unique identifier for a [Cell] in order to identify
 ///   each instance.
-/// * `neighbors`: The `neighbors` property is an optional container of [Uuid]
+/// - `neighbors`: The `neighbors` property is an optional container of [Uuid]
 ///   values. It represents the [Uuid]s of the neighboring cells that are connected
 ///   to the current [Cell], indexed such that the `i-th` neighbor is opposite the
 ///   `i-th`` [Vertex].
-/// * `data`: The `data` property is an optional field that can hold a value of
+/// - `data`: The `data` property is an optional field that can hold a value of
 ///   type `V`. It allows storage of additional data associated with the [Cell];
 ///   the data must implement [Eq], [Hash], [Ord], [PartialEq], and [PartialOrd].
 pub struct Cell<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -56,7 +56,7 @@ where
 
 impl<T, U, V, const D: usize> CellBuilder<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -82,7 +82,7 @@ where
 // Basic implementation block for simpler methods that don't require ComplexField
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -150,11 +150,31 @@ where
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
-    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([0.0, 0.0, 1.0]))
+    ///     .data(1)
+    ///     .build()
+    ///     .unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([0.0, 1.0, 0.0]))
+    ///     .data(1)
+    ///     .build()
+    ///     .unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, 0.0, 0.0]))
+    ///     .data(1)
+    ///     .build()
+    ///     .unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default()
+    ///     .point(Point::new([1.0, 1.0, 1.0]))
+    ///     .data(2)
+    ///     .build()
+    ///     .unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default()
+    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+    ///     .data("three-one cell")
+    ///     .build()
+    ///     .unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
     pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool {
@@ -185,6 +205,7 @@ where
     /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
     /// let cell2: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
     /// assert!(cell.contains_vertex_of(&cell2));
+    /// ```
     pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
@@ -193,7 +214,14 @@ where
 // Advanced implementation block for methods that require ComplexField
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone + ComplexField<RealField = T> + Copy + Default + PartialEq + PartialOrd + Sum,
+    T: Clone
+        + ComplexField<RealField = T>
+        + Copy
+        + Default
+        + PartialEq
+        + PartialOrd
+        + OrderedEq
+        + Sum,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -203,8 +231,8 @@ where
     ///
     /// # Arguments:
     ///
-    /// * `facet`: The [Facet] to be used to create the [Cell].
-    /// * `vertex`: The [Vertex] to be added to the [Cell].
+    /// - `facet`: The [Facet] to be used to create the [Cell].
+    /// - `vertex`: The [Vertex] to be added to the [Cell].
     ///
     /// # Returns:
     ///
@@ -226,6 +254,7 @@ where
     /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
     /// assert!(new_cell.vertices.contains(&vertex5));
+    /// ```
     pub fn from_facet_and_vertex(
         facet: Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
@@ -264,6 +293,10 @@ where
 
     /// The function `circumcenter` returns the circumcenter of the cell.
     ///
+    /// The circumcenter is the unique point equidistant from all vertices of
+    /// the simplex. Returns an error if the cell is not a valid simplex or
+    /// if the computation fails due to degeneracy or numerical issues.
+    ///
     /// Using the approach from:
     ///
     /// Lévy, Bruno, and Yang Liu.
@@ -295,10 +328,8 @@ where
     /// The resulting vector gives the coordinates of the circumcenter.
     ///
     /// # Returns:
-    ///
-    /// If the function is successful, it will return an Ok variant containing
-    /// the circumcenter as a Point<f64, D> value. If there is an error, it
-    /// will return an Err variant containing an error message.
+    /// The circumcenter as a Point<f64, D> if successful, or an error if the
+    /// simplex is degenerate or the matrix inversion fails.
     ///
     /// # Example
     ///
@@ -521,6 +552,7 @@ where
     /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let facets = cell.facets();
     /// assert_eq!(facets.len(), 4);
+    /// ```
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
         let mut facets: Vec<Facet<T, U, V, D>> = Vec::new();
         for vertex in self.vertices.iter() {
@@ -534,7 +566,7 @@ where
 /// Equality of cells is based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -552,7 +584,7 @@ where
 /// Eq implementation for Cell based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -562,7 +594,7 @@ where
 /// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -580,7 +612,7 @@ where
 /// Custom Hash implementation for Cell
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,

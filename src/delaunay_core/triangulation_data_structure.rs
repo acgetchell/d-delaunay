@@ -6,7 +6,7 @@
 use super::{
     cell::{Cell, CellBuilder},
     facet::Facet,
-    point::Point,
+    point::{OrderedEq, Point},
     utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
@@ -26,7 +26,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -50,7 +50,7 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -104,10 +104,10 @@ where
 ///
 /// # Properties:
 ///
-/// * `vertices`: A [HashMap] that stores vertices with their corresponding
+/// - `vertices`: A [HashMap] that stores vertices with their corresponding
 ///   [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
 ///   U, and a constant D representing the dimension.
-/// * `cells`: The `cells` property is a [HashMap] that stores [Cell] objects.
+/// - `cells`: The `cells` property is a [HashMap] that stores [Cell] objects.
 ///   Each [Cell] has one or more [Vertex] objects with cell data of type V.
 ///   Note the dimensionality of the cell may differ from D, though the [Tds]
 ///   only stores cells of maximal dimensionality D and infers other lower
@@ -115,12 +115,12 @@ where
 ///
 /// For example, in 3 dimensions:
 ///
-/// * A 0-dimensional cell is a [Vertex].
-/// * A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
+/// - A 0-dimensional cell is a [Vertex].
+/// - A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
 ///   [Vertex] endpoints.
-/// * A 2-dimensional cell is a [Facet] given by the `Tetrahedron` and the
+/// - A 2-dimensional cell is a [Facet] given by the `Tetrahedron` and the
 ///   opposite [Vertex].
-/// * A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
+/// - A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
 ///
 /// A similar pattern holds for higher dimensions.
 ///
@@ -128,7 +128,7 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -158,7 +158,8 @@ where
         + PartialEq
         + PartialOrd
         + SubAssign<f64>
-        + Sum,
+        + Sum
+        + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -226,7 +227,7 @@ where
 
         // Hashmap::insert returns the old value if the key already exists and
         // updates it with the new value
-        let result = self.vertices.insert(vertex.uuid, vertex);
+        let result = self.vertices.insert(vertex.uuid(), vertex);
 
         // Return an error if there is a uuid collision
         match result {
@@ -474,7 +475,8 @@ where
         // For more complex cases, use the full Bowyer-Watson algorithm
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-        let supercell_vertices: HashSet<Uuid> = supercell.vertices.iter().map(|v| v.uuid).collect();
+        let supercell_vertices: HashSet<Uuid> =
+            supercell.vertices.iter().map(|v| v.uuid()).collect();
         let supercell_uuid = supercell.uuid;
         self.cells.insert(supercell_uuid, supercell.clone());
 
@@ -484,7 +486,7 @@ where
         // Iterate over each input vertex and insert it into the triangulation
         for vertex in input_vertices.iter() {
             // Skip if this vertex is already part of supercell vertices
-            if supercell_vertices.contains(&vertex.uuid) {
+            if supercell_vertices.contains(&vertex.uuid()) {
                 continue;
             }
 
@@ -571,7 +573,7 @@ where
             .iter()
             .filter(|(_, cell)| {
                 let cell_vertex_uuids: HashSet<Uuid> =
-                    cell.vertices.iter().map(|v| v.uuid).collect();
+                    cell.vertices.iter().map(|v| v.uuid()).collect();
                 let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
 
                 // Remove cells that don't consist entirely of input vertices
@@ -591,7 +593,7 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid()).collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -674,7 +676,7 @@ where
         // Find which cells contain each vertex
         for (cell_id, cell) in &self.cells {
             for vertex in &cell.vertices {
-                if let Some(incident_cells) = vertex_to_cells.get_mut(&vertex.uuid) {
+                if let Some(incident_cells) = vertex_to_cells.get_mut(&vertex.uuid()) {
                     incident_cells.push(*cell_id);
                 }
             }
@@ -703,7 +705,7 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid()).collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -741,7 +743,7 @@ pub fn validate_neighbors<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -751,7 +753,7 @@ where
     let mut total_neighbor_links = 0;
     for (cell_id, cell) in &tds.cells {
         println!("Checking cell {:?}", cell_id);
-        let this_vertices: HashSet<_> = cell.vertices.iter().map(|v| v.uuid).collect();
+        let this_vertices: HashSet<_> = cell.vertices.iter().map(|v| v.uuid()).collect();
 
         if let Some(neighbors) = &cell.neighbors {
             if neighbors.len() > D + 1 {
@@ -784,7 +786,7 @@ where
 
                 // Shared facet check: should share exactly D vertices (i.e., D+1 simplex - 1)
                 let neighbor_vertices: HashSet<_> =
-                    neighbor_cell.vertices.iter().map(|v| v.uuid).collect();
+                    neighbor_cell.vertices.iter().map(|v| v.uuid()).collect();
                 let shared: HashSet<_> = this_vertices.intersection(&neighbor_vertices).collect();
                 if shared.len() != D {
                     return Err(anyhow!(
@@ -803,8 +805,8 @@ where
 }
 
 /// Helper that verifies every cell
-///   * has exactly `D+1` vertices (a D‑simplex), **and**
-///   * no two cells share the exact same sorted set of vertex UUIDs.
+///   - has exactly `D+1` vertices (a D‑simplex), **and**
+///   - no two cells share the exact same sorted set of vertex UUIDs.
 ///
 /// It also prints a human‑friendly summary of each cell’s vertices.
 ///
@@ -813,7 +815,7 @@ pub fn validate_unique_cells<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + Into<f64>, // for pretty printing
+    T: Clone + Copy + Default + PartialEq + PartialOrd + Into<f64> + OrderedEq, // for pretty printing
     U: Clone + Copy + Eq + Hash + Ord,
     V: Clone + Copy + Eq + Hash + Ord,
     [T; D]: Copy + Default + DeserializeOwned + Serialize,
@@ -838,14 +840,19 @@ where
         // 2.  Pretty print this cell
         print!("Cell {:>3} {} vertices:", idx, cell.vertices.len());
         for v in &cell.vertices {
-            let coords: Vec<f64> = v.point.coordinates().iter().map(|c| (*c).into()).collect();
+            let coords: Vec<f64> = v
+                .point()
+                .coordinates()
+                .iter()
+                .map(|c| (*c).into())
+                .collect();
             print!(" {:?}", coords);
         }
         println!();
         idx += 1;
 
         // 3.  Uniqueness check
-        let mut key: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid).collect();
+        let mut key: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid()).collect();
         key.sort_unstable();
         if let Some(dup_id) = seen.insert(key.clone(), *cell_id) {
             return Err(anyhow!(
@@ -985,7 +992,7 @@ mod tests {
         // Debug: Print actual supercell coordinates
         println!("Actual supercell vertices:");
         for (i, vertex) in unwrapped_supercell.vertices.iter().enumerate() {
-            println!("  Vertex {}: {:?}", i, vertex.point.coordinates());
+            println!("  Vertex {}: {:?}", i, vertex.point().coordinates());
         }
 
         // The supercell should contain all input points

@@ -6,7 +6,7 @@
 //! Facets are not stored in the `Triangulation Data Structure` (TDS)
 //! directly, but created on the fly when needed.
 
-use super::{cell::Cell, vertex::Vertex};
+use super::{cell::Cell, point::OrderedEq, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
@@ -18,14 +18,14 @@ use thiserror::Error;
 ///
 /// # Properties
 ///
-/// * `cell` - The [Cell] that contains this facet.
-/// * `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].
+/// - `cell` - The [Cell] that contains this facet.
+/// - `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].
 ///
 /// Note that `D` is the dimensionality of the [Cell] and [Vertex];
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
 pub struct Facet<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -39,7 +39,7 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -50,8 +50,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `cell`: The [Cell] that contains the [Facet].
-    /// * `vertex`: The [Vertex] opposite to the [Facet].
+    /// - `cell`: The [Cell] that contains the [Facet].
+    /// - `vertex`: The [Vertex] opposite to the [Facet].
     ///
     /// # Returns
     ///
@@ -100,7 +100,7 @@ where
 /// Generic Eq implementation for Facet that requires Hash bounds
 impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -111,7 +111,7 @@ where
 
 impl<T, U, V, const D: usize> Hash for Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -373,7 +373,7 @@ mod tests {
 
         assert_eq!(facet, cloned_facet);
         assert_eq!(facet.cell.uuid, cloned_facet.cell.uuid);
-        assert_eq!(facet.vertex.uuid, cloned_facet.vertex.uuid);
+        assert_eq!(facet.vertex.uuid(), cloned_facet.vertex.uuid());
     }
 
     #[test]
