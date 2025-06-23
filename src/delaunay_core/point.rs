@@ -163,6 +163,7 @@ macro_rules! impl_finite_check_for_float {
     ($($t:ty),*) => {
         $(
             impl FiniteCheck for $t {
+                #[inline(always)]
                 fn is_finite_generic(&self) -> bool {
                     self.is_finite()
                 }
@@ -177,6 +178,7 @@ macro_rules! impl_finite_check_for_int {
     ($($t:ty),*) => {
         $(
             impl FiniteCheck for $t {
+                #[inline(always)]
                 fn is_finite_generic(&self) -> bool {
                     true
                 }
@@ -196,6 +198,7 @@ macro_rules! impl_hash_coordinate_for_float {
     ($($t:ty),*) => {
         $(
             impl HashCoordinate for $t {
+                #[inline(always)]
                 fn hash_coord<H: Hasher>(&self, state: &mut H) {
                     OrderedFloat(*self).hash(state);
                 }
@@ -255,6 +258,7 @@ macro_rules! impl_ordered_eq_for_float {
     ($($t:ty),*) => {
         $(
             impl OrderedEq for $t {
+                #[inline(always)]
                 fn ordered_eq(&self, other: &Self) -> bool {
                     OrderedFloat(*self) == OrderedFloat(*other)
                 }
