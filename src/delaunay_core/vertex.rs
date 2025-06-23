@@ -79,6 +79,7 @@ where
     /// assert_eq!(vertices.len(), 1);
     /// assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
     /// ```
+    #[inline]
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
         points
             .into_iter()
@@ -110,6 +111,7 @@ where
     /// assert_eq!(map.len(), 2);
     /// assert!(map.values().all(|v| v.dim() == 2));
     /// ```
+    #[inline]
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
         vertices.into_iter().map(|v| (v.uuid(), v)).collect()
     }
@@ -177,6 +179,7 @@ where
     /// let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_eq!(vertex.dim(), 4);
     /// ```
+    #[inline]
     pub fn dim(&self) -> usize {
         D
     }
@@ -223,13 +226,15 @@ where
     }
 }
 
-/// Equality of vertices is based on equality of elements in vector of coords.
+// Implementations with identical trait bounds grouped together
+// Group 1: PartialEq, PartialOrd, and From trait implementations
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Equality of vertices is based on equality of elements in vector of coords.
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.point == other.point
@@ -239,42 +244,16 @@ where
     }
 }
 
-/// Generic Eq implementation for Vertex based on point equality
-impl<T, U, const D: usize> Eq for Vertex<T, U, D>
-where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Vertex<T, U, D>: Hash,
-{
-}
-
-/// Order of vertices is based on lexicographic order of elements in vector of coords.
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Order of vertices is based on lexicographic order of elements in vector of coords.
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.point.partial_cmp(&other.point)
-    }
-}
-
-// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
-impl<T, U, const D: usize> Hash for Vertex<T, U, D>
-where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Hash,
-{
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.point.hash(state);
-        self.uuid.hash(state);
-        self.incident_cell.hash(state);
-        self.data.hash(state);
     }
 }
 
@@ -286,6 +265,7 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    #[inline]
     fn from(vertex: Vertex<T, U, D>) -> [T; D] {
         vertex.point().coordinates()
     }
@@ -299,8 +279,36 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    #[inline]
     fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
         vertex.point().coordinates()
+    }
+}
+
+// Group 2: Eq implementation with additional Hash requirement
+impl<T, U, const D: usize> Eq for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Vertex<T, U, D>: Hash,
+{
+    // Generic Eq implementation for Vertex based on point equality
+}
+
+impl<T, U, const D: usize> Hash for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Hash,
+{
+    /// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
     }
 }
 
