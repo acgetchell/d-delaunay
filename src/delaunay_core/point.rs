@@ -461,7 +461,12 @@ mod tests {
     fn point_default() {
         let point: Point<f64, 4> = Point::default();
 
-        assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
+        let coords = point.coordinates();
+        assert_relative_eq!(
+            coords.as_slice(),
+            [0.0, 0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Human readable output for cargo test -- --nocapture
         println!("Default: {point:?}");
@@ -471,7 +476,12 @@ mod tests {
     fn point_new() {
         let point = Point::new([1.0, 2.0, 3.0, 4.0]);
 
-        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+        let coords = point.coordinates();
+        assert_relative_eq!(
+            coords.as_slice(),
+            [1.0, 2.0, 3.0, 4.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Human readable output for cargo test -- --nocapture
         println!("Point: {point:?}");
@@ -483,7 +493,9 @@ mod tests {
         let point_copy = point;
 
         assert_eq!(point, point_copy);
-        assert_eq!(point.coordinates(), point_copy.coordinates());
+        let coords1 = point.coordinates();
+        let coords2 = point_copy.coordinates();
+        assert_relative_eq!(coords1.as_slice(), coords2.as_slice(), epsilon = 1e-9);
         assert_eq!(point.dim(), point_copy.dim());
     }
 
@@ -501,7 +513,12 @@ mod tests {
     fn point_origin() {
         let point: Point<f64, 4> = Point::origin();
 
-        assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
+        let coords = point.coordinates();
+        assert_relative_eq!(
+            coords.as_slice(),
+            [0.0, 0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Human readable output for cargo test -- --nocapture
         println!("Origin: {:?} is {}-D", point, point.dim());
@@ -550,7 +567,12 @@ mod tests {
         let coords = [1i32, 2i32, 3i32];
         let point: Point<f64, 3> = Point::from(coords);
 
-        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
+        let result_coords = point.coordinates();
+        assert_relative_eq!(
+            result_coords.as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(point.dim(), 3);
     }
 
@@ -559,7 +581,12 @@ mod tests {
         let coords = [1.5f32, 2.5f32, 3.5f32, 4.5f32];
         let point: Point<f64, 4> = Point::from(coords);
 
-        assert_eq!(point.coordinates(), [1.5, 2.5, 3.5, 4.5]);
+        let result_coords = point.coordinates();
+        assert_relative_eq!(
+            result_coords.as_slice(),
+            [1.5, 2.5, 3.5, 4.5].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(point.dim(), 4);
     }
 
@@ -568,7 +595,12 @@ mod tests {
         // Test conversion when source and target types are the same
         let coords_f32 = [1.0f32, 2.0f32, 3.0f32];
         let point_f32: Point<f32, 3> = Point::from(coords_f32);
-        assert_eq!(point_f32.coordinates(), [1.0f32, 2.0f32, 3.0f32]);
+        let result_f32 = point_f32.coordinates();
+        assert_relative_eq!(
+            result_f32.as_slice(),
+            [1.0f32, 2.0f32, 3.0f32].as_slice(),
+            epsilon = 1e-9
+        );
 
         let coords_i32 = [1i32, 2i32, 3i32];
         let point_i32: Point<i32, 3> = Point::from(coords_i32);
@@ -598,12 +630,22 @@ mod tests {
         // Test conversion from f32 to f32 (same type)
         let coords_f32 = [1.5f32, 2.5f32];
         let point_f32: Point<f32, 2> = Point::from(coords_f32);
-        assert_eq!(point_f32.coordinates(), [1.5f32, 2.5f32]);
+        let result_f32 = point_f32.coordinates();
+        assert_relative_eq!(
+            result_f32.as_slice(),
+            [1.5f32, 2.5f32].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Test conversion from f32 to f64 (safe upcast)
         let coords_f32 = [1.5f32, 2.5f32];
         let point_f64: Point<f64, 2> = Point::from(coords_f32);
-        assert_eq!(point_f64.coordinates(), [1.5f64, 2.5f64]);
+        let result_f64 = point_f64.coordinates();
+        assert_relative_eq!(
+            result_f64.as_slice(),
+            [1.5f64, 2.5f64].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -611,12 +653,22 @@ mod tests {
         // Test conversion from i32 to f64
         let coords_i32 = [1i32, 2i32, 3i32];
         let point_f64: Point<f64, 3> = Point::from(coords_i32);
-        assert_eq!(point_f64.coordinates(), [1.0f64, 2.0f64, 3.0f64]);
+        let result_i32_f64 = point_f64.coordinates();
+        assert_relative_eq!(
+            result_i32_f64.as_slice(),
+            [1.0f64, 2.0f64, 3.0f64].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Test conversion from u8 to f64
         let coords_u8 = [10u8, 20u8];
         let point_f64: Point<f64, 2> = Point::from(coords_u8);
-        assert_eq!(point_f64.coordinates(), [10.0f64, 20.0f64]);
+        let result_u8_f64 = point_f64.coordinates();
+        assert_relative_eq!(
+            result_u8_f64.as_slice(),
+            [10.0f64, 20.0f64].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -689,26 +741,39 @@ mod tests {
         // Test conversion with mixed type arrays
         let coords_mixed_i32 = [-100i32, 200i32, 300i32];
         let point_f64: Point<f64, 3> = Point::from(coords_mixed_i32);
-        assert_eq!(point_f64.coordinates(), [-100.0f64, 200.0f64, 300.0f64]);
+        let mixed_coords = point_f64.coordinates();
+        assert_relative_eq!(
+            mixed_coords.as_slice(),
+            [-100.0f64, 200.0f64, 300.0f64].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Test with larger values
         let coords_large = [10000i32, 20000i32];
         let point_f64: Point<f64, 2> = Point::from(coords_large);
-        assert_eq!(point_f64.coordinates(), [10000.0f64, 20000.0f64]);
+        let large_coords = point_f64.coordinates();
+        assert_relative_eq!(
+            large_coords.as_slice(),
+            [10000.0f64, 20000.0f64].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Test with very small values
         // When converting from f32 to f64, there can be small precision
         // differences due to how floating point numbers are represented in
         // memory. Use approximate comparison for these small values.
-        let coords_small_f32 = [0.000001f32, 0.000002f32];
+        let coords_small_f32 = [0.000_001_f32, 0.000_002_f32];
         let point_f64: Point<f64, 2> = Point::from(coords_small_f32);
 
         // Use relative comparison with appropriate epsilon for small floating
         // point values
-        let expected = [0.000001f64, 0.000002f64];
-        for (&actual, &expected) in point_f64.coordinates().iter().zip(expected.iter()) {
-            assert_relative_eq!(actual, expected, epsilon = 1e-6, max_relative = 1e-6);
-        }
+        let expected = [0.000_001_f64, 0.000_002_f64];
+        assert_relative_eq!(
+            point_f64.coordinates().as_slice(),
+            expected.as_slice(),
+            epsilon = 1e-6,
+            max_relative = 1e-6
+        );
     }
 
     #[test]
@@ -762,11 +827,17 @@ mod tests {
     fn point_with_f32() {
         let point: Point<f32, 2> = Point::new([1.5, 2.5]);
 
-        assert_eq!(point.coordinates(), [1.5, 2.5]);
+        let coords = point.coordinates();
+        assert_relative_eq!(coords.as_slice(), [1.5, 2.5].as_slice(), epsilon = 1e-9);
         assert_eq!(point.dim(), 2);
 
         let origin: Point<f32, 2> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0]);
+        let origin_coords = origin.coordinates();
+        assert_relative_eq!(
+            origin_coords.as_slice(),
+            [0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -818,12 +889,20 @@ mod tests {
     fn point_negative_coordinates() {
         let point = Point::new([-1.0, -2.0, -3.0]);
 
-        assert_eq!(point.coordinates(), [-1.0, -2.0, -3.0]);
+        assert_relative_eq!(
+            point.coordinates().as_slice(),
+            [-1.0, -2.0, -3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(point.dim(), 3);
 
         // Test with mixed positive/negative
         let mixed_point = Point::new([1.0, -2.0, 3.0, -4.0]);
-        assert_eq!(mixed_point.coordinates(), [1.0, -2.0, 3.0, -4.0]);
+        assert_relative_eq!(
+            mixed_point.coordinates().as_slice(),
+            [1.0, -2.0, 3.0, -4.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -832,14 +911,23 @@ mod tests {
         let origin: Point<f64, 3> = Point::origin();
 
         assert_eq!(zero_point, origin);
-        assert_eq!(zero_point.coordinates(), [0.0, 0.0, 0.0]);
+        assert_relative_eq!(
+            zero_point.coordinates().as_slice(),
+            [0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
     fn point_large_coordinates() {
         let large_point = Point::new([1e6, 2e6, 3e6]);
 
-        assert_eq!(large_point.coordinates(), [1000000.0, 2000000.0, 3000000.0]);
+        let coords = large_point.coordinates();
+        assert_relative_eq!(
+            coords.as_slice(),
+            [1_000_000.0, 2_000_000.0, 3_000_000.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(large_point.dim(), 3);
     }
 
@@ -847,7 +935,12 @@ mod tests {
     fn point_small_coordinates() {
         let small_point = Point::new([1e-6, 2e-6, 3e-6]);
 
-        assert_eq!(small_point.coordinates(), [0.000001, 0.000002, 0.000003]);
+        let coords = small_point.coordinates();
+        assert_relative_eq!(
+            coords.as_slice(),
+            [0.000_001, 0.000_002, 0.000_003].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(small_point.dim(), 3);
     }
 
@@ -872,11 +965,18 @@ mod tests {
         // Test conversion from different integer types
         let u8_coords: [u8; 3] = [1, 2, 3];
         let point_from_u8: Point<f64, 3> = Point::from(u8_coords);
-        assert_eq!(point_from_u8.coordinates(), [1.0, 2.0, 3.0]);
+        assert_relative_eq!(
+            point_from_u8.coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         let i16_coords: [i16; 2] = [-1, 32767];
         let point_from_i16: Point<f64, 2> = Point::from(i16_coords);
-        assert_eq!(point_from_i16.coordinates(), [-1.0, 32767.0]);
+        assert_relative_eq!(
+            point_from_i16.coordinates().as_slice(),
+            [-1.0, 32767.0].as_slice()
+        );
     }
 
     #[test]
@@ -1030,17 +1130,20 @@ mod tests {
 
         // Test implicit conversion from owned point
         let coords_owned: [f64; 3] = point.into();
-        assert_eq!(coords_owned, [1.0, 2.0, 3.0]);
+        assert_relative_eq!(coords_owned.as_slice(), [1.0, 2.0, 3.0].as_slice());
 
         // Create a new point for reference test
         let point_ref: Point<f64, 3> = Point::new([4.0, 5.0, 6.0]);
 
         // Test implicit conversion from point reference
         let coords_ref: [f64; 3] = (&point_ref).into();
-        assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
+        assert_relative_eq!(coords_ref.as_slice(), [4.0, 5.0, 6.0].as_slice());
 
         // Verify the original point is still available after reference conversion
-        assert_eq!(point_ref.coordinates(), [4.0, 5.0, 6.0]);
+        assert_relative_eq!(
+            point_ref.coordinates().as_slice(),
+            [4.0, 5.0, 6.0].as_slice()
+        );
     }
 
     #[test]
@@ -1603,5 +1706,548 @@ mod tests {
         assert_ne!(point_f32_nan, point_f32_zero);
         assert_ne!(point_f32_nan, point_f32_neg_zero);
         assert_eq!(point_f32_zero, point_f32_neg_zero);
+    }
+
+    #[test]
+    fn finite_check_trait_coverage() {
+        // Test FiniteCheck trait implementations for all numeric types
+
+        // Test floating point types
+        assert!(1.0f32.is_finite_generic());
+        assert!(1.0f64.is_finite_generic());
+        assert!(!f32::NAN.is_finite_generic());
+        assert!(!f64::NAN.is_finite_generic());
+        assert!(!f32::INFINITY.is_finite_generic());
+        assert!(!f64::INFINITY.is_finite_generic());
+        assert!(!f32::NEG_INFINITY.is_finite_generic());
+        assert!(!f64::NEG_INFINITY.is_finite_generic());
+
+        // Test edge cases for floating point
+        assert!(f32::MAX.is_finite_generic());
+        assert!(f64::MAX.is_finite_generic());
+        assert!(f32::MIN.is_finite_generic());
+        assert!(f64::MIN.is_finite_generic());
+        assert!(f32::MIN_POSITIVE.is_finite_generic());
+        assert!(f64::MIN_POSITIVE.is_finite_generic());
+        assert!(0.0f32.is_finite_generic());
+        assert!((-0.0f64).is_finite_generic());
+
+        // Test all integer types (should always be finite)
+        assert!(42i8.is_finite_generic());
+        assert!(42i16.is_finite_generic());
+        assert!(42i32.is_finite_generic());
+        assert!(42i64.is_finite_generic());
+        assert!(42i128.is_finite_generic());
+        assert!(42isize.is_finite_generic());
+        assert!(42u8.is_finite_generic());
+        assert!(42u16.is_finite_generic());
+        assert!(42u32.is_finite_generic());
+        assert!(42u64.is_finite_generic());
+        assert!(42u128.is_finite_generic());
+        assert!(42usize.is_finite_generic());
+
+        // Test integer edge cases
+        assert!(i8::MAX.is_finite_generic());
+        assert!(i8::MIN.is_finite_generic());
+        assert!(u8::MAX.is_finite_generic());
+        assert!(u8::MIN.is_finite_generic());
+        assert!(i32::MAX.is_finite_generic());
+        assert!(i32::MIN.is_finite_generic());
+        assert!(i64::MAX.is_finite_generic());
+        assert!(i64::MIN.is_finite_generic());
+        assert!(isize::MAX.is_finite_generic());
+        assert!(isize::MIN.is_finite_generic());
+        assert!(usize::MAX.is_finite_generic());
+        assert!(usize::MIN.is_finite_generic());
+    }
+
+    #[test]
+    fn hash_coordinate_trait_coverage() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
+
+        // Helper function to get hash for a coordinate
+        fn hash_coord<T: HashCoordinate>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash_coord(&mut hasher);
+            hasher.finish()
+        }
+
+        // Test floating point types
+        let hash_f32 = hash_coord(&std::f32::consts::PI);
+        let hash_f64 = hash_coord(&std::f64::consts::PI);
+        assert!(hash_f32 > 0);
+        assert!(hash_f64 > 0);
+
+        // Test that same values hash to same result
+        assert_eq!(hash_coord(&1.0f32), hash_coord(&1.0f32));
+        assert_eq!(hash_coord(&1.0f64), hash_coord(&1.0f64));
+
+        // Test NaN hashing consistency
+        assert_eq!(hash_coord(&f32::NAN), hash_coord(&f32::NAN));
+        assert_eq!(hash_coord(&f64::NAN), hash_coord(&f64::NAN));
+
+        // Test infinity hashing
+        assert_eq!(hash_coord(&f32::INFINITY), hash_coord(&f32::INFINITY));
+        assert_eq!(hash_coord(&f64::INFINITY), hash_coord(&f64::INFINITY));
+        assert_eq!(
+            hash_coord(&f32::NEG_INFINITY),
+            hash_coord(&f32::NEG_INFINITY)
+        );
+        assert_eq!(
+            hash_coord(&f64::NEG_INFINITY),
+            hash_coord(&f64::NEG_INFINITY)
+        );
+
+        // Test that different special values hash differently
+        assert_ne!(hash_coord(&f64::INFINITY), hash_coord(&f64::NEG_INFINITY));
+
+        // Test all integer types
+        assert_eq!(hash_coord(&42i8), hash_coord(&42i8));
+        assert_eq!(hash_coord(&42i16), hash_coord(&42i16));
+        assert_eq!(hash_coord(&42i32), hash_coord(&42i32));
+        assert_eq!(hash_coord(&42i64), hash_coord(&42i64));
+        assert_eq!(hash_coord(&42i128), hash_coord(&42i128));
+        assert_eq!(hash_coord(&42isize), hash_coord(&42isize));
+        assert_eq!(hash_coord(&42u8), hash_coord(&42u8));
+        assert_eq!(hash_coord(&42u16), hash_coord(&42u16));
+        assert_eq!(hash_coord(&42u32), hash_coord(&42u32));
+        assert_eq!(hash_coord(&42u64), hash_coord(&42u64));
+        assert_eq!(hash_coord(&42u128), hash_coord(&42u128));
+        assert_eq!(hash_coord(&42usize), hash_coord(&42usize));
+
+        // Test integer edge cases
+        assert_eq!(hash_coord(&i8::MAX), hash_coord(&i8::MAX));
+        assert_eq!(hash_coord(&i8::MIN), hash_coord(&i8::MIN));
+        assert_eq!(hash_coord(&u64::MAX), hash_coord(&u64::MAX));
+        assert_eq!(hash_coord(&u64::MIN), hash_coord(&u64::MIN));
+    }
+
+    #[test]
+    fn ordered_eq_trait_coverage() {
+        // Test OrderedEq trait implementations
+
+        // Test floating point types with normal values
+        assert!(1.0f32.ordered_eq(&1.0f32));
+        assert!(1.0f64.ordered_eq(&1.0f64));
+        assert!(!1.0f32.ordered_eq(&2.0f32));
+        assert!(!1.0f64.ordered_eq(&2.0f64));
+
+        // Test NaN equality (should be true with OrderedEq)
+        assert!(f32::NAN.ordered_eq(&f32::NAN));
+        assert!(f64::NAN.ordered_eq(&f64::NAN));
+
+        // Test infinity values
+        assert!(f32::INFINITY.ordered_eq(&f32::INFINITY));
+        assert!(f64::INFINITY.ordered_eq(&f64::INFINITY));
+        assert!(f32::NEG_INFINITY.ordered_eq(&f32::NEG_INFINITY));
+        assert!(f64::NEG_INFINITY.ordered_eq(&f64::NEG_INFINITY));
+        assert!(!f32::INFINITY.ordered_eq(&f32::NEG_INFINITY));
+        assert!(!f64::INFINITY.ordered_eq(&f64::NEG_INFINITY));
+
+        // Test zero comparisons
+        assert!(0.0f32.ordered_eq(&(-0.0f32)));
+        assert!(0.0f64.ordered_eq(&(-0.0f64)));
+
+        // Test integer types
+        assert!(42i8.ordered_eq(&42i8));
+        assert!(42i16.ordered_eq(&42i16));
+        assert!(42i32.ordered_eq(&42i32));
+        assert!(42i64.ordered_eq(&42i64));
+        assert!(42i128.ordered_eq(&42i128));
+        assert!(42isize.ordered_eq(&42isize));
+        assert!(42u8.ordered_eq(&42u8));
+        assert!(42u16.ordered_eq(&42u16));
+        assert!(42u32.ordered_eq(&42u32));
+        assert!(42u64.ordered_eq(&42u64));
+        assert!(42u128.ordered_eq(&42u128));
+        assert!(42usize.ordered_eq(&42usize));
+
+        // Test integer inequality
+        assert!(!1i32.ordered_eq(&2i32));
+        assert!(!100u64.ordered_eq(&200u64));
+
+        // Test edge cases for integers
+        assert!(i8::MAX.ordered_eq(&i8::MAX));
+        assert!(i8::MIN.ordered_eq(&i8::MIN));
+        assert!(!i8::MAX.ordered_eq(&i8::MIN));
+        assert!(u32::MAX.ordered_eq(&u32::MAX));
+        assert!(u32::MIN.ordered_eq(&u32::MIN));
+    }
+
+    #[test]
+    fn point_extreme_dimensions() {
+        // Test with high dimensional points (limited by serde trait implementations)
+
+        // Test 20D point
+        let coords_20d = [1.0; 20];
+        let point_20d = Point::new(coords_20d);
+        assert_eq!(point_20d.dim(), 20);
+        assert_relative_eq!(point_20d.coordinates().as_slice(), coords_20d.as_slice());
+        assert!(point_20d.is_valid());
+
+        // Test 25D point
+        let coords_25d = [2.5; 25];
+        let point_25d = Point::new(coords_25d);
+        assert_eq!(point_25d.dim(), 25);
+        assert_relative_eq!(point_25d.coordinates().as_slice(), coords_25d.as_slice());
+        assert!(point_25d.is_valid());
+
+        // Test 32D point with mixed values (max supported by std traits)
+        let mut coords_32d = [0.0; 32];
+        for (i, coord) in coords_32d.iter_mut().enumerate() {
+            *coord = i as f64;
+        }
+        let point_32d = Point::new(coords_32d);
+        assert_eq!(point_32d.dim(), 32);
+        assert_relative_eq!(point_32d.coordinates().as_slice(), coords_32d.as_slice());
+        assert!(point_32d.is_valid());
+
+        // Test high dimensional point with NaN
+        let mut coords_with_nan = [1.0; 25];
+        coords_with_nan[12] = f64::NAN;
+        let point_with_nan = Point::new(coords_with_nan);
+        assert!(!point_with_nan.is_valid());
+
+        // Test equality for high dimensional points
+        let point_20d_copy = Point::new([1.0; 20]);
+        assert_eq!(point_20d, point_20d_copy);
+
+        // Test with 30D points
+        let coords_30d_a = [std::f64::consts::PI; 30];
+        let coords_30d_b = [std::f64::consts::PI; 30];
+        let point_30d_a = Point::new(coords_30d_a);
+        let point_30d_b = Point::new(coords_30d_b);
+        assert_eq!(point_30d_a, point_30d_b);
+        assert!(point_30d_a.is_valid());
+    }
+
+    #[test]
+    fn point_boundary_numeric_values() {
+        // Test with extreme numeric values
+
+        // Test with very large f64 values
+        let large_point = Point::new([f64::MAX, f64::MAX / 2.0, 1e308]);
+        assert!(large_point.is_valid());
+        assert_relative_eq!(large_point.coordinates()[0], f64::MAX);
+
+        // Test with very small f64 values
+        let small_point = Point::new([f64::MIN, f64::MIN_POSITIVE, 1e-308]);
+        assert!(small_point.is_valid());
+
+        // Test with subnormal numbers
+        let subnormal = f64::MIN_POSITIVE / 2.0;
+        let subnormal_point = Point::new([subnormal, -subnormal, 0.0]);
+        assert!(subnormal_point.is_valid());
+
+        // Test with integer extremes
+        let extreme_int_point = Point::new([i64::MAX, i64::MIN, 0i64]);
+        assert!(extreme_int_point.is_valid());
+        assert_eq!(extreme_int_point.coordinates(), [i64::MAX, i64::MIN, 0i64]);
+
+        // Test with unsigned integer extremes
+        let extreme_uint_point = Point::new([u64::MAX, u64::MIN, 42u64]);
+        assert!(extreme_uint_point.is_valid());
+        assert_eq!(
+            extreme_uint_point.coordinates(),
+            [u64::MAX, u64::MIN, 42u64]
+        );
+
+        // Test f32 extremes
+        let extreme_f32_point = Point::new([f32::MAX, f32::MIN, f32::MIN_POSITIVE]);
+        assert!(extreme_f32_point.is_valid());
+    }
+
+    #[test]
+    fn point_clone_and_copy_semantics() {
+        // Test that Point correctly implements Clone and Copy
+
+        let original = Point::new([1.0, 2.0, 3.0]);
+
+        // Test explicit cloning
+        #[allow(clippy::redundant_clone)]
+        let cloned = original.clone();
+        assert_relative_eq!(
+            original.coordinates().as_slice(),
+            cloned.coordinates().as_slice()
+        );
+
+        // Test copy semantics (should work implicitly)
+        let copied = original; // This should copy, not move
+        assert_eq!(original, copied);
+
+        // Original should still be accessible after copy
+        assert_eq!(original.dim(), 3);
+        assert_eq!(copied.dim(), 3);
+
+        // Test with different types
+        let int_point = Point::new([1i32, 2i32]);
+        let int_copied = int_point;
+        assert_eq!(int_point, int_copied);
+
+        // Test with f32
+        let f32_point = Point::new([1.5f32, 2.5f32, 3.5f32, 4.5f32]);
+        let f32_copied = f32_point;
+        assert_eq!(f32_point, f32_copied);
+    }
+
+    #[test]
+    fn point_partial_ord_comprehensive() {
+        use std::cmp::Ordering;
+
+        // Test lexicographic ordering in detail
+        let point_a = Point::new([1.0, 2.0, 3.0]);
+        let point_b = Point::new([1.0, 2.0, 4.0]); // Greater in last coordinate
+        let point_c = Point::new([1.0, 3.0, 0.0]); // Greater in second coordinate
+        let point_d = Point::new([2.0, 0.0, 0.0]); // Greater in first coordinate
+
+        // Test all comparison operators
+        assert!(point_a < point_b);
+        assert!(point_b > point_a);
+        assert!(point_a <= point_b);
+        assert!(point_b >= point_a);
+
+        assert!(point_a < point_c);
+        assert!(point_a < point_d);
+        assert!(point_c < point_d);
+
+        // Test partial_cmp directly
+        assert_eq!(point_a.partial_cmp(&point_b), Some(Ordering::Less));
+        assert_eq!(point_b.partial_cmp(&point_a), Some(Ordering::Greater));
+        assert_eq!(point_a.partial_cmp(&point_a), Some(Ordering::Equal));
+
+        // Test with negative numbers
+        let neg_point_a = Point::new([-1.0, -2.0]);
+        let neg_point_b = Point::new([-1.0, -1.0]);
+        assert!(neg_point_a < neg_point_b); // -2.0 < -1.0
+
+        // Test with mixed positive/negative
+        let mixed_a = Point::new([-1.0, 2.0]);
+        let mixed_b = Point::new([1.0, -2.0]);
+        assert!(mixed_a < mixed_b); // -1.0 < 1.0
+
+        // Test with zeros
+        let zero_a = Point::new([0.0, 0.0]);
+        let zero_b = Point::new([0.0, 0.0]);
+        assert_eq!(zero_a.partial_cmp(&zero_b), Some(Ordering::Equal));
+
+        // Test with special float values (where defined)
+        let inf_point = Point::new([f64::INFINITY]);
+        let normal_point = Point::new([1.0]);
+        // Note: PartialOrd with NaN/Infinity may have special behavior
+        assert!(normal_point < inf_point);
+    }
+
+    #[test]
+    fn point_memory_layout_and_size() {
+        use std::mem;
+
+        // Test that Point has the expected memory layout
+        // Point should be the same size as its coordinate array
+
+        assert_eq!(mem::size_of::<Point<f64, 3>>(), mem::size_of::<[f64; 3]>());
+        assert_eq!(mem::size_of::<Point<f32, 4>>(), mem::size_of::<[f32; 4]>());
+        assert_eq!(mem::size_of::<Point<i32, 2>>(), mem::size_of::<[i32; 2]>());
+        assert_eq!(mem::size_of::<Point<u64, 5>>(), mem::size_of::<[u64; 5]>());
+
+        // Test alignment
+        assert_eq!(
+            mem::align_of::<Point<f64, 3>>(),
+            mem::align_of::<[f64; 3]>()
+        );
+        assert_eq!(
+            mem::align_of::<Point<i32, 4>>(),
+            mem::align_of::<[i32; 4]>()
+        );
+
+        // Test with different dimensions
+        assert_eq!(mem::size_of::<Point<f64, 1>>(), 8); // 1 * 8 bytes
+        assert_eq!(mem::size_of::<Point<f64, 2>>(), 16); // 2 * 8 bytes
+        assert_eq!(mem::size_of::<Point<f64, 10>>(), 80); // 10 * 8 bytes
+
+        assert_eq!(mem::size_of::<Point<f32, 1>>(), 4); // 1 * 4 bytes
+        assert_eq!(mem::size_of::<Point<f32, 2>>(), 8); // 2 * 4 bytes
+
+        assert_eq!(mem::size_of::<Point<i32, 1>>(), 4); // 1 * 4 bytes
+        assert_eq!(mem::size_of::<Point<i32, 3>>(), 12); // 3 * 4 bytes
+    }
+
+    #[test]
+    fn point_zero_dimensional() {
+        // Test 0-dimensional points (edge case)
+        let point_0d: Point<f64, 0> = Point::new([]);
+        assert_eq!(point_0d.dim(), 0);
+        assert_relative_eq!(
+            point_0d.coordinates().as_slice(),
+            ([] as [f64; 0]).as_slice()
+        );
+        assert!(point_0d.is_valid());
+
+        // Test equality for 0D points
+        let point_0d_2: Point<f64, 0> = Point::new([]);
+        assert_eq!(point_0d, point_0d_2);
+
+        // Test hashing for 0D points
+        let hash_0d = get_hash(&point_0d);
+        let hash_0d_2 = get_hash(&point_0d_2);
+        assert_eq!(hash_0d, hash_0d_2);
+
+        // Test with different types
+        let point_0d_int: Point<i32, 0> = Point::new([]);
+        assert_eq!(point_0d_int.dim(), 0);
+        assert!(point_0d_int.is_valid());
+
+        // Test origin for 0D
+        let origin_0d: Point<f64, 0> = Point::origin();
+        assert_eq!(origin_0d, point_0d);
+    }
+
+    #[test]
+    fn point_serialization_edge_cases() {
+        // Test serialization with special floating point values
+
+        // Test with NaN
+        let point_with_nan = Point::new([f64::NAN, 1.0, 2.0]);
+        let serialized_nan = serde_json::to_string(&point_with_nan).unwrap();
+        // NaN serializes as null in JSON
+        assert!(serialized_nan.contains("null"));
+
+        // Test with infinity
+        let point_with_inf = Point::new([f64::INFINITY, 1.0]);
+        let serialized_inf = serde_json::to_string(&point_with_inf).unwrap();
+        // Infinity serializes as null in JSON
+        assert!(serialized_inf.contains("null"));
+
+        // Test with negative infinity
+        let point_with_neg_inf = Point::new([f64::NEG_INFINITY, 1.0]);
+        let serialized_neg_inf = serde_json::to_string(&point_with_neg_inf).unwrap();
+        assert!(serialized_neg_inf.contains("null"));
+
+        // Test with very large numbers
+        let point_large = Point::new([1e100, -1e100, 0.0]);
+        let serialized_large = serde_json::to_string(&point_large).unwrap();
+        let deserialized_large: Point<f64, 3> = serde_json::from_str(&serialized_large).unwrap();
+        assert_eq!(point_large, deserialized_large);
+
+        // Test with very small numbers
+        let point_small = Point::new([1e-100, -1e-100, 0.0]);
+        let serialized_small = serde_json::to_string(&point_small).unwrap();
+        let deserialized_small: Point<f64, 3> = serde_json::from_str(&serialized_small).unwrap();
+        assert_eq!(point_small, deserialized_small);
+    }
+
+    #[test]
+    fn point_conversion_edge_cases() {
+        // Test edge cases in type conversions
+
+        // Test conversion with potential precision loss (should still work)
+        let precise_coords = [1.000_000_000_000_001_f64, 2.000_000_000_000_002_f64];
+        let point_precise: Point<f64, 2> = Point::from(precise_coords);
+        assert_relative_eq!(
+            point_precise.coordinates().as_slice(),
+            precise_coords.as_slice()
+        );
+
+        // Test conversion from array reference
+        let coords_ref = &[1.0f32, 2.0f32, 3.0f32];
+        let point_from_ref: Point<f64, 3> = Point::from(*coords_ref);
+        assert_relative_eq!(
+            point_from_ref.coordinates().as_slice(),
+            [1.0f64, 2.0f64, 3.0f64].as_slice()
+        );
+
+        // Test conversion to array with different methods
+        let point = Point::new([1.0, 2.0, 3.0]);
+
+        // Using Into trait
+        let coords_into: [f64; 3] = point.into();
+        assert_relative_eq!(coords_into.as_slice(), [1.0, 2.0, 3.0].as_slice());
+
+        // Using From trait with reference
+        let point_ref = Point::new([4.0, 5.0]);
+        let coords_from_ref: [f64; 2] = (&point_ref).into();
+        assert_relative_eq!(coords_from_ref.as_slice(), [4.0, 5.0].as_slice());
+
+        // Verify original point is still usable after reference conversion
+        assert_relative_eq!(point_ref.coordinates().as_slice(), [4.0, 5.0].as_slice());
+    }
+
+    #[test]
+    fn point_hash_distribution_basic() {
+        use std::collections::HashSet;
+
+        // Test that different points generally produce different hashes
+        // (This is a probabilistic test, not a guarantee)
+
+        let mut hashes = HashSet::new();
+
+        // Generate a variety of points and collect their hashes
+        for i in 0..100 {
+            let point = Point::new([f64::from(i), f64::from(i * 2)]);
+            let hash = get_hash(&point);
+            hashes.insert(hash);
+        }
+
+        // We should have close to 100 unique hashes (allowing for some collisions)
+        assert!(
+            hashes.len() > 90,
+            "Hash distribution seems poor: {} unique hashes out of 100",
+            hashes.len()
+        );
+
+        // Test with negative values
+        for i in -50..50 {
+            let point = Point::new([f64::from(i), f64::from(i * 3), f64::from(i * 5)]);
+            let hash = get_hash(&point);
+            hashes.insert(hash);
+        }
+
+        // Should have even more unique hashes now
+        assert!(
+            hashes.len() > 140,
+            "Hash distribution with negatives: {} unique hashes",
+            hashes.len()
+        );
+    }
+
+    #[test]
+    fn point_trait_completeness() {
+        // Helper functions for compile-time trait checks
+        fn assert_send<T: Send>(_: T) {}
+        fn assert_sync<T: Sync>(_: T) {}
+
+        // Test that Point implements all expected traits
+
+        let point = Point::new([1.0, 2.0, 3.0]);
+
+        // Test Debug trait
+        let debug_output = format!("{point:?}");
+        assert!(!debug_output.is_empty());
+        assert!(debug_output.contains("Point"));
+
+        // Test Default trait
+        let default_point: Point<f64, 3> = Point::default();
+        assert_relative_eq!(
+            default_point.coordinates().as_slice(),
+            [0.0, 0.0, 0.0].as_slice()
+        );
+
+        // Test PartialOrd trait (ordering)
+        let point_smaller = Point::new([1.0, 2.0, 2.9]);
+        assert!(point_smaller < point);
+
+        // Test that Send and Sync are implemented (compile-time check)
+        assert_send(point);
+        assert_sync(point);
+
+        // Test Clone and Copy
+        #[allow(clippy::redundant_clone)]
+        let _cloned = point.clone();
+        let _copied = point;
+
+        // Test that point can be used in collections requiring Hash + Eq
+        let mut set = std::collections::HashSet::new();
+        set.insert(point);
+        assert!(set.contains(&point));
     }
 }

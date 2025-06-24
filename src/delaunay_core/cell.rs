@@ -737,6 +737,7 @@ mod tests {
 
     use super::*;
     use crate::delaunay_core::{point::Point, vertex::VertexBuilder};
+    use approx::assert_relative_eq;
 
     #[test]
     fn cell_build() {
@@ -1176,7 +1177,7 @@ mod tests {
         let circumradius = cell.circumradius().unwrap();
         let radius: f64 = 3.0_f64.sqrt() / 2.0;
 
-        assert_eq!(circumradius, radius);
+        assert_relative_eq!(circumradius, radius, epsilon = 1e-9);
 
         // Human readable output for cargo test -- --nocapture
         println!("Circumradius: {circumradius:?}");
@@ -1993,8 +1994,8 @@ mod tests {
         let circumcenter = cell.circumcenter().unwrap();
 
         // For this triangle, circumcenter should be at (1.0, 0.75)
-        assert!((circumcenter.coordinates()[0] - 1.0).abs() < 1e-10);
-        assert!((circumcenter.coordinates()[1] - 0.75).abs() < 1e-10);
+        assert_relative_eq!(circumcenter.coordinates()[0], 1.0, epsilon = 1e-10);
+        assert_relative_eq!(circumcenter.coordinates()[1], 0.75, epsilon = 1e-10);
     }
 
     #[test]
@@ -2020,7 +2021,7 @@ mod tests {
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
-        assert!((circumradius - expected_radius).abs() < 1e-10);
+        assert_relative_eq!(circumradius, expected_radius, epsilon = 1e-10);
     }
 
     #[test]
@@ -2298,7 +2299,7 @@ mod tests {
         let radius_with_center = cell.circumradius_with_center(&circumcenter);
         let radius_direct = cell.circumradius().unwrap();
 
-        assert!((radius_with_center - radius_direct).abs() < 1e-10);
+        assert_relative_eq!(radius_with_center, radius_direct, epsilon = 1e-10);
     }
 
     #[test]

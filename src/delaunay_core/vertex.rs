@@ -322,6 +322,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
 
     // Helper function to create a basic vertex with given coordinates
     fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
@@ -370,7 +371,11 @@ mod tests {
     fn vertex_default() {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
 
-        assert_eq!(vertex.point().coordinates(), [0.0, 0.0, 0.0]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 3);
         assert!(vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -387,7 +392,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -409,7 +418,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -429,6 +442,11 @@ mod tests {
         let vertex_copy = vertex;
 
         assert_eq!(vertex, vertex_copy);
+        assert_relative_eq!(
+            vertex_copy.point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0, 4.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -440,11 +458,23 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
-        assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
+        assert_relative_eq!(
+            vertices[0].point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertices[0].dim(), 3);
-        assert_eq!(vertices[1].point().coordinates(), [4.0, 5.0, 6.0]);
+        assert_relative_eq!(
+            vertices[1].point().coordinates().as_slice(),
+            [4.0, 5.0, 6.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertices[1].dim(), 3);
-        assert_eq!(vertices[2].point().coordinates(), [7.0, 8.0, 9.0]);
+        assert_relative_eq!(
+            vertices[2].point().coordinates().as_slice(),
+            [7.0, 8.0, 9.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
@@ -653,7 +683,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [1.5, 2.5]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [1.5, 2.5].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 2);
         assert!(!vertex.uuid().is_nil());
     }
@@ -801,7 +835,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [-1.0, -2.0, -3.0]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [-1.0, -2.0, -3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -827,9 +865,10 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(
-            vertex.point().coordinates(),
-            [1000000.0, 2000000.0, 3000000.0]
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [1_000_000.0, 2_000_000.0, 3_000_000.0].as_slice(),
+            epsilon = 1e-9
         );
         assert_eq!(vertex.dim(), 3);
     }
@@ -841,7 +880,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [0.000001, 0.000002, 0.000003]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [0.000_001, 0.000_002, 0.000_003].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 3);
     }
 
@@ -859,7 +902,11 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
         assert_eq!(vertices.len(), 1);
-        assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
+        assert_relative_eq!(
+            vertices[0].point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertices[0].dim(), 3);
         assert!(!vertices[0].uuid().is_nil());
     }
@@ -884,9 +931,10 @@ mod tests {
 
         assert_eq!(hashmap.len(), 1);
         assert!(hashmap.contains_key(&uuid));
-        assert_eq!(
-            hashmap.get(&uuid).unwrap().point().coordinates(),
-            [1.0, 2.0, 3.0]
+        assert_relative_eq!(
+            hashmap.get(&uuid).unwrap().point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
         );
     }
 
@@ -945,7 +993,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [1.0, -2.0, 3.0, -4.0]);
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [1.0, -2.0, 3.0, -4.0].as_slice(),
+            epsilon = 1e-9
+        );
         assert_eq!(vertex.dim(), 4);
     }
 
@@ -958,7 +1010,11 @@ mod tests {
 
         // Test implicit conversion from owned vertex
         let coords_owned: [f64; 3] = vertex.into();
-        assert_eq!(coords_owned, [1.0, 2.0, 3.0]);
+        assert_relative_eq!(
+            coords_owned.as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Create a new vertex for reference test
         let vertex_ref: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
@@ -968,10 +1024,18 @@ mod tests {
 
         // Test implicit conversion from vertex reference
         let coords_ref: [f64; 3] = (&vertex_ref).into();
-        assert_eq!(coords_ref, [4.0, 5.0, 6.0]);
+        assert_relative_eq!(
+            coords_ref.as_slice(),
+            [4.0, 5.0, 6.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Verify the original vertex is still available after reference conversion
-        assert_eq!(vertex_ref.point().coordinates(), [4.0, 5.0, 6.0]);
+        assert_relative_eq!(
+            vertex_ref.point().coordinates().as_slice(),
+            [4.0, 5.0, 6.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]

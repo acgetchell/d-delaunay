@@ -291,6 +291,7 @@ pub enum FacetError {
 mod tests {
     use super::*;
     use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
+    use approx::assert_relative_eq;
 
     // Define type aliases for complex types
     type TestVertex3D = Vertex<f64, Option<()>, 3>;
@@ -554,7 +555,11 @@ mod tests {
         // Default facet should have empty cell and default vertex
         assert_eq!(facet.cell().vertices().len(), 0);
         let default_coords: [f64; 3] = facet.vertex().into();
-        assert_eq!(default_coords, [0.0, 0.0, 0.0]);
+        assert_relative_eq!(
+            default_coords.as_slice(),
+            [0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -984,6 +989,13 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
+        // Helper function to get hash value
+        fn get_hash<T: Hash>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
         // Create a cell with some vertices
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
@@ -1013,13 +1025,6 @@ mod tests {
 
         // Create a different facet that should hash to a different value
         let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
-
-        // Helper function to get hash value
-        fn get_hash<T: Hash>(value: &T) -> u64 {
-            let mut hasher = DefaultHasher::new();
-            value.hash(&mut hasher);
-            hasher.finish()
-        }
 
         // Test that equal facets hash to the same value
         assert_eq!(get_hash(&facet1), get_hash(&facet2));
