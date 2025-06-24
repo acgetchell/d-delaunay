@@ -1,5 +1,7 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
+#![allow(clippy::similar_names)]
+
 use super::{
     facet::Facet,
     matrix::invert,
@@ -20,7 +22,7 @@ use uuid::Uuid;
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// - `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 ///   data U, and a constant D representing the number of dimensions.
@@ -30,7 +32,7 @@ use uuid::Uuid;
 /// - `neighbors`: The `neighbors` property is an optional container of [Uuid]
 ///   values. It represents the [Uuid]s of the neighboring cells that are connected
 ///   to the current [Cell], indexed such that the `i-th` neighbor is opposite the
-///   `i-th`` [Vertex].
+///   `i-th` [Vertex].
 /// - `data`: The `data` property is an optional field that can hold a value of
 ///   type `V`. It allows storage of additional data associated with the [Cell];
 ///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
@@ -89,11 +91,11 @@ where
 {
     /// The function returns the number of vertices in the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The number of vertices in the [Cell].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -112,11 +114,11 @@ where
 
     /// Returns a reference to the vertices of the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A reference to the `Vec<Vertex<T, U, D>>` containing the vertices of the cell.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -135,11 +137,11 @@ where
 
     /// Returns the UUID of the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The Uuid uniquely identifying this cell.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -157,12 +159,12 @@ where
 
     /// The `dim` function returns the dimensionality of the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function returns the dimension, which is calculated by
     /// subtracting 1 from the number of vertices in the [Cell].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -182,16 +184,16 @@ where
     /// The function `contains_vertex` checks if a given vertex is present in
     /// the Cell.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * vertex: The [Vertex] to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Vertex] is present in the [Cell], and
     /// `false` otherwise.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -230,15 +232,15 @@ where
 
     /// The function `contains_vertex_of` checks if the [Cell] contains any [Vertex] of a given [Cell].
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `cell`: The [Cell] to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Cell] has any [Vertex] in common with the [Cell].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -259,16 +261,20 @@ where
 
     /// The function `from_facet_and_vertex` creates a new [Cell] object from a [Facet] and a [Vertex].
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// - `facet`: The [Facet] to be used to create the [Cell].
     /// - `vertex`: The [Vertex] to be added to the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A [Result] type containing the new [Cell] or an error message.
     ///
-    /// # Example:
+    /// # Errors
+    ///
+    /// This function currently does not return errors, but uses `Result` for future extensibility.
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -311,7 +317,7 @@ where
 
     /// The function `is_valid` checks if a [Cell] is valid.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// True if the [Cell] is valid; the `Vertices` are correct (all coordinates
     /// are finite and UUIDs are valid), all vertices are distinct from one another,
@@ -319,7 +325,7 @@ where
     /// neighboring [Cell]s, and the `neighbors` are indexed such that the index
     /// of the [Vertex] opposite the neighboring cell is the same.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -407,11 +413,18 @@ where
     ///
     /// The resulting vector gives the coordinates of the circumcenter.
     ///
-    /// # Returns:
+    /// # Returns
     /// The circumcenter as a Point<f64, D> if successful, or an error if the
     /// simplex is degenerate or the matrix inversion fails.
     ///
-    /// # Example:
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The cell is not a valid simplex
+    /// - The matrix inversion fails due to degeneracy
+    /// - Vector to array conversion fails
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -465,6 +478,12 @@ where
     }
 
     /// The function `circumradius` returns the circumradius of the cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circumcenter calculation fails. See [`circumcenter`] for details.
+    ///
+    /// [`circumcenter`]: Self::circumcenter
     pub fn circumradius(&self) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -491,16 +510,22 @@ where
     /// The function `circumsphere_contains` checks if a given vertex is
     /// contained in the circumsphere of the Cell.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertex`: vertex to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Vertex] is contained in the circumsphere
     /// of the [Cell], and `false` otherwise.
     ///
-    /// # Example:
+    /// # Errors
+    ///
+    /// Returns an error if the circumcenter calculation fails. See [`circumcenter`] for details.
+    ///
+    /// [`circumcenter`]: Self::circumcenter
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -538,16 +563,20 @@ where
     /// stability by using a matrix determinant approach instead of distance calculations,
     /// which can accumulate floating-point errors.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertex`: The [Vertex] to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Vertex] is contained in the circumsphere
     /// of the [Cell], and `false` otherwise.
     ///
-    /// # Example:
+    /// # Errors
+    ///
+    /// Returns an error if matrix operations fail or if coordinate conversion fails.
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -600,7 +629,12 @@ where
 
     /// The function `facets` returns the [Facet]s of the [Cell].
     ///
-    /// # Example:
+    /// # Panics
+    ///
+    /// Panics if `Facet::new()` fails for any vertex in the cell. This should not
+    /// happen under normal circumstances with valid cell data.
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -1465,7 +1499,7 @@ mod tests {
 
     #[test]
     fn cell_default() {
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = Default::default();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::default();
 
         assert!(cell.vertices().is_empty());
         assert!(cell.uuid().is_nil());
@@ -2132,8 +2166,8 @@ mod tests {
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let _result = cell.circumsphere_contains_vertex(vertex_far_outside);
-        assert!(_result.is_ok());
+        let result = cell.circumsphere_contains_vertex(vertex_far_outside);
+        assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
         let origin = VertexBuilder::default()
@@ -2141,8 +2175,8 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let _result_origin = cell.circumsphere_contains_vertex(origin);
-        assert!(_result_origin.is_ok());
+        let result_origin = cell.circumsphere_contains_vertex(origin);
+        assert!(result_origin.is_ok());
     }
 
     #[test]
@@ -2171,16 +2205,16 @@ mod tests {
             .point(Point::new([10.0, 10.0]))
             .build()
             .unwrap();
-        let _result = cell.circumsphere_contains_vertex(vertex_far_outside);
-        assert!(_result.is_ok());
+        let result = cell.circumsphere_contains_vertex(vertex_far_outside);
+        assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
         let center = VertexBuilder::default()
             .point(Point::new([0.33, 0.33]))
             .build()
             .unwrap();
-        let _result_center = cell.circumsphere_contains_vertex(center);
-        assert!(_result_center.is_ok());
+        let result_center = cell.circumsphere_contains_vertex(center);
+        assert!(result_center.is_ok());
     }
 
     #[test]

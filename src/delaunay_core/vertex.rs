@@ -13,7 +13,7 @@ use uuid::Uuid;
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// - `point`: A generic [Point] representing the coordinates of
 ///   the vertex in a D-dimensional space.
@@ -58,18 +58,23 @@ where
     /// The function `from_points` takes a vector of points and returns a
     /// vector of vertices, using the `new` method.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `points`: `points` is a vector of [Point] objects.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The function `from_points` returns a `Vec<Vertex<T, U, D>>`, where `T`
     /// is the type of the coordinates of the [Vertex], `U` is the type of the
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
     ///
-    /// # Example:
+    /// # Panics
+    ///
+    /// Panics if the `VertexBuilder` fails to build a vertex from any point.
+    /// This should not happen under normal circumstances with valid point data.
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
@@ -91,16 +96,16 @@ where
     /// The function `into_hashmap` converts a vector of vertices into a
     /// [`HashMap`], using the vertices [Uuid] as the key.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertices`: `vertices` is a vector of `Vertex<T, U, D>`.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The function `into_hashmap` returns a [`HashMap`] with the key type
     /// [Uuid] and the value type [Vertex], i.e. `std::collections::HashMap<Uuid, Vertex<T, U, D>>`.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use std::collections::HashMap;
@@ -120,11 +125,11 @@ where
 
     /// Returns the point coordinates of the vertex.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A reference to the Point representing the vertex's coordinates.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -141,11 +146,11 @@ where
 
     /// Returns the UUID of the vertex.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The Uuid uniquely identifying this vertex.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -168,12 +173,12 @@ where
 
     /// The `dim` function returns the dimensionality of the [Vertex].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function is returning the value of `D`, which the number of
     /// coordinates.
     ///
-    /// # Example:
+    /// # Example
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
@@ -188,13 +193,13 @@ where
 
     /// The function `is_valid` checks if a [Vertex] is valid.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// True if the [Vertex] is valid; the [Point] is correct, the [Uuid] is
     /// valid and not nil, and the `incident_cell` contains the [Uuid] of a
     /// `Cell` that contains the [Vertex].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -363,7 +368,7 @@ mod tests {
 
     #[test]
     fn vertex_default() {
-        let vertex: Vertex<f64, Option<()>, 3> = Default::default();
+        let vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
 
         assert_eq!(vertex.point().coordinates(), [0.0, 0.0, 0.0]);
         assert_eq!(vertex.dim(), 3);
@@ -1120,7 +1125,7 @@ mod tests {
         assert!(!valid_vertex.uuid().is_nil());
 
         // Test that default vertex (which has nil UUID) is invalid
-        let default_vertex: Vertex<f64, Option<()>, 3> = Default::default();
+        let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         assert!(!default_vertex.is_valid()); // Should be invalid due to nil UUID
         assert!(default_vertex.uuid().is_nil());
         assert!(default_vertex.point().is_valid()); // Point itself is valid (zeros)

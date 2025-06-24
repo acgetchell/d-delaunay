@@ -16,7 +16,7 @@ use thiserror::Error;
 /// Passing in a [Vertex] and a [Cell] containing that vertex to the
 /// constructor will create a [Facet] struct.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// - `cell` - The [Cell] that contains this facet.
 /// - `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].
@@ -53,12 +53,18 @@ where
     /// - `cell`: The [Cell] that contains the [Facet].
     /// - `vertex`: The [Vertex] opposite to the [Facet].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A [Result] containing a [Facet] or an error message as to why
     /// the [Facet] could not be created.
     ///
-    /// # Example:
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The cell does not contain the specified vertex
+    /// - The cell is a zero simplex (contains only one vertex)
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -87,11 +93,11 @@ where
 
     /// Returns a reference to the [Cell] that contains this facet.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A reference to the [Cell] that defines this facet.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -127,11 +133,11 @@ where
     /// In a d-dimensional simplex, the facet is a (d-1)-dimensional sub-simplex,
     /// and the opposite vertex is the one vertex that, when removed, leaves the facet.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A reference to the [Vertex] opposite to this facet.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};

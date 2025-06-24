@@ -26,3 +26,4 @@ missing_docs = "warn"
 
 [lints.clippy]
 extra_unused_type_parameters = "warn"
+pedantic = "warn"

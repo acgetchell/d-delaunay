@@ -8,11 +8,13 @@
 //! - **NaN-aware equality**: Unlike IEEE 754 standard where NaN ≠ NaN, our Point implementation
 //!   treats NaN values as equal to themselves for consistent behavior in data structures.
 //! - **Consistent hashing**: Points with identical coordinates (including NaN) produce the same
-//!   hash value, enabling reliable use in HashMap and HashSet.
+//!   hash value, enabling reliable use in `HashMap` and `HashSet`.
 //! - **Mathematical properties**: Equality satisfies reflexivity, symmetry, and transitivity.
 //! - **Special value handling**: Proper comparison of infinity, negative infinity, and zero values.
 //!
 //! Run this example with: `cargo run --example point_comparison_and_hashing`
+
+#![allow(clippy::similar_names)]
 
 use d_delaunay::delaunay_core::point::Point;
 use std::collections::{HashMap, HashSet};
@@ -171,7 +173,7 @@ fn infinity_comparison_demo() {
     println!();
 }
 
-/// Demonstrates HashMap usage with points containing special values
+/// Demonstrates `HashMap` usage with points containing special values
 fn hashmap_demo() {
     println!("🗺️  HashMap with Special Values");
     println!("-------------------------------");
@@ -222,7 +224,7 @@ fn hashmap_demo() {
     println!();
 }
 
-/// Demonstrates HashSet behavior with special values
+/// Demonstrates `HashSet` behavior with special values
 fn hashset_demo() {
     println!("📦 HashSet with Special Values");
     println!("------------------------------");
@@ -342,7 +344,7 @@ fn numeric_types_demo() {
 
     // Mixed precision floating point
     println!("\nFloating Point Precision:");
-    let point_precise = Point::new([1.0000000000000001f64, 2.0]);
+    let point_precise = Point::new([1.000_000_000_000_000_1_f64, 2.0]);
     let point_rounded = Point::new([1.0f64, 2.0]);
     println!(
         "High precision vs rounded equal: {}",

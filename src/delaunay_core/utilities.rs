@@ -7,12 +7,12 @@ use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
 ///
-/// # Returns:
+/// # Returns
 ///
 /// a randomly generated [Uuid] (Universally Unique Identifier) using the
 /// `new_v4` method from the [Uuid] struct.
 ///
-/// # Example:
+/// # Example
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::make_uuid;
@@ -28,7 +28,7 @@ pub fn make_uuid() -> Uuid {
 /// returns the minimum or maximum coordinates based on the specified
 /// ordering.
 ///
-/// # Arguments:
+/// # Arguments
 ///
 /// - `vertices`: A [`HashMap`] containing [Vertex] objects, where the key is a
 ///   [Uuid] and the value is a [Vertex].
@@ -37,12 +37,19 @@ pub fn make_uuid() -> Uuid {
 ///   coordinates. [Ordering] is an enum with three possible values: `Less`,
 ///   `Equal`, and `Greater`.
 ///
-/// # Returns:
+/// # Returns
 ///
 /// an array of type `T` with length `D` containing the minimum or maximum
 /// coordinate for each dimension.
 ///
-/// # Example:
+/// # Panics
+///
+/// This function should not panic under normal circumstances as it handles
+/// the empty vertices case by returning default coordinates. However, it uses
+/// `.unwrap()` internally which could theoretically panic if the `HashMap`
+/// iterator behavior changes unexpectedly.
+///
+/// # Example
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
@@ -105,7 +112,11 @@ where
 
 /// The function `vec_to_array` converts a [Vec] to an array of f64
 ///
-/// # Example:
+/// # Errors
+///
+/// Returns an error if the vector length does not match the target array dimension `D`.
+///
+/// # Example
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::vec_to_array;

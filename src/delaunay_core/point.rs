@@ -15,6 +15,8 @@
 //! If you need standard IEEE 754 equality semantics, compare the coordinates
 //! directly instead of using Point equality.
 
+#![allow(clippy::similar_names)]
+
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
@@ -23,7 +25,7 @@ use std::hash::{Hash, Hasher};
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// * `coords`: `coords` is a private property of the [Point]. It is an array of
 ///   type `T` with a length of `D`. The type `T` is a generic type parameter,
@@ -49,16 +51,16 @@ where
     /// The function `new` creates a new instance of a [Point] with the given
     /// coordinates.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `coords`: The `coords` parameter is an array of type `T` with a
     ///   length of `D`.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `new` function returns an instance of the [Point].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -72,12 +74,12 @@ where
 
     /// The `dim` function returns the dimensionality of the [Point].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function returns the value of `D`, which the number of
     /// coordinates.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -92,11 +94,11 @@ where
 
     /// Returns a copy of the coordinates of the point.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `coordinates` function returns a copy of the coordinates array.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -110,12 +112,12 @@ where
 
     /// The `origin` function returns the origin [Point].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `origin()` function returns a D-dimensional origin point
     /// in Cartesian coordinates.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -134,12 +136,12 @@ where
     /// The Rust type system guarantees that the number of coordinates
     /// matches the dimensionality `D`.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `is_valid()` function returns a boolean indicating whether the
     /// point is valid, meaning all coordinates are finite.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -271,7 +273,7 @@ pub trait OrderedEq {
     ///
     /// * `other` - The other value to compare with
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the values are equal according to ordered comparison,
     /// `false` otherwise.
@@ -337,17 +339,17 @@ where
 {
     /// Create a new [Point] from an array of coordinates of type `T`.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `coords`: An array of type `T` with a length of `D`, representing the
     ///   coordinates of the point.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The function returns a new instance of the [Point] struct with the
     /// coordinates converted to type `U`.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -370,7 +372,7 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -389,7 +391,7 @@ where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -457,7 +459,7 @@ mod tests {
 
     #[test]
     fn point_default() {
-        let point: Point<f64, 4> = Default::default();
+        let point: Point<f64, 4> = Point::default();
 
         assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
 
@@ -530,7 +532,7 @@ mod tests {
 
     #[test]
     fn point_to_and_from_json() {
-        let point: Point<f64, 4> = Default::default();
+        let point: Point<f64, 4> = Point::default();
         let serialized = serde_json::to_string(&point).unwrap();
 
         assert_eq!(serialized, "{\"coords\":[0.0,0.0,0.0,0.0]}");

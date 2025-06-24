@@ -102,7 +102,7 @@ where
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// - `vertices`: A [`HashMap`] that stores vertices with their corresponding
 ///   [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
@@ -170,12 +170,12 @@ where
     /// The function creates a new instance of a triangulation data structure
     /// with given points, initializing the vertices and cells.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `points`: A container of [Point]s with which to initialize the
     ///   triangulation.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A Delaunay triangulation with cells and neighbors aligned, and vertices
     /// associated with cells.
@@ -194,17 +194,23 @@ where
     /// The `add` function checks if a [Vertex] with the same coordinates already
     /// exists in the [`HashMap`], and if not, inserts the [Vertex].
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertex`: The [Vertex] to add.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The function `add` returns `Ok(())` if the vertex was successfully
     /// added to the [`HashMap`], or an error message if the vertex already
     /// exists or if there is a [Uuid] collision.
     ///
-    /// # Example:
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - A vertex with the same coordinates already exists in the triangulation
+    /// - A vertex with the same UUID already exists (UUID collision)
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
@@ -240,11 +246,11 @@ where
     /// The function returns the number of vertices in the triangulation
     /// data structure.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The number of [Vertex] objects in the [Tds].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
@@ -263,12 +269,12 @@ where
 
     /// The `dim` function returns the dimensionality of the [Tds].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function returns the minimum value between the number of
     /// vertices minus one and the value of `D` as an [i32].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
@@ -287,7 +293,7 @@ where
 
     /// The function `number_of_cells` returns the number of cells in the [Tds].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The number of [Cell]s in the [Tds].
     #[must_use]
@@ -298,7 +304,7 @@ where
     /// The `supercell` function creates a larger cell that contains all the
     /// input vertices, with some padding added.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A [Cell] that encompasses all [Vertex] objects in the triangulation.
     #[allow(clippy::unnecessary_wraps)]
@@ -426,9 +432,24 @@ where
 
     /// Performs the Bowyer-Watson algorithm to triangulate a set of vertices.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A [Result] containing the updated [Tds] with the Delaunay triangulation, or an error message.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Supercell creation fails
+    /// - Circumsphere calculations fail during the algorithm
+    /// - Cell creation from facets and vertices fails
+    ///
+    /// # Algorithm
+    ///
+    /// The Bowyer-Watson algorithm works by:
+    /// 1. Creating a supercell that contains all input vertices
+    /// 2. For each input vertex, finding all cells whose circumsphere contains the vertex
+    /// 3. Removing these "bad" cells and creating new cells using the boundary facets
+    /// 4. Cleaning up supercell artifacts and assigning neighbor relationships
     pub fn bowyer_watson(mut self) -> Result<Self, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -739,9 +760,23 @@ where
 
     /// Checks whether the triangulation data structure is valid by verifying neighbor relationships.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// `true` if the triangulation passes all neighbor validation checks, otherwise `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Neighbor relationships are not mutual between cells
+    /// - Cells have too many neighbors for their dimension
+    /// - Neighboring cells don't share the proper number of vertices
+    /// - Duplicate cells exist (cells with identical vertex sets)
+    ///
+    /// # Validation Checks
+    ///
+    /// This function performs comprehensive validation including:
+    /// 1. Neighbor relationship validation via [`validate_neighbors`]
+    /// 2. Cell uniqueness validation via [`validate_unique_cells`]
     pub fn is_valid(&self) -> Result<(), Error>
     where
         [T; D]: serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -753,6 +788,14 @@ where
 }
 
 /// Helper function to validate neighbor relationships in Tds
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A cell has more neighbors than dimensionally possible (more than D+1)
+/// - Neighbor relationships are not mutual between cells
+/// - A neighbor cell referenced in a cell's neighbor list doesn't exist
+/// - Neighboring cells don't share exactly D vertices (a proper facet)
 pub fn validate_neighbors<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
@@ -828,7 +871,13 @@ where
 ///   - has exactly `D+1` vertices (a D‑simplex), **and**
 ///   - no two cells share the exact same sorted set of vertex UUIDs.
 ///
-/// It also prints a human‑friendly summary of each cell’s vertices.
+/// It also prints a human‑friendly summary of each cell's vertices.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Any cell doesn't have exactly D+1 vertices (not a proper D-simplex)
+/// - Two or more cells share identical vertex sets (duplicate cells)
 ///
 /// Returns `Ok(())` on success or an `anyhow::Error` describing the first failure.
 pub fn validate_unique_cells<T, U, V, const D: usize>(
