@@ -1309,18 +1309,6 @@ where
         let mut seen: HashMap<Vec<Uuid>, Uuid> = HashMap::new();
 
         for (cell_id, cell) in &self.cells {
-            // Check that cell has exactly D+1 vertices (a proper D-simplex)
-            if cell.vertices().len() != D + 1 {
-                return Err(TriangulationValidationError::DuplicateCells {
-                    message: format!(
-                        "Cell {:?} has {} vertices; expected {}",
-                        cell_id,
-                        cell.vertices().len(),
-                        D + 1
-                    ),
-                });
-            }
-
             // Check for duplicate cells (cells with identical vertex sets)
             let mut key: Vec<Uuid> = cell
                 .vertices()
@@ -2115,9 +2103,10 @@ mod tests {
         tds.cells.insert(cell.uuid(), cell);
 
         let result = tds.is_valid();
+        // Should now get InvalidCell error because cell validation detects insufficient vertices
         assert!(matches!(
             result,
-            Err(TriangulationValidationError::DuplicateCells { .. })
+            Err(TriangulationValidationError::InvalidCell { .. })
         ));
     }
 

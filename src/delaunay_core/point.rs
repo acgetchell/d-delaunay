@@ -808,8 +808,8 @@ mod tests {
         assert_relative_eq!(
             point_f64.coordinates().as_slice(),
             expected.as_slice(),
-            epsilon = 1e-6,
-            max_relative = 1e-6
+            epsilon = 1e-9,
+            max_relative = 1e-7
         );
     }
 
