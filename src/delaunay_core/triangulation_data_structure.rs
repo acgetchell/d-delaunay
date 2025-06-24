@@ -451,7 +451,7 @@ where
                     .build()
                     .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {:?}", e)))
                 {
-                    self.cells.insert(cell.uuid, cell);
+                    self.cells.insert(cell.uuid(), cell);
                     created_cells += 1;
                 }
             }
@@ -476,8 +476,8 @@ where
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
         let supercell_vertices: HashSet<Uuid> =
-            supercell.vertices.iter().map(|v| v.uuid()).collect();
-        let supercell_uuid = supercell.uuid;
+            supercell.vertices().iter().map(|v| v.uuid()).collect();
+        let supercell_uuid = supercell.uuid();
         self.cells.insert(supercell_uuid, supercell.clone());
 
         // Collect input vertices into a vector to avoid borrowing conflicts
@@ -500,7 +500,7 @@ where
             // Create new cells using the boundary facets and the new vertex
             for facet in boundary_facets.iter() {
                 let new_cell = Cell::from_facet_and_vertex(facet.clone(), *vertex)?;
-                self.cells.insert(new_cell.uuid, new_cell);
+                self.cells.insert(new_cell.uuid(), new_cell);
             }
         }
 
@@ -573,7 +573,7 @@ where
             .iter()
             .filter(|(_, cell)| {
                 let cell_vertex_uuids: HashSet<Uuid> =
-                    cell.vertices.iter().map(|v| v.uuid()).collect();
+                    cell.vertices().iter().map(|v| v.uuid()).collect();
                 let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
 
                 // Remove cells that don't consist entirely of input vertices
@@ -593,7 +593,7 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid()).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(|v| v.uuid()).collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -675,7 +675,7 @@ where
 
         // Find which cells contain each vertex
         for (cell_id, cell) in &self.cells {
-            for vertex in &cell.vertices {
+            for vertex in cell.vertices() {
                 if let Some(incident_cells) = vertex_to_cells.get_mut(&vertex.uuid()) {
                     incident_cells.push(*cell_id);
                 }
@@ -705,7 +705,7 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid()).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(|v| v.uuid()).collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -753,7 +753,7 @@ where
     let mut total_neighbor_links = 0;
     for (cell_id, cell) in &tds.cells {
         println!("Checking cell {:?}", cell_id);
-        let this_vertices: HashSet<_> = cell.vertices.iter().map(|v| v.uuid()).collect();
+        let this_vertices: HashSet<_> = cell.vertices().iter().map(|v| v.uuid()).collect();
 
         if let Some(neighbors) = &cell.neighbors {
             if neighbors.len() > D + 1 {
@@ -786,7 +786,7 @@ where
 
                 // Shared facet check: should share exactly D vertices (i.e., D+1 simplex - 1)
                 let neighbor_vertices: HashSet<_> =
-                    neighbor_cell.vertices.iter().map(|v| v.uuid()).collect();
+                    neighbor_cell.vertices().iter().map(|v| v.uuid()).collect();
                 let shared: HashSet<_> = this_vertices.intersection(&neighbor_vertices).collect();
                 if shared.len() != D {
                     return Err(anyhow!(
@@ -828,18 +828,18 @@ where
 
     for (cell_id, cell) in &tds.cells {
         // 1.  D + 1‑vertex check
-        if cell.vertices.len() != D + 1 {
+        if cell.vertices().len() != D + 1 {
             return Err(anyhow!(
                 "Cell {:?} has {} vertices; expected {}",
                 cell_id,
-                cell.vertices.len(),
+                cell.vertices().len(),
                 D + 1
             ));
         }
 
         // 2.  Pretty print this cell
-        print!("Cell {:>3} {} vertices:", idx, cell.vertices.len());
-        for v in &cell.vertices {
+        print!("Cell {:>3} {} vertices:", idx, cell.vertices().len());
+        for v in cell.vertices() {
             let coords: Vec<f64> = v
                 .point()
                 .coordinates()
@@ -852,7 +852,7 @@ where
         idx += 1;
 
         // 3.  Uniqueness check
-        let mut key: Vec<Uuid> = cell.vertices.iter().map(|v| v.uuid()).collect();
+        let mut key: Vec<Uuid> = cell.vertices().iter().map(|v| v.uuid()).collect();
         key.sort_unstable();
         if let Some(dup_id) = seen.insert(key.clone(), *cell_id) {
             return Err(anyhow!(
@@ -987,17 +987,17 @@ mod tests {
         let unwrapped_supercell =
             supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}!", err));
 
-        assert_eq!(unwrapped_supercell.vertices.len(), 4);
+        assert_eq!(unwrapped_supercell.vertices().len(), 4);
 
         // Debug: Print actual supercell coordinates
         println!("Actual supercell vertices:");
-        for (i, vertex) in unwrapped_supercell.vertices.iter().enumerate() {
+        for (i, vertex) in unwrapped_supercell.vertices().iter().enumerate() {
             println!("  Vertex {}: {:?}", i, vertex.point().coordinates());
         }
 
         // The supercell should contain all input points
         // Let's verify it's a proper tetrahedron rather than checking specific coordinates
-        assert_eq!(unwrapped_supercell.vertices.len(), 4);
+        assert_eq!(unwrapped_supercell.vertices().len(), 4);
 
         // Human readable output for cargo test -- --nocapture
         println!("{:?}", unwrapped_supercell);

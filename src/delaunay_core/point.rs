@@ -380,9 +380,55 @@ where
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use approx::assert_relative_eq;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    // Helper function to get hash value for any hashable type
+    fn get_hash<T: Hash>(value: &T) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    // Helper function to test basic point properties
+    fn test_basic_point_properties<T, const D: usize>(
+        point: &Point<T, D>,
+        expected_coords: [T; D],
+        expected_dim: usize,
+    ) where
+        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + std::fmt::Debug,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        assert_eq!(point.coordinates(), expected_coords);
+        assert_eq!(point.dim(), expected_dim);
+    }
+
+    // Helper function to test point equality and hash consistency
+    fn test_point_equality_and_hash<T, const D: usize>(
+        point1: Point<T, D>,
+        point2: Point<T, D>,
+        should_be_equal: bool,
+    ) where
+        T: HashCoordinate
+            + Clone
+            + Copy
+            + Default
+            + PartialEq
+            + PartialOrd
+            + OrderedEq
+            + std::fmt::Debug,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        if should_be_equal {
+            assert_eq!(point1, point2);
+            assert_eq!(get_hash(&point1), get_hash(&point2));
+        } else {
+            assert_ne!(point1, point2);
+            // Note: Different points may still hash to same value (hash collisions)
+        }
+    }
 
     #[test]
     fn point_default() {
@@ -641,45 +687,37 @@ mod tests {
     #[test]
     fn point_1d() {
         let point: Point<f64, 1> = Point::new([42.0]);
-
-        assert_eq!(point.coordinates(), [42.0]);
-        assert_eq!(point.dim(), 1);
+        test_basic_point_properties(&point, [42.0], 1);
 
         let origin: Point<f64, 1> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0]);
+        test_basic_point_properties(&origin, [0.0], 1);
     }
 
     #[test]
     fn point_2d() {
         let point: Point<f64, 2> = Point::new([1.0, 2.0]);
-
-        assert_eq!(point.coordinates(), [1.0, 2.0]);
-        assert_eq!(point.dim(), 2);
+        test_basic_point_properties(&point, [1.0, 2.0], 2);
 
         let origin: Point<f64, 2> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0]);
+        test_basic_point_properties(&origin, [0.0, 0.0], 2);
     }
 
     #[test]
     fn point_3d() {
         let point: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
-
-        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
-        assert_eq!(point.dim(), 3);
+        test_basic_point_properties(&point, [1.0, 2.0, 3.0], 3);
 
         let origin: Point<f64, 3> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0, 0.0]);
+        test_basic_point_properties(&origin, [0.0, 0.0, 0.0], 3);
     }
 
     #[test]
     fn point_5d() {
         let point: Point<f64, 5> = Point::new([1.0, 2.0, 3.0, 4.0, 5.0]);
-
-        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
-        assert_eq!(point.dim(), 5);
+        test_basic_point_properties(&point, [1.0, 2.0, 3.0, 4.0, 5.0], 5);
 
         let origin: Point<f64, 5> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0, 0.0, 0.0, 0.0]);
+        test_basic_point_properties(&origin, [0.0, 0.0, 0.0, 0.0, 0.0], 5);
     }
 
     #[test]
@@ -889,62 +927,28 @@ mod tests {
 
     #[test]
     fn point_hash_consistency_floating_point() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
         // Test that OrderedFloat provides consistent hashing for NaN-free floats
         let point1 = Point::new([1.0, 2.0, 3.5]);
         let point2 = Point::new([1.0, 2.0, 3.5]);
-
-        let mut hasher1 = DefaultHasher::new();
-        let mut hasher2 = DefaultHasher::new();
-
-        point1.hash(&mut hasher1);
-        point2.hash(&mut hasher2);
-
-        assert_eq!(hasher1.finish(), hasher2.finish());
+        test_point_equality_and_hash(point1, point2, true);
 
         // Test with f32
         let point_f32_1 = Point::new([1.5f32, 2.5f32]);
         let point_f32_2 = Point::new([1.5f32, 2.5f32]);
-
-        let mut hasher_f32_1 = DefaultHasher::new();
-        let mut hasher_f32_2 = DefaultHasher::new();
-
-        point_f32_1.hash(&mut hasher_f32_1);
-        point_f32_2.hash(&mut hasher_f32_2);
-
-        assert_eq!(hasher_f32_1.finish(), hasher_f32_2.finish());
+        test_point_equality_and_hash(point_f32_1, point_f32_2, true);
     }
 
     #[test]
     fn point_hash_consistency_integers() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
         // Test integer hashing consistency
         let point_i32_1 = Point::new([42, -17, 100]);
         let point_i32_2 = Point::new([42, -17, 100]);
-
-        let mut hasher1 = DefaultHasher::new();
-        let mut hasher2 = DefaultHasher::new();
-
-        point_i32_1.hash(&mut hasher1);
-        point_i32_2.hash(&mut hasher2);
-
-        assert_eq!(hasher1.finish(), hasher2.finish());
+        test_point_equality_and_hash(point_i32_1, point_i32_2, true);
 
         // Test with u64
         let point_u64_1 = Point::new([1000u64, 2000u64]);
         let point_u64_2 = Point::new([1000u64, 2000u64]);
-
-        let mut hasher_u64_1 = DefaultHasher::new();
-        let mut hasher_u64_2 = DefaultHasher::new();
-
-        point_u64_1.hash(&mut hasher_u64_1);
-        point_u64_2.hash(&mut hasher_u64_2);
-
-        assert_eq!(hasher_u64_1.finish(), hasher_u64_2.finish());
+        test_point_equality_and_hash(point_u64_1, point_u64_2, true);
     }
 
     #[test]

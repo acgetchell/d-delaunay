@@ -42,10 +42,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The vertices of the cell.
-    pub vertices: Vec<Vertex<T, U, D>>,
+    vertices: Vec<Vertex<T, U, D>>,
     /// The unique identifier of the cell.
     #[builder(setter(skip), default = "make_uuid()")]
-    pub uuid: Uuid,
+    uuid: Uuid,
     /// The neighboring cells connected to the current cell.
     #[builder(setter(skip), default = "None")]
     pub neighbors: Option<Vec<Uuid>>,
@@ -107,6 +107,51 @@ where
     /// ```
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
+    }
+
+    /// Returns a reference to the vertices of the [Cell].
+    ///
+    /// # Returns:
+    ///
+    /// A reference to the `Vec<Vertex<T, U, D>>` containing the vertices of the cell.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// assert_eq!(cell.vertices().len(), 3);
+    /// ```
+    #[inline]
+    pub fn vertices(&self) -> &Vec<Vertex<T, U, D>> {
+        &self.vertices
+    }
+
+    /// Returns the UUID of the [Cell].
+    ///
+    /// # Returns:
+    ///
+    /// The Uuid uniquely identifying this cell.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use uuid::Uuid;
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1]).build().unwrap();
+    /// assert_ne!(cell.uuid(), Uuid::nil());
+    /// ```
+    #[inline]
+    pub fn uuid(&self) -> Uuid {
+        self.uuid
     }
 
     /// The `dim` function returns the dimensionality of the [Cell].
@@ -253,7 +298,7 @@ where
     /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
     /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
-    /// assert!(new_cell.vertices.contains(&vertex5));
+    /// assert!(new_cell.vertices().contains(&vertex5));
     /// ```
     pub fn from_facet_and_vertex(
         facet: Facet<T, U, V, D>,
@@ -673,11 +718,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
-        assert_eq!(cell.vertices[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices[3].data.unwrap(), 2);
+        assert_eq!(*cell.vertices(), vec![vertex1, vertex2, vertex3, vertex4]);
+        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[3].data.unwrap(), 2);
         assert_eq!(cell.dim(), 3);
         assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
@@ -759,11 +804,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
-        assert_eq!(cell.vertices[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices[3].data.unwrap(), 2);
+        assert_eq!(*cell.vertices(), vec![vertex1, vertex2, vertex3, vertex4]);
+        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[3].data.unwrap(), 2);
         assert_eq!(cell.dim(), 3);
         assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
@@ -839,10 +884,10 @@ mod tests {
             .unwrap();
         let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
 
-        assert!(new_cell.vertices.contains(&vertex1));
-        assert!(new_cell.vertices.contains(&vertex2));
-        assert!(new_cell.vertices.contains(&vertex3));
-        assert!(new_cell.vertices.contains(&vertex5));
+        assert!(new_cell.vertices().contains(&vertex1));
+        assert!(new_cell.vertices().contains(&vertex2));
+        assert!(new_cell.vertices().contains(&vertex3));
+        assert!(new_cell.vertices().contains(&vertex5));
 
         // Human readable output for cargo test -- --nocapture
         println!("New Cell: {:?}", new_cell);
@@ -1285,8 +1330,8 @@ mod tests {
 
         assert_eq!(cell1, cell2);
         // Two cells with the same vertices but different uuids are equal
-        assert_ne!(cell1.uuid, cell2.uuid);
-        assert_eq!(cell1.vertices, cell2.vertices);
+        assert_ne!(cell1.uuid(), cell2.uuid());
+        assert_eq!(cell1.vertices(), cell2.vertices());
         assert_eq!(cell2, cell3);
         assert_ne!(cell3, cell4);
     }
@@ -1409,8 +1454,8 @@ mod tests {
     fn cell_default() {
         let cell: Cell<f64, Option<()>, Option<()>, 3> = Default::default();
 
-        assert!(cell.vertices.is_empty());
-        assert!(cell.uuid.is_nil());
+        assert!(cell.vertices().is_empty());
+        assert!(cell.uuid().is_nil());
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
     }
@@ -1433,7 +1478,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
-        assert!(!cell.uuid.is_nil());
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
@@ -1458,7 +1503,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 3);
         assert_eq!(cell.dim(), 2);
-        assert!(!cell.uuid.is_nil());
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
@@ -1491,7 +1536,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 5);
         assert_eq!(cell.dim(), 4);
-        assert!(!cell.uuid.is_nil());
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
@@ -1587,9 +1632,9 @@ mod tests {
             .unwrap();
 
         // Same vertices but different UUIDs
-        assert_ne!(cell1.uuid, cell2.uuid);
-        assert!(!cell1.uuid.is_nil());
-        assert!(!cell2.uuid.is_nil());
+        assert_ne!(cell1.uuid(), cell2.uuid());
+        assert!(!cell1.uuid().is_nil());
+        assert!(!cell2.uuid().is_nil());
     }
 
     #[test]
@@ -1674,8 +1719,8 @@ mod tests {
             .build()
             .unwrap();
 
-        let uuid1 = cell1.uuid;
-        let uuid2 = cell2.uuid;
+        let uuid1 = cell1.uuid();
+        let uuid2 = cell2.uuid();
         let cells = vec![cell1, cell2];
         let hashmap = Cell::into_hashmap(cells);
 
@@ -2442,9 +2487,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(cell.vertices[0].data.unwrap(), "first");
-        assert_eq!(cell.vertices[1].data.unwrap(), "second");
-        assert_eq!(cell.vertices[2].data.unwrap(), "third");
+        assert_eq!(cell.vertices()[0].data.unwrap(), "first");
+        assert_eq!(cell.vertices()[1].data.unwrap(), "second");
+        assert_eq!(cell.vertices()[2].data.unwrap(), "third");
         assert_eq!(cell.data.unwrap(), 42u32);
     }
 

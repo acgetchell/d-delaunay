@@ -31,10 +31,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The [Cell] that contains this facet.
-    pub cell: Cell<T, U, V, D>,
+    cell: Cell<T, U, V, D>,
 
     /// The [Vertex] opposite to this facet.
-    pub vertex: Vertex<T, U, D>,
+    vertex: Vertex<T, U, D>,
 }
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
@@ -71,25 +71,171 @@ where
     /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
-    /// assert_eq!(facet.cell, cell);
+    /// assert_eq!(facet.cell(), &cell);
     /// ```
     pub fn new(cell: Cell<T, U, V, D>, vertex: Vertex<T, U, D>) -> Result<Self, anyhow::Error> {
-        if !cell.vertices.contains(&vertex) {
+        if !cell.vertices().contains(&vertex) {
             return Err(FacetError::CellDoesNotContainVertex.into());
         }
 
-        if cell.vertices.len() == 1 {
+        if cell.vertices().len() == 1 {
             return Err(FacetError::CellIsZeroSimplex.into());
         }
 
         Ok(Facet { cell, vertex })
     }
 
-    /// The `vertices` method in the [Facet] returns a container of
-    /// [Vertex] objects that are in the [Facet].
+    /// Returns a reference to the [Cell] that contains this facet.
+    ///
+    /// # Returns:
+    ///
+    /// A reference to the [Cell] that defines this facet.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    ///
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    ///
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
+    ///
+    /// // Access the cell through the getter
+    /// let facet_cell = facet.cell();
+    /// assert_eq!(facet_cell.vertices().len(), 4);
+    /// assert_eq!(facet_cell.uuid(), cell.uuid());
+    /// ```
+    #[inline]
+    pub fn cell(&self) -> &Cell<T, U, V, D> {
+        &self.cell
+    }
+
+    /// Returns a reference to the [Vertex] opposite to this facet.
+    ///
+    /// The opposite vertex is the vertex in the cell that is not part of the facet.
+    /// In a d-dimensional simplex, the facet is a (d-1)-dimensional sub-simplex,
+    /// and the opposite vertex is the one vertex that, when removed, leaves the facet.
+    ///
+    /// # Returns:
+    ///
+    /// A reference to the [Vertex] opposite to this facet.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    ///
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    ///
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
+    ///
+    /// // Access the opposite vertex through the getter
+    /// let opposite_vertex = facet.vertex();
+    /// assert_eq!(opposite_vertex.uuid(), vertex1.uuid());
+    ///
+    /// // The facet's vertices should be all vertices except the opposite one
+    /// let facet_vertices = facet.vertices();
+    /// assert_eq!(facet_vertices.len(), 3);
+    /// assert!(!facet_vertices.contains(&vertex1)); // opposite vertex not in facet
+    /// assert!(facet_vertices.contains(&vertex2));
+    /// assert!(facet_vertices.contains(&vertex3));
+    /// assert!(facet_vertices.contains(&vertex4));
+    /// ```
+    #[inline]
+    pub fn vertex(&self) -> &Vertex<T, U, D> {
+        &self.vertex
+    }
+
+    /// Returns the vertices that make up this facet.
+    ///
+    /// In a d-dimensional simplex, a facet is a (d-1)-dimensional sub-simplex.
+    /// This method returns all vertices of the cell except the opposite vertex.
+    /// For example, in a 3D tetrahedron (4 vertices), each facet is a triangle (3 vertices).
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Vertex<T, U, D>>` containing all vertices that form this facet,
+    /// which are all the cell's vertices excluding the opposite vertex.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    ///
+    /// // Create a 3D tetrahedron with 4 vertices
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(); // origin
+    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(); // x-axis
+    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(); // y-axis
+    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(); // z-axis
+    ///
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// // Create a facet with vertex1 as the opposite vertex
+    /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
+    ///
+    /// // Get the vertices that make up this facet
+    /// let facet_vertices = facet.vertices();
+    ///
+    /// // The facet should contain 3 vertices (it's a triangle in 3D)
+    /// assert_eq!(facet_vertices.len(), 3);
+    ///
+    /// // The facet should NOT contain the opposite vertex (vertex1)
+    /// assert!(!facet_vertices.contains(&vertex1));
+    ///
+    /// // The facet should contain all other vertices
+    /// assert!(facet_vertices.contains(&vertex2));
+    /// assert!(facet_vertices.contains(&vertex3));
+    /// assert!(facet_vertices.contains(&vertex4));
+    ///
+    /// // Verify we have exactly the expected vertices
+    /// let mut expected_vertices = vec![vertex2, vertex3, vertex4];
+    /// expected_vertices.sort_by_key(|v| v.uuid());
+    /// let mut actual_vertices = facet_vertices;
+    /// actual_vertices.sort_by_key(|v| v.uuid());
+    /// assert_eq!(actual_vertices, expected_vertices);
+    ///
+    /// // Test with a different opposite vertex
+    /// let facet2 = Facet::new(cell.clone(), vertex2).unwrap();
+    /// let facet2_vertices = facet2.vertices();
+    ///
+    /// // This facet should exclude vertex2 and include vertex1, vertex3, vertex4
+    /// assert_eq!(facet2_vertices.len(), 3);
+    /// assert!(!facet2_vertices.contains(&vertex2)); // opposite vertex excluded
+    /// assert!(facet2_vertices.contains(&vertex1));
+    /// assert!(facet2_vertices.contains(&vertex3));
+    /// assert!(facet2_vertices.contains(&vertex4));
+    /// ```
     pub fn vertices(&self) -> Vec<Vertex<T, U, D>> {
         self.cell
-            .vertices
+            .vertices()
             .iter()
             .filter(|v| **v != self.vertex)
             .cloned()
@@ -97,7 +243,7 @@ where
     }
 }
 
-/// Generic Eq implementation for Facet that requires Hash bounds
+// Consolidated trait implementations for Facet
 impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -118,6 +264,7 @@ where
     Vertex<T, U, D>: Hash,
     Cell<T, U, V, D>: Hash,
 {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.cell.hash(state);
         self.vertex.hash(state);
@@ -136,35 +283,71 @@ pub enum FacetError {
 }
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
 
+    // Helper function to create a standard tetrahedron (3D cell with 4 vertices)
+    fn create_tetrahedron() -> (
+        Cell<f64, Option<()>, Option<()>, 3>,
+        Vec<Vertex<f64, Option<()>, 3>>,
+    ) {
+        let vertices = vec![
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([1.0, 0.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([0.0, 1.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0, 1.0]))
+                .build()
+                .unwrap(),
+        ];
+        let cell = CellBuilder::default()
+            .vertices(vertices.clone())
+            .build()
+            .unwrap();
+        (cell, vertices)
+    }
+
+    // Helper function to create a triangle (2D cell with 3 vertices)
+    fn create_triangle() -> (
+        Cell<f64, Option<()>, Option<()>, 2>,
+        Vec<Vertex<f64, Option<()>, 2>>,
+    ) {
+        let vertices = vec![
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([1.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([0.5, 1.0]))
+                .build()
+                .unwrap(),
+        ];
+        let cell = CellBuilder::default()
+            .vertices(vertices.clone())
+            .build()
+            .unwrap();
+        (cell, vertices)
+    }
+
     #[test]
     fn facet_new() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let (cell, vertices) = create_tetrahedron();
+        let facet = Facet::new(cell.clone(), vertices[0]).unwrap();
 
-        assert_eq!(facet.cell, cell);
+        assert_eq!(facet.cell(), &cell);
 
         // Human readable output for cargo test -- --nocapture
         println!("Facet: {:?}", facet);
@@ -216,33 +399,14 @@ mod tests {
 
     #[test]
     fn facet_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
-        let vertices = facet.clone().vertices();
+        let (cell, vertices) = create_tetrahedron();
+        let facet = Facet::new(cell.clone(), vertices[0]).unwrap();
+        let facet_vertices = facet.vertices();
 
-        assert_eq!(vertices.len(), 3);
-        assert_eq!(vertices[0], vertex2);
-        assert_eq!(vertices[1], vertex3);
-        assert_eq!(vertices[2], vertex4);
+        assert_eq!(facet_vertices.len(), 3);
+        assert_eq!(facet_vertices[0], vertices[1]);
+        assert_eq!(facet_vertices[1], vertices[2]);
+        assert_eq!(facet_vertices[2], vertices[3]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Facet: {:?}", facet);
@@ -372,8 +536,8 @@ mod tests {
         let cloned_facet = facet.clone();
 
         assert_eq!(facet, cloned_facet);
-        assert_eq!(facet.cell.uuid, cloned_facet.cell.uuid);
-        assert_eq!(facet.vertex.uuid(), cloned_facet.vertex.uuid());
+        assert_eq!(facet.cell().uuid(), cloned_facet.cell().uuid());
+        assert_eq!(facet.vertex().uuid(), cloned_facet.vertex().uuid());
     }
 
     #[test]
@@ -381,8 +545,8 @@ mod tests {
         let facet: Facet<f64, Option<()>, Option<()>, 3> = Facet::default();
 
         // Default facet should have empty cell and default vertex
-        assert_eq!(facet.cell.vertices.len(), 0);
-        let default_coords: [f64; 3] = (&facet.vertex).into();
+        assert_eq!(facet.cell().vertices().len(), 0);
+        let default_coords: [f64; 3] = facet.vertex().into();
         assert_eq!(default_coords, [0.0, 0.0, 0.0]);
     }
 
@@ -432,8 +596,8 @@ mod tests {
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
 
-        assert_eq!(facet.cell.data, Some("triangle"));
-        assert_eq!(facet.vertex.data, Some(1));
+        assert_eq!(facet.cell().data, Some("triangle"));
+        assert_eq!(facet.vertex().data, Some(1));
 
         let vertices = facet.vertices();
         assert_eq!(vertices.len(), 2);
@@ -443,29 +607,14 @@ mod tests {
 
     #[test]
     fn facet_2d_triangle() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.5, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let (cell, vertices) = create_triangle();
+        let facet = Facet::new(cell.clone(), vertices[0]).unwrap();
 
         // Facet of 2D triangle is an edge (1D)
-        let vertices = facet.vertices();
-        assert_eq!(vertices.len(), 2);
-        assert_eq!(vertices[0], vertex2);
-        assert_eq!(vertices[1], vertex3);
+        let facet_vertices = facet.vertices();
+        assert_eq!(facet_vertices.len(), 2);
+        assert_eq!(facet_vertices[0], vertices[1]);
+        assert_eq!(facet_vertices[1], vertices[2]);
     }
 
     #[test]
