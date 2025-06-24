@@ -16,7 +16,7 @@ use thiserror::Error;
 /// Passing in a [Vertex] and a [Cell] containing that vertex to the
 /// constructor will create a [Facet] struct.
 ///
-/// # Properties
+/// # Properties:
 ///
 /// - `cell` - The [Cell] that contains this facet.
 /// - `vertex` - The [Vertex] in the [Cell] opposite to this [Facet].

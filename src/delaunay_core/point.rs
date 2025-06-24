@@ -190,7 +190,30 @@ impl_finite_check!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128,
 
 /// Helper trait for hashing individual coordinates for non-hashable types
 /// like f32 and f64.
-trait HashCoordinate {
+pub trait HashCoordinate {
+    /// Hashes a single coordinate value using the provided hasher.
+    ///
+    /// This method provides a consistent way to hash coordinate values,
+    /// including floating-point types that don't normally implement Hash.
+    /// For floating-point types, this uses OrderedFloat to ensure consistent
+    /// hashing behavior, including proper handling of NaN values.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - The hasher state to write the hash value to
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::point::HashCoordinate;
+    /// use std::collections::hash_map::DefaultHasher;
+    /// use std::hash::Hasher;
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// let value = 3.14f64;
+    /// value.hash_coord(&mut hasher);
+    /// let hash_value = hasher.finish();
+    /// ```
     fn hash_coord<H: Hasher>(&self, state: &mut H);
 }
 

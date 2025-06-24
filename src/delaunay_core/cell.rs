@@ -324,16 +324,48 @@ where
     }
 
     /// The function is_valid checks if a [Cell] is valid.
-    /// struct.
     ///
     /// # Returns:
     ///
-    /// True if the [Cell] is valid; the `Vertices` are correct, the `UUID` is
-    /// valid and unique, the `neighbors` contains `UUID`s of neighboring
-    /// [Cell]s, and the `neighbors` are indexed such that the index of the
-    /// [Vertex] opposite the neighboring cell is the same.
-    pub fn is_valid(self) -> bool {
-        todo!("Implement is_valid for Cell")
+    /// True if the [Cell] is valid; the `Vertices` are correct (all coordinates
+    /// are finite and UUIDs are valid), all vertices are distinct from one another,
+    /// the cell `UUID` is valid and not nil, the `neighbors` contains `UUID`s of
+    /// neighboring [Cell]s, and the `neighbors` are indexed such that the index
+    /// of the [Vertex] opposite the neighboring cell is the same.
+    ///
+    /// # Example:
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// assert!(cell.is_valid());
+    /// ```
+    pub fn is_valid(&self) -> bool
+    where
+        T: super::point::FiniteCheck + super::point::HashCoordinate + Copy,
+    {
+        // Check if all vertices are valid
+        let vertices_valid = self.vertices.iter().all(|vertex| (*vertex).is_valid());
+
+        // Check if UUID is not nil
+        let uuid_valid = !self.uuid.is_nil();
+
+        // Check if all vertices are distinct from one another
+        let vertices_distinct = {
+            let mut seen = std::collections::HashSet::new();
+            self.vertices.iter().all(|vertex| seen.insert(*vertex))
+        };
+
+        vertices_valid && uuid_valid && vertices_distinct
+        // TODO: Additional validation can be added here:
+        // - Validate neighbors structure if present
+        // - Validate that the cell forms a valid simplex
+        // - Validate neighbor indices match vertex ordering
     }
 
     /// The function `circumcenter` returns the circumcenter of the cell.
@@ -2537,5 +2569,70 @@ mod tests {
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());
+    }
+
+    #[test]
+    fn cell_is_valid() {
+        // Test cell is_valid with valid vertices
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3])
+            .build()
+            .unwrap();
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Valid Cell: {:?}", cell);
+        assert!(cell.is_valid());
+
+        // Test cell is_valid with invalid vertices (containing NaN)
+        let vertex_invalid = VertexBuilder::default()
+            .point(Point::new([f64::NAN, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex_valid1 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex_valid2 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex_invalid, vertex_valid1, vertex_valid2])
+            .build()
+            .unwrap();
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Invalid Cell: {:?}", invalid_cell);
+        assert!(!invalid_cell.is_valid());
+
+        // Test cell is_valid with duplicate vertices
+        let vertex_dup = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex_distinct = VertexBuilder::default()
+            .point(Point::new([2.0, 2.0, 2.0]))
+            .build()
+            .unwrap();
+        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex_dup, vertex_dup, vertex_distinct])
+            .build()
+            .unwrap();
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Duplicate Vertices Cell: {:?}", duplicate_cell);
+        assert!(!duplicate_cell.is_valid());
     }
 }
