@@ -104,10 +104,10 @@ where
 ///
 /// # Properties:
 ///
-/// - `vertices`: A [HashMap] that stores vertices with their corresponding
+/// - `vertices`: A [`HashMap`] that stores vertices with their corresponding
 ///   [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
 ///   U, and a constant D representing the dimension.
-/// - `cells`: The `cells` property is a [HashMap] that stores [Cell] objects.
+/// - `cells`: The `cells` property is a [`HashMap`] that stores [Cell] objects.
 ///   Each [Cell] has one or more [Vertex] objects with cell data of type V.
 ///   Note the dimensionality of the cell may differ from D, though the [Tds]
 ///   only stores cells of maximal dimensionality D and infers other lower
@@ -133,12 +133,12 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// A [HashMap] that stores [Vertex] objects with their corresponding [Uuid]s as
+    /// A [`HashMap`] that stores [Vertex] objects with their corresponding [Uuid]s as
     /// keys. Each [Vertex] has a [Point] of type T, vertex data of type U,
     /// and a constant D representing the dimension.
     pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
 
-    /// A [HashMap] that stores [Cell] objects with their corresponding [Uuid]s as
+    /// A [`HashMap`] that stores [Cell] objects with their corresponding [Uuid]s as
     /// keys.
     /// Each [Cell] has one or more [Vertex] objects and cell data of type V.
     /// Note the dimensionality of the cell may differ from D, though the [Tds]
@@ -192,7 +192,7 @@ where
     }
 
     /// The `add` function checks if a [Vertex] with the same coordinates already
-    /// exists in the [HashMap], and if not, inserts the [Vertex].
+    /// exists in the [`HashMap`], and if not, inserts the [Vertex].
     ///
     /// # Arguments:
     ///
@@ -201,7 +201,7 @@ where
     /// # Returns:
     ///
     /// The function `add` returns `Ok(())` if the vertex was successfully
-    /// added to the [HashMap], or an error message if the vertex already
+    /// added to the [`HashMap`], or an error message if the vertex already
     /// exists or if there is a [Uuid] collision.
     ///
     /// # Example:

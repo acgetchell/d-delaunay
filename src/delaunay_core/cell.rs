@@ -33,7 +33,7 @@ use uuid::Uuid;
 ///   `i-th`` [Vertex].
 /// - `data`: The `data` property is an optional field that can hold a value of
 ///   type `V`. It allows storage of additional data associated with the [Cell];
-///   the data must implement [Eq], [Hash], [Ord], [PartialEq], and [PartialOrd].
+///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -302,14 +302,14 @@ where
         })
     }
 
-    /// The function `into_hashmap` converts a [Vec] of cells into a [HashMap],
+    /// The function `into_hashmap` converts a [Vec] of cells into a [`HashMap`],
     /// using the [Cell] [Uuid]s as keys.
     #[must_use]
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
         cells.into_iter().map(|c| (c.uuid, c)).collect()
     }
 
-    /// The function is_valid checks if a [Cell] is valid.
+    /// The function `is_valid` checks if a [Cell] is valid.
     ///
     /// # Returns:
     ///
@@ -384,7 +384,7 @@ where
     /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
     /// <https://doi.org/10.1145/1778765.1778856>.
     ///
-    /// The circumcenter C of a cell with vertices x_0, x_1, ..., x_n is the
+    /// The circumcenter C of a cell with vertices `x_0`, `x_1`, ..., `x_n` is the
     /// solution to the system:
     ///
     /// C = 1/2 (A^-1*B)
@@ -394,7 +394,7 @@ where
     /// A is a matrix (to be inverted) of the form:
     ///     (x_1-x0) for all coordinates in x1, x0
     ///     (x2-x0) for all coordinates in x2, x0
-    ///     ... for all x_n in the cell
+    ///     ... for all `x_n` in the cell
     ///
     /// These are the perpendicular bisectors of the edges of the cell.
     ///
@@ -403,7 +403,7 @@ where
     /// B is a vector of the form:
     ///     (x_1^2-x0^2) for all coordinates in x1, x0
     ///     (x_2^2-x0^2) for all coordinates in x2, x0
-    ///     ... for all x_n in the cell
+    ///     ... for all `x_n` in the cell
     ///
     /// The resulting vector gives the coordinates of the circumcenter.
     ///

@@ -9,7 +9,7 @@
 //!
 //! This means that for Points containing floating-point coordinates:
 //! - `Point::new([f64::NAN]) == Point::new([f64::NAN])` returns `true`
-//! - Points with NaN values can be used as HashMap keys
+//! - Points with NaN values can be used as `HashMap` keys
 //! - All NaN bit patterns are considered equal
 //!
 //! If you need standard IEEE 754 equality semantics, compare the coordinates
@@ -197,7 +197,7 @@ pub trait HashCoordinate {
     ///
     /// This method provides a consistent way to hash coordinate values,
     /// including floating-point types that don't normally implement Hash.
-    /// For floating-point types, this uses OrderedFloat to ensure consistent
+    /// For floating-point types, this uses `OrderedFloat` to ensure consistent
     /// hashing behavior, including proper handling of NaN values.
     ///
     /// # Arguments

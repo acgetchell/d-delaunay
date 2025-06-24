@@ -29,7 +29,7 @@ use uuid::Uuid;
 /// Data type T is in practice f64 which does not implement Eq, Hash, or Ord.
 ///
 /// U is intended to be data associated with the vertex, e.g. a string, which
-/// implements Eq, Hash, Ord, PartialEq, and PartialOrd.
+/// implements Eq, Hash, Ord, `PartialEq`, and `PartialOrd`.
 pub struct Vertex<T, U, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -89,7 +89,7 @@ where
     }
 
     /// The function `into_hashmap` converts a vector of vertices into a
-    /// [HashMap], using the vertices [Uuid] as the key.
+    /// [`HashMap`], using the vertices [Uuid] as the key.
     ///
     /// # Arguments:
     ///
@@ -97,7 +97,7 @@ where
     ///
     /// # Returns:
     ///
-    /// The function `into_hashmap` returns a [HashMap] with the key type
+    /// The function `into_hashmap` returns a [`HashMap`] with the key type
     /// [Uuid] and the value type [Vertex], i.e. `std::collections::HashMap<Uuid, Vertex<T, U, D>>`.
     ///
     /// # Example:
@@ -186,7 +186,7 @@ where
         D
     }
 
-    /// The function is_valid checks if a [Vertex] is valid.
+    /// The function `is_valid` checks if a [Vertex] is valid.
     ///
     /// # Returns:
     ///
