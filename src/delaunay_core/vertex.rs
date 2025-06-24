@@ -13,7 +13,7 @@ use uuid::Uuid;
 /// a unique identifier, an optional incident cell identifier, and optional
 /// data.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// - `point`: A generic [Point] representing the coordinates of
 ///   the vertex in a D-dimensional space.
@@ -29,7 +29,7 @@ use uuid::Uuid;
 /// Data type T is in practice f64 which does not implement Eq, Hash, or Ord.
 ///
 /// U is intended to be data associated with the vertex, e.g. a string, which
-/// implements Eq, Hash, Ord, PartialEq, and PartialOrd.
+/// implements Eq, Hash, Ord, `PartialEq`, and `PartialOrd`.
 pub struct Vertex<T, U, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -58,18 +58,23 @@ where
     /// The function `from_points` takes a vector of points and returns a
     /// vector of vertices, using the `new` method.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `points`: `points` is a vector of [Point] objects.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The function `from_points` returns a `Vec<Vertex<T, U, D>>`, where `T`
     /// is the type of the coordinates of the [Vertex], `U` is the type of the
     /// optional data associated with the [Vertex], and `D` is the
     /// dimensionality of the [Vertex].
     ///
-    /// # Example:
+    /// # Panics
+    ///
+    /// Panics if the `VertexBuilder` fails to build a vertex from any point.
+    /// This should not happen under normal circumstances with valid point data.
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
@@ -79,6 +84,8 @@ where
     /// assert_eq!(vertices.len(), 1);
     /// assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
     /// ```
+    #[inline]
+    #[must_use]
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
         points
             .into_iter()
@@ -87,18 +94,18 @@ where
     }
 
     /// The function `into_hashmap` converts a vector of vertices into a
-    /// [HashMap], using the vertices [Uuid] as the key.
+    /// [`HashMap`], using the vertices [Uuid] as the key.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertices`: `vertices` is a vector of `Vertex<T, U, D>`.
     ///
-    /// # Returns:
+    /// # Returns
     ///
-    /// The function `into_hashmap` returns a [HashMap] with the key type
+    /// The function `into_hashmap` returns a [`HashMap`] with the key type
     /// [Uuid] and the value type [Vertex], i.e. `std::collections::HashMap<Uuid, Vertex<T, U, D>>`.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use std::collections::HashMap;
@@ -110,17 +117,19 @@ where
     /// assert_eq!(map.len(), 2);
     /// assert!(map.values().all(|v| v.dim() == 2));
     /// ```
+    #[inline]
+    #[must_use]
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
         vertices.into_iter().map(|v| (v.uuid(), v)).collect()
     }
 
     /// Returns the point coordinates of the vertex.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A reference to the Point representing the vertex's coordinates.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -137,11 +146,11 @@ where
 
     /// Returns the UUID of the vertex.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The Uuid uniquely identifying this vertex.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -164,12 +173,12 @@ where
 
     /// The `dim` function returns the dimensionality of the [Vertex].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function is returning the value of `D`, which the number of
     /// coordinates.
     ///
-    /// # Example:
+    /// # Example
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
@@ -177,19 +186,20 @@ where
     /// let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_eq!(vertex.dim(), 4);
     /// ```
+    #[inline]
     pub fn dim(&self) -> usize {
         D
     }
 
-    /// The function is_valid checks if a [Vertex] is valid.
+    /// The function `is_valid` checks if a [Vertex] is valid.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// True if the [Vertex] is valid; the [Point] is correct, the [Uuid] is
     /// valid and not nil, and the `incident_cell` contains the [Uuid] of a
     /// `Cell` that contains the [Vertex].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -223,13 +233,15 @@ where
     }
 }
 
-/// Equality of vertices is based on equality of elements in vector of coords.
+// Implementations with identical trait bounds grouped together
+// Group 1: PartialEq, PartialOrd, and From trait implementations
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Equality of vertices is based on equality of elements in vector of coords.
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.point == other.point
@@ -239,42 +251,16 @@ where
     }
 }
 
-/// Generic Eq implementation for Vertex based on point equality
-impl<T, U, const D: usize> Eq for Vertex<T, U, D>
-where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Vertex<T, U, D>: Hash,
-{
-}
-
-/// Order of vertices is based on lexicographic order of elements in vector of coords.
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    /// Order of vertices is based on lexicographic order of elements in vector of coords.
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.point.partial_cmp(&other.point)
-    }
-}
-
-// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
-impl<T, U, const D: usize> Hash for Vertex<T, U, D>
-where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Hash,
-{
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.point.hash(state);
-        self.uuid.hash(state);
-        self.incident_cell.hash(state);
-        self.data.hash(state);
     }
 }
 
@@ -286,6 +272,7 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    #[inline]
     fn from(vertex: Vertex<T, U, D>) -> [T; D] {
         vertex.point().coordinates()
     }
@@ -299,19 +286,89 @@ where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
+    #[inline]
     fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
         vertex.point().coordinates()
     }
 }
 
+// Group 2: Eq implementation with additional Hash requirement
+impl<T, U, const D: usize> Eq for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Vertex<T, U, D>: Hash,
+{
+    // Generic Eq implementation for Vertex based on point equality
+}
+
+impl<T, U, const D: usize> Hash for Vertex<T, U, D>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Hash,
+{
+    /// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.point.hash(state);
+        self.uuid.hash(state);
+        self.incident_cell.hash(state);
+        self.data.hash(state);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    // Helper function to create a basic vertex with given coordinates
+    fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
+    where
+        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+        U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        VertexBuilder::default()
+            .point(Point::new(coords))
+            .build()
+            .unwrap()
+    }
+
+    // Helper function to create a vertex with data
+    fn create_vertex_with_data<T, U, const D: usize>(coords: [T; D], data: U) -> Vertex<T, U, D>
+    where
+        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+        U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        VertexBuilder::default()
+            .point(Point::new(coords))
+            .data(data)
+            .build()
+            .unwrap()
+    }
+
+    // Helper function to test basic vertex properties
+    fn test_basic_vertex_properties<T, U, const D: usize>(
+        vertex: &Vertex<T, U, D>,
+        expected_coords: [T; D],
+        expected_dim: usize,
+    ) where
+        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + std::fmt::Debug,
+        U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        assert_eq!(vertex.point().coordinates(), expected_coords);
+        assert_eq!(vertex.dim(), expected_dim);
+        assert!(!vertex.uuid().is_nil());
+        assert!(vertex.incident_cell.is_none());
+    }
 
     #[test]
     fn vertex_default() {
-        let vertex: Vertex<f64, Option<()>, 3> = Default::default();
+        let vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
 
         assert_eq!(vertex.point().coordinates(), [0.0, 0.0, 0.0]);
         assert_eq!(vertex.dim(), 3);
@@ -320,7 +377,7 @@ mod tests {
         assert!(vertex.data.is_none());
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
+        println!("{vertex:?}");
     }
 
     #[test]
@@ -341,7 +398,7 @@ mod tests {
         assert_eq!(vertex.data.unwrap(), "3D");
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
+        println!("{vertex:?}");
     }
 
     #[test]
@@ -359,7 +416,7 @@ mod tests {
         assert_eq!(vertex.data.unwrap(), 1);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
+        println!("{vertex:?}");
     }
 
     #[test]
@@ -391,7 +448,7 @@ mod tests {
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertices);
+        println!("{vertices:?}");
     }
 
     #[test]
@@ -407,14 +464,14 @@ mod tests {
 
         assert_eq!(values.len(), 3);
 
-        values.sort_by_key(|a| a.uuid());
-        vertices.sort_by_key(|a| a.uuid());
+        values.sort_by_key(super::Vertex::uuid);
+        vertices.sort_by_key(super::Vertex::uuid);
 
         assert_eq!(values, vertices);
 
         // Human readable output for cargo test -- --nocapture
-        println!("values = {:?}", values);
-        println!("vertices = {:?}", vertices);
+        println!("values = {values:?}");
+        println!("vertices = {vertices:?}");
     }
 
     #[test]
@@ -443,7 +500,7 @@ mod tests {
         assert_eq!(deserialized, vertex);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {:?}", serialized);
+        println!("Serialized: {serialized:?}");
     }
 
     #[test]
@@ -563,57 +620,29 @@ mod tests {
 
     #[test]
     fn vertex_1d() {
-        let vertex: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
-            .point(Point::new([42.0]))
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [42.0]);
-        assert_eq!(vertex.dim(), 1);
-        assert!(!vertex.uuid().is_nil());
-        assert!(vertex.incident_cell.is_none());
+        let vertex: Vertex<f64, Option<()>, 1> = create_vertex([42.0]);
+        test_basic_vertex_properties(&vertex, [42.0], 1);
         assert!(vertex.data.is_none());
     }
 
     #[test]
     fn vertex_2d() {
-        let vertex: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0]))
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0]);
-        assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid().is_nil());
-        assert!(vertex.incident_cell.is_none());
+        let vertex: Vertex<f64, Option<()>, 2> = create_vertex([1.0, 2.0]);
+        test_basic_vertex_properties(&vertex, [1.0, 2.0], 2);
         assert!(vertex.data.is_none());
     }
 
     #[test]
     fn vertex_4d() {
-        let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0, 4.0]))
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0, 4.0]);
-        assert_eq!(vertex.dim(), 4);
-        assert!(!vertex.uuid().is_nil());
-        assert!(vertex.incident_cell.is_none());
+        let vertex: Vertex<f64, Option<()>, 4> = create_vertex([1.0, 2.0, 3.0, 4.0]);
+        test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0, 4.0], 4);
         assert!(vertex.data.is_none());
     }
 
     #[test]
     fn vertex_5d() {
-        let vertex: Vertex<f64, Option<()>, 5> = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0, 4.0, 5.0]))
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
-        assert_eq!(vertex.dim(), 5);
-        assert!(!vertex.uuid().is_nil());
-        assert!(vertex.incident_cell.is_none());
+        let vertex: Vertex<f64, Option<()>, 5> = create_vertex([1.0, 2.0, 3.0, 4.0, 5.0]);
+        test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0, 4.0, 5.0], 5);
         assert!(vertex.data.is_none());
     }
 
@@ -643,39 +672,22 @@ mod tests {
 
     #[test]
     fn vertex_with_string_data() {
-        let vertex: Vertex<f64, &str, 3> = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .data("test_vertex")
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0, 3.0]);
+        let vertex: Vertex<f64, &str, 3> = create_vertex_with_data([1.0, 2.0, 3.0], "test_vertex");
+        test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0], 3);
         assert_eq!(vertex.data.unwrap(), "test_vertex");
-        assert_eq!(vertex.dim(), 3);
     }
 
     #[test]
     fn vertex_with_numeric_data() {
-        let vertex: Vertex<f64, u32, 2> = VertexBuilder::default()
-            .point(Point::new([5.0, 10.0]))
-            .data(123u32)
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [5.0, 10.0]);
+        let vertex: Vertex<f64, u32, 2> = create_vertex_with_data([5.0, 10.0], 123u32);
+        test_basic_vertex_properties(&vertex, [5.0, 10.0], 2);
         assert_eq!(vertex.data.unwrap(), 123u32);
-        assert_eq!(vertex.dim(), 2);
     }
 
     #[test]
     fn vertex_with_tuple_data() {
-        let vertex: Vertex<f64, (i32, i32), 2> = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0]))
-            .data((42, 84))
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [1.0, 2.0]);
+        let vertex: Vertex<f64, (i32, i32), 2> = create_vertex_with_data([1.0, 2.0], (42, 84));
+        test_basic_vertex_properties(&vertex, [1.0, 2.0], 2);
         assert_eq!(vertex.data.unwrap(), (42, 84));
     }
 
@@ -686,7 +698,7 @@ mod tests {
             .data(42)
             .build()
             .unwrap();
-        let debug_str = format!("{:?}", vertex);
+        let debug_str = format!("{vertex:?}");
 
         assert!(debug_str.contains("Vertex"));
         assert!(debug_str.contains("point"));
@@ -1113,7 +1125,7 @@ mod tests {
         assert!(!valid_vertex.uuid().is_nil());
 
         // Test that default vertex (which has nil UUID) is invalid
-        let default_vertex: Vertex<f64, Option<()>, 3> = Default::default();
+        let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         assert!(!default_vertex.is_valid()); // Should be invalid due to nil UUID
         assert!(default_vertex.uuid().is_nil());
         assert!(default_vertex.point().is_valid()); // Point itself is valid (zeros)

@@ -14,6 +14,10 @@ use thiserror::Error;
 ///
 /// The inverted matrix.
 ///
+/// # Errors
+///
+/// Returns an error if the matrix is singular (determinant equals 0) and cannot be inverted.
+///
 /// # Example
 ///
 /// ```
@@ -57,7 +61,7 @@ mod tests {
 
     #[test]
     fn matrix_default() {
-        let matrix: Matrix = Default::default();
+        let matrix = Matrix::default();
 
         assert_eq!(matrix.data, vec![0.0; 0]);
 

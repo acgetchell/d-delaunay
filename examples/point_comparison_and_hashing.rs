@@ -8,11 +8,13 @@
 //! - **NaN-aware equality**: Unlike IEEE 754 standard where NaN ≠ NaN, our Point implementation
 //!   treats NaN values as equal to themselves for consistent behavior in data structures.
 //! - **Consistent hashing**: Points with identical coordinates (including NaN) produce the same
-//!   hash value, enabling reliable use in HashMap and HashSet.
+//!   hash value, enabling reliable use in `HashMap` and `HashSet`.
 //! - **Mathematical properties**: Equality satisfies reflexivity, symmetry, and transitivity.
 //! - **Special value handling**: Proper comparison of infinity, negative infinity, and zero values.
 //!
 //! Run this example with: `cargo run --example point_comparison_and_hashing`
+
+#![allow(clippy::similar_names)]
 
 use d_delaunay::delaunay_core::point::Point;
 use std::collections::{HashMap, HashSet};
@@ -114,7 +116,7 @@ fn nan_comparison_demo() {
     // Test reflexivity with NaN (this demonstrates our custom implementation)
     #[allow(clippy::eq_op)]
     let reflexivity_result = point_nan1 == point_nan1;
-    println!("point_nan1 == point_nan1: {}", reflexivity_result);
+    println!("point_nan1 == point_nan1: {reflexivity_result}");
 
     // Different NaN patterns
     let point_nan_diff1 = Point::new([f64::NAN, 2.0, 3.0]);
@@ -171,7 +173,7 @@ fn infinity_comparison_demo() {
     println!();
 }
 
-/// Demonstrates HashMap usage with points containing special values
+/// Demonstrates `HashMap` usage with points containing special values
 fn hashmap_demo() {
     println!("🗺️  HashMap with Special Values");
     println!("-------------------------------");
@@ -205,7 +207,7 @@ fn hashmap_demo() {
     );
 
     if let Some(value) = point_map.get(&point_nan_copy) {
-        println!("Retrieved value for NaN point: {}", value);
+        println!("Retrieved value for NaN point: {value}");
     }
 
     // Demonstrate that NaN points can be used as keys reliably
@@ -222,7 +224,7 @@ fn hashmap_demo() {
     println!();
 }
 
-/// Demonstrates HashSet behavior with special values
+/// Demonstrates `HashSet` behavior with special values
 fn hashset_demo() {
     println!("📦 HashSet with Special Values");
     println!("------------------------------");
@@ -281,7 +283,7 @@ fn mathematical_properties_demo() {
     // Reflexivity: a == a (this demonstrates our custom implementation)
     #[allow(clippy::eq_op)]
     let reflexivity_result = point_a == point_a;
-    println!("Reflexivity (a == a): {}", reflexivity_result);
+    println!("Reflexivity (a == a): {reflexivity_result}");
 
     // Symmetry: if a == b, then b == a
     let symmetry_ab = point_a == point_b;
@@ -342,7 +344,7 @@ fn numeric_types_demo() {
 
     // Mixed precision floating point
     println!("\nFloating Point Precision:");
-    let point_precise = Point::new([1.0000000000000001f64, 2.0]);
+    let point_precise = Point::new([1.000_000_000_000_000_1_f64, 2.0]);
     let point_rounded = Point::new([1.0f64, 2.0]);
     println!(
         "High precision vs rounded equal: {}",

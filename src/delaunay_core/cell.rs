@@ -1,5 +1,7 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
 
+#![allow(clippy::similar_names)]
+
 use super::{
     facet::Facet,
     matrix::invert,
@@ -9,7 +11,7 @@ use super::{
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use peroxide::fuga::*;
+use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use uuid::Uuid;
@@ -20,7 +22,7 @@ use uuid::Uuid;
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
 /// identifier, optional neighbors, and optional data.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// - `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 ///   data U, and a constant D representing the number of dimensions.
@@ -30,10 +32,10 @@ use uuid::Uuid;
 /// - `neighbors`: The `neighbors` property is an optional container of [Uuid]
 ///   values. It represents the [Uuid]s of the neighboring cells that are connected
 ///   to the current [Cell], indexed such that the `i-th` neighbor is opposite the
-///   `i-th`` [Vertex].
+///   `i-th` [Vertex].
 /// - `data`: The `data` property is an optional field that can hold a value of
 ///   type `V`. It allows storage of additional data associated with the [Cell];
-///   the data must implement [Eq], [Hash], [Ord], [PartialEq], and [PartialOrd].
+///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -42,10 +44,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The vertices of the cell.
-    pub vertices: Vec<Vertex<T, U, D>>,
+    vertices: Vec<Vertex<T, U, D>>,
     /// The unique identifier of the cell.
     #[builder(setter(skip), default = "make_uuid()")]
-    pub uuid: Uuid,
+    uuid: Uuid,
     /// The neighboring cells connected to the current cell.
     #[builder(setter(skip), default = "None")]
     pub neighbors: Option<Vec<Uuid>>,
@@ -79,7 +81,7 @@ where
     }
 }
 
-// Basic implementation block for simpler methods that don't require ComplexField
+// Basic implementation block with minimal trait bounds for common methods
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -89,7 +91,7 @@ where
 {
     /// The function returns the number of vertices in the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The number of vertices in the [Cell].
     ///
@@ -105,13 +107,59 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
     /// assert_eq!(cell.number_of_vertices(), 3);
     /// ```
+    #[inline]
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
     }
 
+    /// Returns a reference to the vertices of the [Cell].
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `Vec<Vertex<T, U, D>>` containing the vertices of the cell.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// assert_eq!(cell.vertices().len(), 3);
+    /// ```
+    #[inline]
+    pub fn vertices(&self) -> &Vec<Vertex<T, U, D>> {
+        &self.vertices
+    }
+
+    /// Returns the UUID of the [Cell].
+    ///
+    /// # Returns
+    ///
+    /// The Uuid uniquely identifying this cell.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// use uuid::Uuid;
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1]).build().unwrap();
+    /// assert_ne!(cell.uuid(), Uuid::nil());
+    /// ```
+    #[inline]
+    pub fn uuid(&self) -> Uuid {
+        self.uuid
+    }
+
     /// The `dim` function returns the dimensionality of the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function returns the dimension, which is calculated by
     /// subtracting 1 from the number of vertices in the [Cell].
@@ -128,6 +176,7 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
     /// assert_eq!(cell.dim(), 2);
     /// ```
+    #[inline]
     pub fn dim(&self) -> usize {
         self.vertices.len() - 1
     }
@@ -135,11 +184,11 @@ where
     /// The function `contains_vertex` checks if a given vertex is present in
     /// the Cell.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * vertex: The [Vertex] to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Vertex] is present in the [Cell], and
     /// `false` otherwise.
@@ -183,11 +232,11 @@ where
 
     /// The function `contains_vertex_of` checks if the [Cell] contains any [Vertex] of a given [Cell].
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `cell`: The [Cell] to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Cell] has any [Vertex] in common with the [Cell].
     ///
@@ -209,34 +258,21 @@ where
     pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
-}
 
-// Advanced implementation block for methods that require ComplexField
-impl<T, U, V, const D: usize> Cell<T, U, V, D>
-where
-    T: Clone
-        + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
-        + Sum,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    f64: From<T>,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
     /// The function `from_facet_and_vertex` creates a new [Cell] object from a [Facet] and a [Vertex].
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// - `facet`: The [Facet] to be used to create the [Cell].
     /// - `vertex`: The [Vertex] to be added to the [Cell].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// A [Result] type containing the new [Cell] or an error message.
+    ///
+    /// # Errors
+    ///
+    /// This function currently does not return errors, but uses `Result` for future extensibility.
     ///
     /// # Example
     ///
@@ -252,11 +288,11 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
     /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
     /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
-    /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
-    /// assert!(new_cell.vertices.contains(&vertex5));
+    /// let new_cell = Cell::from_facet_and_vertex(&facet, vertex5).unwrap();
+    /// assert!(new_cell.vertices().contains(&vertex5));
     /// ```
     pub fn from_facet_and_vertex(
-        facet: Facet<T, U, V, D>,
+        facet: &Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
     ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
@@ -272,25 +308,75 @@ where
         })
     }
 
-    /// The function `into_hashmap` converts a [Vec] of cells into a [HashMap],
+    /// The function `into_hashmap` converts a [Vec] of cells into a [`HashMap`],
     /// using the [Cell] [Uuid]s as keys.
+    #[must_use]
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
         cells.into_iter().map(|c| (c.uuid, c)).collect()
     }
 
-    /// The function is_valid checks if a [Cell] is valid.
-    /// struct.
+    /// The function `is_valid` checks if a [Cell] is valid.
     ///
-    /// # Returns:
+    /// # Returns
     ///
-    /// True if the [Cell] is valid; the `Vertices` are correct, the `UUID` is
-    /// valid and unique, the `neighbors` contains `UUID`s of neighboring
-    /// [Cell]s, and the `neighbors` are indexed such that the index of the
-    /// [Vertex] opposite the neighboring cell is the same.
-    pub fn is_valid(self) -> bool {
-        todo!("Implement is_valid for Cell")
-    }
+    /// True if the [Cell] is valid; the `Vertices` are correct (all coordinates
+    /// are finite and UUIDs are valid), all vertices are distinct from one another,
+    /// the cell `UUID` is valid and not nil, the `neighbors` contains `UUID`s of
+    /// neighboring [Cell]s, and the `neighbors` are indexed such that the index
+    /// of the [Vertex] opposite the neighboring cell is the same.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::point::Point;
+    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// assert!(cell.is_valid());
+    /// ```
+    pub fn is_valid(&self) -> bool
+    where
+        T: super::point::FiniteCheck + super::point::HashCoordinate + Copy,
+    {
+        // Check if all vertices are valid
+        let vertices_valid = self.vertices.iter().all(|vertex| (*vertex).is_valid());
 
+        // Check if UUID is not nil
+        let uuid_valid = !self.uuid.is_nil();
+
+        // Check if all vertices are distinct from one another
+        let vertices_distinct = {
+            let mut seen = std::collections::HashSet::new();
+            self.vertices.iter().all(|vertex| seen.insert(*vertex))
+        };
+
+        vertices_valid && uuid_valid && vertices_distinct
+        // TODO: Additional validation can be added here:
+        // - Validate neighbors structure if present
+        // - Validate that the cell forms a valid simplex
+        // - Validate neighbor indices match vertex ordering
+    }
+}
+
+// Advanced implementation block for methods requiring ComplexField
+impl<T, U, V, const D: usize> Cell<T, U, V, D>
+where
+    T: Clone
+        + ComplexField<RealField = T>
+        + Copy
+        + Default
+        + PartialEq
+        + PartialOrd
+        + OrderedEq
+        + Sum,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    f64: From<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
     /// The function `circumcenter` returns the circumcenter of the cell.
     ///
     /// The circumcenter is the unique point equidistant from all vertices of
@@ -304,7 +390,7 @@ where
     /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
     /// <https://doi.org/10.1145/1778765.1778856>.
     ///
-    /// The circumcenter C of a cell with vertices x_0, x_1, ..., x_n is the
+    /// The circumcenter C of a cell with vertices `x_0`, `x_1`, ..., `x_n` is the
     /// solution to the system:
     ///
     /// C = 1/2 (A^-1*B)
@@ -314,7 +400,7 @@ where
     /// A is a matrix (to be inverted) of the form:
     ///     (x_1-x0) for all coordinates in x1, x0
     ///     (x2-x0) for all coordinates in x2, x0
-    ///     ... for all x_n in the cell
+    ///     ... for all `x_n` in the cell
     ///
     /// These are the perpendicular bisectors of the edges of the cell.
     ///
@@ -323,13 +409,20 @@ where
     /// B is a vector of the form:
     ///     (x_1^2-x0^2) for all coordinates in x1, x0
     ///     (x_2^2-x0^2) for all coordinates in x2, x0
-    ///     ... for all x_n in the cell
+    ///     ... for all `x_n` in the cell
     ///
     /// The resulting vector gives the coordinates of the circumcenter.
     ///
-    /// # Returns:
+    /// # Returns
     /// The circumcenter as a Point<f64, D> if successful, or an error if the
     /// simplex is degenerate or the matrix inversion fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The cell is not a valid simplex
+    /// - The matrix inversion fails due to degeneracy
+    /// - Vector to array conversion fails
     ///
     /// # Example
     ///
@@ -354,90 +447,83 @@ where
             return Err(anyhow::Error::msg("Not a simplex!"));
         }
 
+        // Build matrix A and vector B for the linear system
         let mut matrix = zeros(dim, dim);
+        let mut b = zeros(dim, 1);
         let coords_0: [T; D] = (&self.vertices[0]).into();
+        let coords_0_f64: [f64; D] = coords_0.map(std::convert::Into::into);
+
         for i in 0..dim {
             let coords_i: [T; D] = (&self.vertices[i + 1]).into();
+            let coords_vertex_f64: [f64; D] = coords_i.map(std::convert::Into::into);
+
+            // Fill matrix row
             for j in 0..dim {
                 matrix[(i, j)] = (coords_i[j] - coords_0[j]).into();
             }
-        }
 
-        let a_inv = invert(&matrix)?;
-        let mut b = zeros(dim, 1);
-
-        // Precompute coords_0 once to avoid repeated conversion
-        let coords_0: [T; D] = (&self.vertices[0]).into();
-        let coords_0_f64: [f64; D] = coords_0.map(|x| x.into());
-
-        for i in 0..dim {
-            // Use implicit conversion from vertex to coordinates, then convert to f64
-            let coords_i_plus_1: [T; D] = (&self.vertices[i + 1]).into();
-            let coords_i_plus_1_f64: [f64; D] = coords_i_plus_1.map(|x| x.into());
+            // Fill vector element
             b[(i, 0)] = na::distance_squared(
-                &na::Point::from(coords_i_plus_1_f64),
+                &na::Point::from(coords_vertex_f64),
                 &na::Point::from(coords_0_f64),
             );
         }
 
+        let a_inv = invert(&matrix)?;
         let solution = a_inv * b * 0.5;
+        let solution_vec = solution.col(0).clone();
+        let solution_array = vec_to_array(&solution_vec).map_err(anyhow::Error::msg)?;
 
-        let solution_vec = solution.col(0).to_vec();
-        let solution_array = vec_to_array(solution_vec).map_err(anyhow::Error::msg)?;
-
-        let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
-
-        Ok(solution_point)
+        Ok(Point::<f64, D>::from(solution_array))
     }
 
     /// The function `circumradius` returns the circumradius of the cell.
-    /// The circumradius is the distance from the circumcenter to any vertex.
     ///
-    /// # Returns:
+    /// # Errors
     ///
-    /// If successful, returns an Ok containing the circumradius of the cell,
-    /// otherwise returns an Err with an error message.
-    fn circumradius(&self) -> Result<T, anyhow::Error>
+    /// Returns an error if the circumcenter calculation fails. See [`circumcenter`] for details.
+    ///
+    /// [`circumcenter`]: Self::circumcenter
+    pub fn circumradius(&self) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        // Use implicit conversion from vertex to coordinates, then convert to f64
-        let vertex_coords: [T; D] = (&self.vertices[0]).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
-        Ok(na::distance(
-            &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords_f64),
-        ))
+        Ok(self.circumradius_with_center(&circumcenter))
     }
 
     /// Alternative method that accepts precomputed circumcenter
-    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
+    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> T
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        // Use implicit conversion from vertex to coordinates, then convert to f64
         let vertex_coords: [T; D] = (&self.vertices[0]).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
-        Ok(na::distance(
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+        na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
             &na::Point::<T, D>::from(vertex_coords_f64),
-        ))
+        )
     }
 
     /// The function `circumsphere_contains` checks if a given vertex is
     /// contained in the circumsphere of the Cell.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertex`: vertex to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Vertex] is contained in the circumsphere
     /// of the [Cell], and `false` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circumcenter calculation fails. See [`circumcenter`] for details.
+    ///
+    /// [`circumcenter`]: Self::circumcenter
     ///
     /// # Example
     ///
@@ -459,10 +545,10 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        let circumradius = self.circumradius_with_center(&circumcenter)?;
+        let circumradius = self.circumradius_with_center(&circumcenter);
         // Use implicit conversion from vertex to coordinates, then convert to f64
         let vertex_coords: [T; D] = (&vertex).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
         let radius = na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
             &na::Point::<T, D>::from(vertex_coords_f64),
@@ -477,15 +563,20 @@ where
     /// stability by using a matrix determinant approach instead of distance calculations,
     /// which can accumulate floating-point errors.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `vertex`: The [Vertex] to check.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// Returns `true` if the given [Vertex] is contained in the circumsphere
     /// of the [Cell], and `false` otherwise.
-    /// /// # Example
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if matrix operations fail or if coordinate conversion fails.
+    ///
+    /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
@@ -538,6 +629,11 @@ where
 
     /// The function `facets` returns the [Facet]s of the [Cell].
     ///
+    /// # Panics
+    ///
+    /// Panics if `Facet::new()` fails for any vertex in the cell. This should not
+    /// happen under normal circumstances with valid cell data.
+    ///
     /// # Example
     ///
     /// ```
@@ -554,13 +650,23 @@ where
     /// assert_eq!(facets.len(), 4);
     /// ```
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
-        let mut facets: Vec<Facet<T, U, V, D>> = Vec::new();
-        for vertex in self.vertices.iter() {
-            facets.push(Facet::new(self.clone(), *vertex).unwrap());
-        }
-
-        facets
+        self.vertices
+            .iter()
+            .map(|vertex| Facet::new(self.clone(), *vertex).unwrap())
+            .collect()
     }
+}
+
+/// Helper function to sort vertices for comparison and hashing
+fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    let mut sorted = vertices.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted
 }
 
 /// Equality of cells is based on equality of sorted vector of vertices.
@@ -573,11 +679,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        let mut left = self.vertices.clone();
-        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let mut right = other.vertices.clone();
-        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        left == right
+        sorted_vertices::<T, U, D>(&self.vertices) == sorted_vertices::<T, U, D>(&other.vertices)
     }
 }
 
@@ -601,11 +703,8 @@ where
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let mut left = self.vertices.clone();
-        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let mut right = other.vertices.clone();
-        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        left.partial_cmp(&right)
+        sorted_vertices::<T, U, D>(&self.vertices)
+            .partial_cmp(&sorted_vertices::<T, U, D>(&other.vertices))
     }
 }
 
@@ -622,14 +721,8 @@ where
         // Hash the UUID first
         self.uuid.hash(state);
 
-        // Sort vertices for consistent hashing regardless of order
-        let mut sorted_vertices = self.vertices.clone();
-        // The trait bounds on `V` include both `PartialOrd` and `Ord`, which guarantee a total order for the vertices.
-        // This ensures that `partial_cmp` will always return `Some(Ordering)`, making the use of `unwrap()` safe here.
-        sorted_vertices.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        // Hash vertices after sorting
-        for vertex in &sorted_vertices {
+        // Hash sorted vertices for consistent ordering
+        for vertex in &sorted_vertices::<T, U, D>(&self.vertices) {
             vertex.hash(state);
         }
 
@@ -672,18 +765,18 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
-        assert_eq!(cell.vertices[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices[3].data.unwrap(), 2);
+        assert_eq!(*cell.vertices(), vec![vertex1, vertex2, vertex3, vertex4]);
+        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[3].data.unwrap(), 2);
         assert_eq!(cell.dim(), 3);
         assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -727,7 +820,7 @@ mod tests {
         assert!(cell.is_err());
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", cell);
+        println!("{cell:?}");
     }
 
     #[test]
@@ -758,11 +851,11 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(cell.vertices, [vertex1, vertex2, vertex3, vertex4]);
-        assert_eq!(cell.vertices[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices[3].data.unwrap(), 2);
+        assert_eq!(*cell.vertices(), vec![vertex1, vertex2, vertex3, vertex4]);
+        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[1].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[2].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[3].data.unwrap(), 2);
         assert_eq!(cell.dim(), 3);
         assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
@@ -770,7 +863,7 @@ mod tests {
         assert_eq!(cell.data.unwrap(), "three-one cell");
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -836,15 +929,15 @@ mod tests {
             .point(Point::origin())
             .build()
             .unwrap();
-        let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
+        let new_cell = Cell::from_facet_and_vertex(&facet, vertex5).unwrap();
 
-        assert!(new_cell.vertices.contains(&vertex1));
-        assert!(new_cell.vertices.contains(&vertex2));
-        assert!(new_cell.vertices.contains(&vertex3));
-        assert!(new_cell.vertices.contains(&vertex5));
+        assert!(new_cell.vertices().contains(&vertex1));
+        assert!(new_cell.vertices().contains(&vertex2));
+        assert!(new_cell.vertices().contains(&vertex3));
+        assert!(new_cell.vertices().contains(&vertex5));
 
         // Human readable output for cargo test -- --nocapture
-        println!("New Cell: {:?}", new_cell);
+        println!("New Cell: {new_cell:?}");
     }
 
     #[test]
@@ -880,8 +973,8 @@ mod tests {
         assert_eq!(values[0], cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("values: {:?}", values);
-        println!("cells = {:?}", cell);
+        println!("values: {values:?}");
+        println!("cells = {cell:?}");
     }
 
     #[test]
@@ -961,7 +1054,7 @@ mod tests {
         assert!(cell.contains_vertex(vertex4));
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1005,7 +1098,7 @@ mod tests {
         assert!(cell.contains_vertex_of(&cell2));
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1025,7 +1118,7 @@ mod tests {
         assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
 
         // Human readable output for cargo test -- --nocapture
-        println!("Circumcenter: {:?}", circumcenter);
+        println!("Circumcenter: {circumcenter:?}");
     }
 
     #[test]
@@ -1086,7 +1179,7 @@ mod tests {
         assert_eq!(circumradius, radius);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Circumradius: {:?}", circumradius);
+        println!("Circumradius: {circumradius:?}");
     }
 
     #[test]
@@ -1124,7 +1217,7 @@ mod tests {
         assert!(cell.circumsphere_contains(vertex5).unwrap());
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1162,7 +1255,7 @@ mod tests {
         assert!(!cell.circumsphere_contains(vertex5).unwrap());
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1195,14 +1288,14 @@ mod tests {
         let facets = cell.facets();
 
         assert_eq!(facets.len(), 4);
-        for facet in facets.iter() {
+        for facet in &facets {
             // assert!(cell.facets().contains(facet));
             let facet_vertices = facet.vertices();
             assert!(cell.facets().iter().any(|f| f.vertices() == facet_vertices));
         }
 
         // Human readable output for cargo test -- --nocapture
-        println!("Facets: {:?}", facets);
+        println!("Facets: {facets:?}");
     }
 
     #[test]
@@ -1240,7 +1333,7 @@ mod tests {
         assert_eq!(deserialized, cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {:?}", serialized);
+        println!("Serialized: {serialized:?}");
     }
 
     #[test]
@@ -1284,8 +1377,8 @@ mod tests {
 
         assert_eq!(cell1, cell2);
         // Two cells with the same vertices but different uuids are equal
-        assert_ne!(cell1.uuid, cell2.uuid);
-        assert_eq!(cell1.vertices, cell2.vertices);
+        assert_ne!(cell1.uuid(), cell2.uuid());
+        assert_eq!(cell1.vertices(), cell2.vertices());
         assert_eq!(cell2, cell3);
         assert_ne!(cell3, cell4);
     }
@@ -1406,10 +1499,10 @@ mod tests {
 
     #[test]
     fn cell_default() {
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = Default::default();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::default();
 
-        assert!(cell.vertices.is_empty());
-        assert!(cell.uuid.is_nil());
+        assert!(cell.vertices().is_empty());
+        assert!(cell.uuid().is_nil());
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
     }
@@ -1432,7 +1525,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
-        assert!(!cell.uuid.is_nil());
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
@@ -1457,7 +1550,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 3);
         assert_eq!(cell.dim(), 2);
-        assert!(!cell.uuid.is_nil());
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
@@ -1490,7 +1583,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 5);
         assert_eq!(cell.dim(), 4);
-        assert!(!cell.uuid.is_nil());
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
@@ -1586,9 +1679,9 @@ mod tests {
             .unwrap();
 
         // Same vertices but different UUIDs
-        assert_ne!(cell1.uuid, cell2.uuid);
-        assert!(!cell1.uuid.is_nil());
-        assert!(!cell2.uuid.is_nil());
+        assert_ne!(cell1.uuid(), cell2.uuid());
+        assert!(!cell1.uuid().is_nil());
+        assert!(!cell2.uuid().is_nil());
     }
 
     #[test]
@@ -1673,8 +1766,8 @@ mod tests {
             .build()
             .unwrap();
 
-        let uuid1 = cell1.uuid;
-        let uuid2 = cell2.uuid;
+        let uuid1 = cell1.uuid();
+        let uuid2 = cell2.uuid();
         let cells = vec![cell1, cell2];
         let hashmap = Cell::into_hashmap(cells);
 
@@ -1699,7 +1792,7 @@ mod tests {
             .data(42)
             .build()
             .unwrap();
-        let debug_str = format!("{:?}", cell);
+        let debug_str = format!("{cell:?}");
 
         assert!(debug_str.contains("Cell"));
         assert!(debug_str.contains("vertices"));
@@ -2073,8 +2166,8 @@ mod tests {
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let _result = cell.circumsphere_contains_vertex(vertex_far_outside);
-        assert!(_result.is_ok());
+        let result = cell.circumsphere_contains_vertex(vertex_far_outside);
+        assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
         let origin = VertexBuilder::default()
@@ -2082,8 +2175,8 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let _result_origin = cell.circumsphere_contains_vertex(origin);
-        assert!(_result_origin.is_ok());
+        let result_origin = cell.circumsphere_contains_vertex(origin);
+        assert!(result_origin.is_ok());
     }
 
     #[test]
@@ -2112,16 +2205,16 @@ mod tests {
             .point(Point::new([10.0, 10.0]))
             .build()
             .unwrap();
-        let _result = cell.circumsphere_contains_vertex(vertex_far_outside);
-        assert!(_result.is_ok());
+        let result = cell.circumsphere_contains_vertex(vertex_far_outside);
+        assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
         let center = VertexBuilder::default()
             .point(Point::new([0.33, 0.33]))
             .build()
             .unwrap();
-        let _result_center = cell.circumsphere_contains_vertex(center);
-        assert!(_result_center.is_ok());
+        let result_center = cell.circumsphere_contains_vertex(center);
+        assert!(result_center.is_ok());
     }
 
     #[test]
@@ -2202,7 +2295,7 @@ mod tests {
             .unwrap();
 
         let circumcenter = cell.circumcenter().unwrap();
-        let radius_with_center = cell.circumradius_with_center(&circumcenter).unwrap();
+        let radius_with_center = cell.circumradius_with_center(&circumcenter);
         let radius_direct = cell.circumradius().unwrap();
 
         assert!((radius_with_center - radius_direct).abs() < 1e-10);
@@ -2242,8 +2335,10 @@ mod tests {
         }
 
         // All vertices should be represented in facets
-        let all_facet_vertices: std::collections::HashSet<_> =
-            facets.iter().flat_map(|f| f.vertices()).collect();
+        let all_facet_vertices: std::collections::HashSet<_> = facets
+            .iter()
+            .flat_map(super::super::facet::Facet::vertices)
+            .collect();
         assert!(all_facet_vertices.contains(&vertex1));
         assert!(all_facet_vertices.contains(&vertex2));
         assert!(all_facet_vertices.contains(&vertex3));
@@ -2324,7 +2419,7 @@ mod tests {
             .unwrap();
 
         // Create new cell from facet and vertex
-        let new_cell = Cell::from_facet_and_vertex(facet, new_vertex).unwrap();
+        let new_cell = Cell::from_facet_and_vertex(&facet, new_vertex).unwrap();
 
         // Verify the new cell contains the original facet vertices plus the new vertex
         assert!(new_cell.contains_vertex(vertex1));
@@ -2441,9 +2536,9 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(cell.vertices[0].data.unwrap(), "first");
-        assert_eq!(cell.vertices[1].data.unwrap(), "second");
-        assert_eq!(cell.vertices[2].data.unwrap(), "third");
+        assert_eq!(cell.vertices()[0].data.unwrap(), "first");
+        assert_eq!(cell.vertices()[1].data.unwrap(), "second");
+        assert_eq!(cell.vertices()[2].data.unwrap(), "third");
         assert_eq!(cell.data.unwrap(), 42u32);
     }
 
@@ -2491,5 +2586,70 @@ mod tests {
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());
+    }
+
+    #[test]
+    fn cell_is_valid() {
+        // Test cell is_valid with valid vertices
+        let vertex1 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3])
+            .build()
+            .unwrap();
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Valid Cell: {cell:?}");
+        assert!(cell.is_valid());
+
+        // Test cell is_valid with invalid vertices (containing NaN)
+        let vertex_invalid = VertexBuilder::default()
+            .point(Point::new([f64::NAN, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex_valid1 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex_valid2 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .build()
+            .unwrap();
+        let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex_invalid, vertex_valid1, vertex_valid2])
+            .build()
+            .unwrap();
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Invalid Cell: {invalid_cell:?}");
+        assert!(!invalid_cell.is_valid());
+
+        // Test cell is_valid with duplicate vertices
+        let vertex_dup = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .build()
+            .unwrap();
+        let vertex_distinct = VertexBuilder::default()
+            .point(Point::new([2.0, 2.0, 2.0]))
+            .build()
+            .unwrap();
+        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex_dup, vertex_dup, vertex_distinct])
+            .build()
+            .unwrap();
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Duplicate Vertices Cell: {duplicate_cell:?}");
+        assert!(!duplicate_cell.is_valid());
     }
 }

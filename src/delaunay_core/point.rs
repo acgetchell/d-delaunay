@@ -9,11 +9,13 @@
 //!
 //! This means that for Points containing floating-point coordinates:
 //! - `Point::new([f64::NAN]) == Point::new([f64::NAN])` returns `true`
-//! - Points with NaN values can be used as HashMap keys
+//! - Points with NaN values can be used as `HashMap` keys
 //! - All NaN bit patterns are considered equal
 //!
 //! If you need standard IEEE 754 equality semantics, compare the coordinates
 //! directly instead of using Point equality.
+
+#![allow(clippy::similar_names)]
 
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -23,7 +25,7 @@ use std::hash::{Hash, Hasher};
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///
-/// # Properties:
+/// # Properties
 ///
 /// * `coords`: `coords` is a private property of the [Point]. It is an array of
 ///   type `T` with a length of `D`. The type `T` is a generic type parameter,
@@ -49,47 +51,50 @@ where
     /// The function `new` creates a new instance of a [Point] with the given
     /// coordinates.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `coords`: The `coords` parameter is an array of type `T` with a
     ///   length of `D`.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `new` function returns an instance of the [Point].
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
+    #[inline]
     pub fn new(coords: [T; D]) -> Self {
         Self { coords }
     }
 
     /// The `dim` function returns the dimensionality of the [Point].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `dim` function returns the value of `D`, which the number of
     /// coordinates.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
     /// ```
+    #[must_use]
+    #[inline]
     pub fn dim(&self) -> usize {
         D
     }
 
     /// Returns a copy of the coordinates of the point.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `coordinates` function returns a copy of the coordinates array.
     ///
@@ -107,18 +112,19 @@ where
 
     /// The `origin` function returns the origin [Point].
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `origin()` function returns a D-dimensional origin point
     /// in Cartesian coordinates.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
     /// ```
+    #[must_use]
     pub fn origin() -> Self
     where
         T: num_traits::Zero + Copy,
@@ -130,12 +136,12 @@ where
     /// The Rust type system guarantees that the number of coordinates
     /// matches the dimensionality `D`.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The `is_valid()` function returns a boolean indicating whether the
     /// point is valid, meaning all coordinates are finite.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -159,23 +165,22 @@ pub trait FiniteCheck {
     fn is_finite_generic(&self) -> bool;
 }
 
-impl FiniteCheck for f32 {
-    fn is_finite_generic(&self) -> bool {
-        // FloatCore::is_finite checks both not NaN and not infinite
-        self.is_finite()
-    }
-}
-impl FiniteCheck for f64 {
-    fn is_finite_generic(&self) -> bool {
-        self.is_finite()
-    }
-}
-
-// Integers are always finite
-macro_rules! impl_finite_check_for_int {
-    ($($t:ty),*) => {
+// Unified macro for implementing FiniteCheck
+macro_rules! impl_finite_check {
+    (float: $($t:ty),*) => {
         $(
             impl FiniteCheck for $t {
+                #[inline(always)]
+                fn is_finite_generic(&self) -> bool {
+                    self.is_finite()
+                }
+            }
+        )*
+    };
+    (int: $($t:ty),*) => {
+        $(
+            impl FiniteCheck for $t {
+                #[inline(always)]
                 fn is_finite_generic(&self) -> bool {
                     true
                 }
@@ -183,42 +188,55 @@ macro_rules! impl_finite_check_for_int {
         )*
     };
 }
-impl_finite_check_for_int!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+impl_finite_check!(float: f32, f64);
+impl_finite_check!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 /// Helper trait for hashing individual coordinates for non-hashable types
 /// like f32 and f64.
-trait HashCoordinate {
+pub trait HashCoordinate {
+    /// Hashes a single coordinate value using the provided hasher.
+    ///
+    /// This method provides a consistent way to hash coordinate values,
+    /// including floating-point types that don't normally implement Hash.
+    /// For floating-point types, this uses `OrderedFloat` to ensure consistent
+    /// hashing behavior, including proper handling of NaN values.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - The hasher state to write the hash value to
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::point::HashCoordinate;
+    /// use std::collections::hash_map::DefaultHasher;
+    /// use std::hash::Hasher;
+    ///
+    /// let mut hasher = DefaultHasher::new();
+    /// let value = 3.14f64;
+    /// value.hash_coord(&mut hasher);
+    /// let hash_value = hasher.finish();
+    /// ```
     fn hash_coord<H: Hasher>(&self, state: &mut H);
 }
 
-impl HashCoordinate for f32 {
-    fn hash_coord<H: Hasher>(&self, state: &mut H) {
-        OrderedFloat(*self).hash(state);
-    }
-}
-impl HashCoordinate for f64 {
-    fn hash_coord<H: Hasher>(&self, state: &mut H) {
-        OrderedFloat(*self).hash(state);
-    }
-}
-
-impl<T, const D: usize> Hash for Point<T, D>
-where
-    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for &coord in &self.coords {
-            coord.hash_coord(state);
-        }
-    }
-}
-
-// For integer types and other types that implement Hash
-macro_rules! impl_hash_coordinate_for_integers {
-    ($($t:ty),*) => {
+// Unified macro for implementing HashCoordinate
+macro_rules! impl_hash_coordinate {
+    (float: $($t:ty),*) => {
         $(
             impl HashCoordinate for $t {
+                #[inline(always)]
+                fn hash_coord<H: Hasher>(&self, state: &mut H) {
+                    OrderedFloat(*self).hash(state);
+                }
+            }
+        )*
+    };
+    (int: $($t:ty),*) => {
+        $(
+            impl HashCoordinate for $t {
+                #[inline(always)]
                 fn hash_coord<H: Hasher>(&self, state: &mut H) {
                     self.hash(state);
                 }
@@ -227,7 +245,21 @@ macro_rules! impl_hash_coordinate_for_integers {
     };
 }
 
-impl_hash_coordinate_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+impl_hash_coordinate!(float: f32, f64);
+impl_hash_coordinate!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+impl<T, const D: usize> Hash for Point<T, D>
+where
+    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for &coord in &self.coords {
+            coord.hash_coord(state);
+        }
+    }
+}
 
 /// Helper trait for OrderedFloat-based equality comparison that handles NaN properly
 pub trait OrderedEq {
@@ -248,23 +280,22 @@ pub trait OrderedEq {
     fn ordered_eq(&self, other: &Self) -> bool;
 }
 
-impl OrderedEq for f32 {
-    fn ordered_eq(&self, other: &Self) -> bool {
-        OrderedFloat(*self) == OrderedFloat(*other)
-    }
-}
-
-impl OrderedEq for f64 {
-    fn ordered_eq(&self, other: &Self) -> bool {
-        OrderedFloat(*self) == OrderedFloat(*other)
-    }
-}
-
-// For integer types and other types that implement Eq, use regular equality
-macro_rules! impl_ordered_eq_for_integers {
-    ($($t:ty),*) => {
+// Unified macro for implementing OrderedEq
+macro_rules! impl_ordered_eq {
+    (float: $($t:ty),*) => {
         $(
             impl OrderedEq for $t {
+                #[inline(always)]
+                fn ordered_eq(&self, other: &Self) -> bool {
+                    OrderedFloat(*self) == OrderedFloat(*other)
+                }
+            }
+        )*
+    };
+    (int: $($t:ty),*) => {
+        $(
+            impl OrderedEq for $t {
+                #[inline(always)]
                 fn ordered_eq(&self, other: &Self) -> bool {
                     self == other
                 }
@@ -273,7 +304,8 @@ macro_rules! impl_ordered_eq_for_integers {
     };
 }
 
-impl_ordered_eq_for_integers!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+impl_ordered_eq!(float: f32, f64);
+impl_ordered_eq!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 impl<T, const D: usize> PartialEq for Point<T, D>
@@ -297,6 +329,7 @@ where
 {
 }
 
+/// From trait implementations for Point conversions
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
     T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
@@ -306,17 +339,17 @@ where
 {
     /// Create a new [Point] from an array of coordinates of type `T`.
     ///
-    /// # Arguments:
+    /// # Arguments
     ///
     /// * `coords`: An array of type `T` with a length of `D`, representing the
     ///   coordinates of the point.
     ///
-    /// # Returns:
+    /// # Returns
     ///
     /// The function returns a new instance of the [Point] struct with the
     /// coordinates converted to type `U`.
     ///
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -324,21 +357,22 @@ where
     /// let point: Point<f64, 3> = Point::from(coords);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
+    #[inline]
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
-        let coords_u: [U; D] = coords.map(|coord| coord.into());
+        let coords_u: [U; D] = coords.map(std::convert::Into::into);
         Self { coords: coords_u }
     }
 }
 
-/// Enable implicit conversion from Point to coordinate array
-/// This allows `point` to be implicitly converted to `[T; D]`
+/// Enable conversions from Point to coordinate arrays
+/// This allows `point` and `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -346,19 +380,18 @@ where
     /// let coords: [f64; 2] = point.into();
     /// assert_eq!(coords, [1.0, 2.0]);
     /// ```
+    #[inline]
     fn from(point: Point<T, D>) -> [T; D] {
         point.coordinates()
     }
 }
 
-/// Enable implicit conversion from Point reference to coordinate array
-/// This allows `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// # Example:
+    /// # Example
     ///
     /// ```rust
     /// use d_delaunay::delaunay_core::point::Point;
@@ -366,6 +399,7 @@ where
     /// let coords: [i32; 2] = (&point).into();
     /// assert_eq!(coords, [3, 4]);
     /// ```
+    #[inline]
     fn from(point: &Point<T, D>) -> [T; D] {
         point.coordinates()
     }
@@ -373,18 +407,64 @@ where
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use approx::assert_relative_eq;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    // Helper function to get hash value for any hashable type
+    fn get_hash<T: Hash>(value: &T) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    // Helper function to test basic point properties
+    fn test_basic_point_properties<T, const D: usize>(
+        point: &Point<T, D>,
+        expected_coords: [T; D],
+        expected_dim: usize,
+    ) where
+        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + std::fmt::Debug,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        assert_eq!(point.coordinates(), expected_coords);
+        assert_eq!(point.dim(), expected_dim);
+    }
+
+    // Helper function to test point equality and hash consistency
+    fn test_point_equality_and_hash<T, const D: usize>(
+        point1: Point<T, D>,
+        point2: Point<T, D>,
+        should_be_equal: bool,
+    ) where
+        T: HashCoordinate
+            + Clone
+            + Copy
+            + Default
+            + PartialEq
+            + PartialOrd
+            + OrderedEq
+            + std::fmt::Debug,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        if should_be_equal {
+            assert_eq!(point1, point2);
+            assert_eq!(get_hash(&point1), get_hash(&point2));
+        } else {
+            assert_ne!(point1, point2);
+            // Note: Different points may still hash to same value (hash collisions)
+        }
+    }
 
     #[test]
     fn point_default() {
-        let point: Point<f64, 4> = Default::default();
+        let point: Point<f64, 4> = Point::default();
 
         assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Default: {:?}", point);
+        println!("Default: {point:?}");
     }
 
     #[test]
@@ -394,7 +474,7 @@ mod tests {
         assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Point: {:?}", point);
+        println!("Point: {point:?}");
     }
 
     #[test]
@@ -452,7 +532,7 @@ mod tests {
 
     #[test]
     fn point_to_and_from_json() {
-        let point: Point<f64, 4> = Default::default();
+        let point: Point<f64, 4> = Point::default();
         let serialized = serde_json::to_string(&point).unwrap();
 
         assert_eq!(serialized, "{\"coords\":[0.0,0.0,0.0,0.0]}");
@@ -462,7 +542,7 @@ mod tests {
         assert_eq!(deserialized, point);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {:?}", serialized);
+        println!("Serialized: {serialized:?}");
     }
 
     #[test]
@@ -634,45 +714,37 @@ mod tests {
     #[test]
     fn point_1d() {
         let point: Point<f64, 1> = Point::new([42.0]);
-
-        assert_eq!(point.coordinates(), [42.0]);
-        assert_eq!(point.dim(), 1);
+        test_basic_point_properties(&point, [42.0], 1);
 
         let origin: Point<f64, 1> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0]);
+        test_basic_point_properties(&origin, [0.0], 1);
     }
 
     #[test]
     fn point_2d() {
         let point: Point<f64, 2> = Point::new([1.0, 2.0]);
-
-        assert_eq!(point.coordinates(), [1.0, 2.0]);
-        assert_eq!(point.dim(), 2);
+        test_basic_point_properties(&point, [1.0, 2.0], 2);
 
         let origin: Point<f64, 2> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0]);
+        test_basic_point_properties(&origin, [0.0, 0.0], 2);
     }
 
     #[test]
     fn point_3d() {
         let point: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
-
-        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
-        assert_eq!(point.dim(), 3);
+        test_basic_point_properties(&point, [1.0, 2.0, 3.0], 3);
 
         let origin: Point<f64, 3> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0, 0.0]);
+        test_basic_point_properties(&origin, [0.0, 0.0, 0.0], 3);
     }
 
     #[test]
     fn point_5d() {
         let point: Point<f64, 5> = Point::new([1.0, 2.0, 3.0, 4.0, 5.0]);
-
-        assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0, 5.0]);
-        assert_eq!(point.dim(), 5);
+        test_basic_point_properties(&point, [1.0, 2.0, 3.0, 4.0, 5.0], 5);
 
         let origin: Point<f64, 5> = Point::origin();
-        assert_eq!(origin.coordinates(), [0.0, 0.0, 0.0, 0.0, 0.0]);
+        test_basic_point_properties(&origin, [0.0, 0.0, 0.0, 0.0, 0.0], 5);
     }
 
     #[test]
@@ -700,7 +772,7 @@ mod tests {
     #[test]
     fn point_debug_format() {
         let point = Point::new([1.0, 2.0, 3.0]);
-        let debug_str = format!("{:?}", point);
+        let debug_str = format!("{point:?}");
 
         assert!(debug_str.contains("Point"));
         assert!(debug_str.contains("coords"));
@@ -882,62 +954,28 @@ mod tests {
 
     #[test]
     fn point_hash_consistency_floating_point() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
         // Test that OrderedFloat provides consistent hashing for NaN-free floats
         let point1 = Point::new([1.0, 2.0, 3.5]);
         let point2 = Point::new([1.0, 2.0, 3.5]);
-
-        let mut hasher1 = DefaultHasher::new();
-        let mut hasher2 = DefaultHasher::new();
-
-        point1.hash(&mut hasher1);
-        point2.hash(&mut hasher2);
-
-        assert_eq!(hasher1.finish(), hasher2.finish());
+        test_point_equality_and_hash(point1, point2, true);
 
         // Test with f32
         let point_f32_1 = Point::new([1.5f32, 2.5f32]);
         let point_f32_2 = Point::new([1.5f32, 2.5f32]);
-
-        let mut hasher_f32_1 = DefaultHasher::new();
-        let mut hasher_f32_2 = DefaultHasher::new();
-
-        point_f32_1.hash(&mut hasher_f32_1);
-        point_f32_2.hash(&mut hasher_f32_2);
-
-        assert_eq!(hasher_f32_1.finish(), hasher_f32_2.finish());
+        test_point_equality_and_hash(point_f32_1, point_f32_2, true);
     }
 
     #[test]
     fn point_hash_consistency_integers() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
         // Test integer hashing consistency
         let point_i32_1 = Point::new([42, -17, 100]);
         let point_i32_2 = Point::new([42, -17, 100]);
-
-        let mut hasher1 = DefaultHasher::new();
-        let mut hasher2 = DefaultHasher::new();
-
-        point_i32_1.hash(&mut hasher1);
-        point_i32_2.hash(&mut hasher2);
-
-        assert_eq!(hasher1.finish(), hasher2.finish());
+        test_point_equality_and_hash(point_i32_1, point_i32_2, true);
 
         // Test with u64
         let point_u64_1 = Point::new([1000u64, 2000u64]);
         let point_u64_2 = Point::new([1000u64, 2000u64]);
-
-        let mut hasher_u64_1 = DefaultHasher::new();
-        let mut hasher_u64_2 = DefaultHasher::new();
-
-        point_u64_1.hash(&mut hasher_u64_1);
-        point_u64_2.hash(&mut hasher_u64_2);
-
-        assert_eq!(hasher_u64_1.finish(), hasher_u64_2.finish());
+        test_point_equality_and_hash(point_u64_1, point_u64_2, true);
     }
 
     #[test]
@@ -1457,6 +1495,7 @@ mod tests {
 
         // Create different NaN values
         let nan1 = f64::NAN;
+        #[allow(clippy::zero_divided_by_zero)]
         let nan2 = 0.0f64 / 0.0f64; // Another way to create NaN
         let nan3 = f64::INFINITY - f64::INFINITY; // Yet another way
 
@@ -1476,6 +1515,7 @@ mod tests {
 
         // Test with f32 as well
         let f32_nan1 = f32::NAN;
+        #[allow(clippy::zero_divided_by_zero)]
         let f32_nan2 = 0.0f32 / 0.0f32;
 
         let point_f32_1 = Point::new([f32_nan1]);
