@@ -179,6 +179,7 @@ where
     ///
     /// A Delaunay triangulation with cells and neighbors aligned, and vertices
     /// associated with cells.
+    #[must_use]
     pub fn new(points: Vec<Point<T, D>>) -> Self {
         // handle case where vertices are constructed with data
         let vertices = Vertex::into_hashmap(Vertex::from_points(points));
@@ -255,6 +256,7 @@ where
     /// let _ = tds.add(new_vertex1);
     /// assert_eq!(tds.number_of_vertices(), 1);
     /// ```
+    #[must_use]
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
     }
@@ -273,10 +275,14 @@ where
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
     /// assert_eq!(tds.dim(), -1);
     /// ```
+    #[must_use]
     pub fn dim(&self) -> i32 {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
         let len = self.number_of_vertices() as i32;
-
-        min(len - 1, D as i32)
+        // We need at least D+1 vertices to form a simplex in D dimensions
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        let max_dim = D as i32;
+        min(len - 1, max_dim)
     }
 
     /// The function `number_of_cells` returns the number of cells in the [Tds].
@@ -284,6 +290,7 @@ where
     /// # Returns:
     ///
     /// The number of [Cell]s in the [Tds].
+    #[must_use]
     pub fn number_of_cells(&self) -> usize {
         self.cells.len()
     }
@@ -294,15 +301,16 @@ where
     /// # Returns:
     ///
     /// A [Cell] that encompasses all [Vertex] objects in the triangulation.
+    #[allow(clippy::unnecessary_wraps)]
     fn supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
         if self.vertices.is_empty() {
             // For empty input, create a default supercell
-            return self.create_default_supercell();
+            return Ok(Self::create_default_supercell());
         }
 
         // Find the bounding box of all input vertices
-        let min_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(self.vertices.clone(), Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&self.vertices, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&self.vertices, Ordering::Greater);
 
         // Convert coordinates to f64 for calculations
         let mut center_f64 = [0.0f64; D];
@@ -311,7 +319,7 @@ where
         for i in 0..D {
             let min_f64: f64 = min_coords[i].into();
             let max_f64: f64 = max_coords[i].into();
-            center_f64[i] = (min_f64 + max_f64) / 2.0;
+            center_f64[i] = f64::midpoint(min_f64, max_f64);
             let dim_size = max_f64 - min_f64;
             if dim_size > size_f64 {
                 size_f64 = dim_size;
@@ -330,7 +338,7 @@ where
         let radius = T::from(radius_f64);
 
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
-        let points = self.create_supercell_simplex(&center, radius)?;
+        let points = Self::create_supercell_simplex(&center, radius);
 
         let supercell = CellBuilder::default()
             .vertices(Vertex::from_points(points))
@@ -341,25 +349,21 @@ where
     }
 
     /// Creates a default supercell for empty input
-    fn create_default_supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
+    fn create_default_supercell() -> Cell<T, U, V, D> {
         let center = [T::default(); D];
         let radius = T::from(20.0f64);
-        let points = self.create_supercell_simplex(&center, radius)?;
+        let points = Self::create_supercell_simplex(&center, radius);
 
         let supercell = CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
             .unwrap();
 
-        Ok(supercell)
+        supercell
     }
 
     /// Creates a well-formed simplex centered at the given point with the given radius
-    fn create_supercell_simplex(
-        &self,
-        center: &[T; D],
-        radius: T,
-    ) -> Result<Vec<Point<T, D>>, anyhow::Error> {
+    fn create_supercell_simplex(center: &[T; D], radius: T) -> Vec<Point<T, D>> {
         let mut points = Vec::new();
 
         // For 3D, create a regular tetrahedron
@@ -417,7 +421,7 @@ where
             }
         }
 
-        Ok(points)
+        points
     }
 
     /// Performs the Bowyer-Watson algorithm to triangulate a set of vertices.
@@ -438,7 +442,7 @@ where
         // For cases with a small number of vertices, use a direct combinatorial approach
         // This is more reliable than the full Bowyer-Watson algorithm for small cases
         if self.vertices.len() > D && self.vertices.len() <= D + 5 {
-            let vertices: Vec<_> = self.vertices.values().cloned().collect();
+            let vertices: Vec<_> = self.vertices.values().copied().collect();
             let mut created_cells = 0;
 
             // Generate all possible combinations of D+1 vertices
@@ -449,7 +453,7 @@ where
                 if let Ok(cell) = CellBuilder::default()
                     .vertices(combination)
                     .build()
-                    .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {:?}", e)))
+                    .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {e:?}")))
                 {
                     self.cells.insert(cell.uuid(), cell);
                     created_cells += 1;
@@ -461,10 +465,10 @@ where
                 self.remove_duplicate_cells();
 
                 // Assign neighbors between adjacent cells
-                self.assign_neighbors()?;
+                self.assign_neighbors();
 
                 // Assign incident cells to vertices
-                self.assign_incident_cells()?;
+                self.assign_incident_cells();
 
                 return Ok(self);
             }
@@ -475,16 +479,19 @@ where
         // For more complex cases, use the full Bowyer-Watson algorithm
         // Create super-cell that contains all vertices
         let supercell = self.supercell()?;
-        let supercell_vertices: HashSet<Uuid> =
-            supercell.vertices().iter().map(|v| v.uuid()).collect();
+        let supercell_vertices: HashSet<Uuid> = supercell
+            .vertices()
+            .iter()
+            .map(super::vertex::Vertex::uuid)
+            .collect();
         let supercell_uuid = supercell.uuid();
         self.cells.insert(supercell_uuid, supercell.clone());
 
         // Collect input vertices into a vector to avoid borrowing conflicts
-        let input_vertices: Vec<_> = self.vertices.values().cloned().collect();
+        let input_vertices: Vec<_> = self.vertices.values().copied().collect();
 
         // Iterate over each input vertex and insert it into the triangulation
-        for vertex in input_vertices.iter() {
+        for vertex in &input_vertices {
             // Skip if this vertex is already part of supercell vertices
             if supercell_vertices.contains(&vertex.uuid()) {
                 continue;
@@ -498,8 +505,8 @@ where
             }
 
             // Create new cells using the boundary facets and the new vertex
-            for facet in boundary_facets.iter() {
-                let new_cell = Cell::from_facet_and_vertex(facet.clone(), *vertex)?;
+            for facet in &boundary_facets {
+                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
                 self.cells.insert(new_cell.uuid(), new_cell);
             }
         }
@@ -508,10 +515,10 @@ where
         self.remove_cells_containing_supercell_vertices(&supercell);
 
         // Assign neighbors between adjacent cells
-        self.assign_neighbors()?;
+        self.assign_neighbors();
 
         // Assign incident cells to vertices
-        self.assign_incident_cells()?;
+        self.assign_incident_cells();
 
         Ok(self)
     }
@@ -529,7 +536,7 @@ where
         let mut boundary_facets = Vec::new();
 
         // Find cells whose circumsphere contains the vertex
-        for (cell_id, cell) in self.cells.iter() {
+        for (cell_id, cell) in &self.cells {
             let contains = cell.circumsphere_contains_vertex(*vertex)?;
             if contains {
                 bad_cells.push(*cell_id);
@@ -566,14 +573,17 @@ where
         // The goal is to remove supercell artifacts while preserving valid Delaunay cells
         // We should only keep cells that are made entirely of input vertices
 
-        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().cloned().collect();
+        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().copied().collect();
 
         let cells_to_remove: Vec<Uuid> = self
             .cells
             .iter()
             .filter(|(_, cell)| {
-                let cell_vertex_uuids: HashSet<Uuid> =
-                    cell.vertices().iter().map(|v| v.uuid()).collect();
+                let cell_vertex_uuids: HashSet<Uuid> = cell
+                    .vertices()
+                    .iter()
+                    .map(super::vertex::Vertex::uuid)
+                    .collect();
                 let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
 
                 // Remove cells that don't consist entirely of input vertices
@@ -593,7 +603,11 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(|v| v.uuid()).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -611,7 +625,7 @@ where
         }
     }
 
-    fn assign_neighbors(&mut self) -> Result<(), anyhow::Error> {
+    fn assign_neighbors(&mut self) {
         // Create a map to store neighbor relationships
         let mut neighbor_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
 
@@ -621,7 +635,7 @@ where
         }
 
         // Find neighboring cells by comparing facets
-        let cell_ids: Vec<Uuid> = self.cells.keys().cloned().collect();
+        let cell_ids: Vec<Uuid> = self.cells.keys().copied().collect();
 
         for i in 0..cell_ids.len() {
             for j in (i + 1)..cell_ids.len() {
@@ -660,11 +674,9 @@ where
                 }
             }
         }
-
-        Ok(())
     }
 
-    fn assign_incident_cells(&mut self) -> Result<(), anyhow::Error> {
+    fn assign_incident_cells(&mut self) {
         // Create a map from vertex UUID to incident cell UUIDs
         let mut vertex_to_cells: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
 
@@ -694,8 +706,6 @@ where
                 }
             }
         }
-
-        Ok(())
     }
 
     /// Remove duplicate cells (cells with identical vertex sets)
@@ -705,7 +715,11 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(|v| v.uuid()).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -752,8 +766,12 @@ where
     println!("--- NEIGHBOR VALIDATION ---");
     let mut total_neighbor_links = 0;
     for (cell_id, cell) in &tds.cells {
-        println!("Checking cell {:?}", cell_id);
-        let this_vertices: HashSet<_> = cell.vertices().iter().map(|v| v.uuid()).collect();
+        println!("Checking cell {cell_id:?}");
+        let this_vertices: HashSet<_> = cell
+            .vertices()
+            .iter()
+            .map(super::vertex::Vertex::uuid)
+            .collect();
 
         if let Some(neighbors) = &cell.neighbors {
             if neighbors.len() > D + 1 {
@@ -765,11 +783,10 @@ where
             }
 
             for neighbor_id in neighbors {
-                println!("  Neighbor: {:?}", neighbor_id);
+                println!("  Neighbor: {neighbor_id:?}");
                 total_neighbor_links += 1;
-                let neighbor_cell = match tds.cells.get(neighbor_id) {
-                    Some(cell) => cell,
-                    None => return Err(anyhow!("Neighbor cell {:?} not found", neighbor_id)),
+                let Some(neighbor_cell) = tds.cells.get(neighbor_id) else {
+                    return Err(anyhow!("Neighbor cell {:?} not found", neighbor_id));
                 };
 
                 // Mutual neighbor check
@@ -785,8 +802,11 @@ where
                 }
 
                 // Shared facet check: should share exactly D vertices (i.e., D+1 simplex - 1)
-                let neighbor_vertices: HashSet<_> =
-                    neighbor_cell.vertices().iter().map(|v| v.uuid()).collect();
+                let neighbor_vertices: HashSet<_> = neighbor_cell
+                    .vertices()
+                    .iter()
+                    .map(super::vertex::Vertex::uuid)
+                    .collect();
                 let shared: HashSet<_> = this_vertices.intersection(&neighbor_vertices).collect();
                 if shared.len() != D {
                     return Err(anyhow!(
@@ -800,7 +820,7 @@ where
         }
     }
     println!("✓ Neighbor validation passed for all cells");
-    println!("✓ Total neighbor links validated: {}", total_neighbor_links);
+    println!("✓ Total neighbor links validated: {total_neighbor_links}");
     Ok(())
 }
 
@@ -822,7 +842,7 @@ where
 {
     use anyhow::anyhow;
 
-    println!("--- CELL‑VERTEX VALIDATION (D = {}) ---", D);
+    println!("--- CELL‑VERTEX VALIDATION (D = {D}) ---");
     let mut seen: HashMap<Vec<Uuid>, Uuid> = HashMap::new();
     let mut idx = 1;
 
@@ -846,13 +866,17 @@ where
                 .iter()
                 .map(|c| (*c).into())
                 .collect();
-            print!(" {:?}", coords);
+            print!(" {coords:?}");
         }
         println!();
         idx += 1;
 
         // 3.  Uniqueness check
-        let mut key: Vec<Uuid> = cell.vertices().iter().map(|v| v.uuid()).collect();
+        let mut key: Vec<Uuid> = cell
+            .vertices()
+            .iter()
+            .map(super::vertex::Vertex::uuid)
+            .collect();
         key.sort_unstable();
         if let Some(dup_id) = seen.insert(key.clone(), *cell_id) {
             return Err(anyhow!(
@@ -890,7 +914,7 @@ mod tests {
         assert_eq!(tds.dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", tds);
+        println!("{tds:?}");
     }
 
     #[test]
@@ -985,7 +1009,7 @@ mod tests {
         let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
         let supercell = tds.supercell();
         let unwrapped_supercell =
-            supercell.unwrap_or_else(|err| panic!("Error creating supercell: {:?}!", err));
+            supercell.unwrap_or_else(|err| panic!("Error creating supercell: {err:?}!"));
 
         assert_eq!(unwrapped_supercell.vertices().len(), 4);
 
@@ -1000,7 +1024,7 @@ mod tests {
         assert_eq!(unwrapped_supercell.vertices().len(), 4);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", unwrapped_supercell);
+        println!("{unwrapped_supercell:?}");
     }
 
     #[test]
@@ -1019,7 +1043,7 @@ mod tests {
         );
 
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating triangulation: {:?}", err);
+            panic!("Error creating triangulation: {err:?}");
         });
 
         println!(
@@ -1033,7 +1057,7 @@ mod tests {
         assert_eq!(result.number_of_cells(), 1);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", result);
+        println!("{result:?}");
     }
 
     #[test]
@@ -1058,7 +1082,7 @@ mod tests {
         );
 
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating 4D triangulation: {:?}", err);
+            panic!("Error creating 4D triangulation: {err:?}");
         });
 
         println!(
@@ -1099,7 +1123,7 @@ mod tests {
         );
 
         let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating 5D triangulation: {:?}", err);
+            panic!("Error creating 5D triangulation: {err:?}");
         });
 
         println!(

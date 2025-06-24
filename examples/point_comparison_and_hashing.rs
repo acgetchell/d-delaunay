@@ -114,7 +114,7 @@ fn nan_comparison_demo() {
     // Test reflexivity with NaN (this demonstrates our custom implementation)
     #[allow(clippy::eq_op)]
     let reflexivity_result = point_nan1 == point_nan1;
-    println!("point_nan1 == point_nan1: {}", reflexivity_result);
+    println!("point_nan1 == point_nan1: {reflexivity_result}");
 
     // Different NaN patterns
     let point_nan_diff1 = Point::new([f64::NAN, 2.0, 3.0]);
@@ -205,7 +205,7 @@ fn hashmap_demo() {
     );
 
     if let Some(value) = point_map.get(&point_nan_copy) {
-        println!("Retrieved value for NaN point: {}", value);
+        println!("Retrieved value for NaN point: {value}");
     }
 
     // Demonstrate that NaN points can be used as keys reliably
@@ -281,7 +281,7 @@ fn mathematical_properties_demo() {
     // Reflexivity: a == a (this demonstrates our custom implementation)
     #[allow(clippy::eq_op)]
     let reflexivity_result = point_a == point_a;
-    println!("Reflexivity (a == a): {}", reflexivity_result);
+    println!("Reflexivity (a == a): {reflexivity_result}");
 
     // Symmetry: if a == b, then b == a
     let symmetry_ab = point_a == point_b;

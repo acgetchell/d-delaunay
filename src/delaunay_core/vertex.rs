@@ -80,6 +80,7 @@ where
     /// assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
+    #[must_use]
     pub fn from_points(points: Vec<Point<T, D>>) -> Vec<Self> {
         points
             .into_iter()
@@ -112,6 +113,7 @@ where
     /// assert!(map.values().all(|v| v.dim() == 2));
     /// ```
     #[inline]
+    #[must_use]
     pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
         vertices.into_iter().map(|v| (v.uuid(), v)).collect()
     }
@@ -370,7 +372,7 @@ mod tests {
         assert!(vertex.data.is_none());
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
+        println!("{vertex:?}");
     }
 
     #[test]
@@ -391,7 +393,7 @@ mod tests {
         assert_eq!(vertex.data.unwrap(), "3D");
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
+        println!("{vertex:?}");
     }
 
     #[test]
@@ -409,7 +411,7 @@ mod tests {
         assert_eq!(vertex.data.unwrap(), 1);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertex);
+        println!("{vertex:?}");
     }
 
     #[test]
@@ -441,7 +443,7 @@ mod tests {
         assert_eq!(vertices[2].dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", vertices);
+        println!("{vertices:?}");
     }
 
     #[test]
@@ -457,14 +459,14 @@ mod tests {
 
         assert_eq!(values.len(), 3);
 
-        values.sort_by_key(|a| a.uuid());
-        vertices.sort_by_key(|a| a.uuid());
+        values.sort_by_key(super::Vertex::uuid);
+        vertices.sort_by_key(super::Vertex::uuid);
 
         assert_eq!(values, vertices);
 
         // Human readable output for cargo test -- --nocapture
-        println!("values = {:?}", values);
-        println!("vertices = {:?}", vertices);
+        println!("values = {values:?}");
+        println!("vertices = {vertices:?}");
     }
 
     #[test]
@@ -493,7 +495,7 @@ mod tests {
         assert_eq!(deserialized, vertex);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {:?}", serialized);
+        println!("Serialized: {serialized:?}");
     }
 
     #[test]
@@ -691,7 +693,7 @@ mod tests {
             .data(42)
             .build()
             .unwrap();
-        let debug_str = format!("{:?}", vertex);
+        let debug_str = format!("{vertex:?}");
 
         assert!(debug_str.contains("Vertex"));
         assert!(debug_str.contains("point"));

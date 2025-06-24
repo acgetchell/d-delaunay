@@ -9,7 +9,7 @@ use super::{
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use peroxide::fuga::*;
+use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use uuid::Uuid;
@@ -282,11 +282,11 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
     /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
     /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
-    /// let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
+    /// let new_cell = Cell::from_facet_and_vertex(&facet, vertex5).unwrap();
     /// assert!(new_cell.vertices().contains(&vertex5));
     /// ```
     pub fn from_facet_and_vertex(
-        facet: Facet<T, U, V, D>,
+        facet: &Facet<T, U, V, D>,
         vertex: Vertex<T, U, D>,
     ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
@@ -304,6 +304,7 @@ where
 
     /// The function `into_hashmap` converts a [Vec] of cells into a [HashMap],
     /// using the [Cell] [Uuid]s as keys.
+    #[must_use]
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
         cells.into_iter().map(|c| (c.uuid, c)).collect()
     }
@@ -441,7 +442,7 @@ where
 
         for i in 0..dim {
             let coords_i: [T; D] = (&self.vertices[i + 1]).into();
-            let coords_i_f64: [f64; D] = coords_i.map(std::convert::Into::into);
+            let coords_vertex_f64: [f64; D] = coords_i.map(std::convert::Into::into);
 
             // Fill matrix row
             for j in 0..dim {
@@ -450,7 +451,7 @@ where
 
             // Fill vector element
             b[(i, 0)] = na::distance_squared(
-                &na::Point::from(coords_i_f64),
+                &na::Point::from(coords_vertex_f64),
                 &na::Point::from(coords_0_f64),
             );
         }
@@ -458,7 +459,7 @@ where
         let a_inv = invert(&matrix)?;
         let solution = a_inv * b * 0.5;
         let solution_vec = solution.col(0).clone();
-        let solution_array = vec_to_array(solution_vec).map_err(anyhow::Error::msg)?;
+        let solution_array = vec_to_array(&solution_vec).map_err(anyhow::Error::msg)?;
 
         Ok(Point::<f64, D>::from(solution_array))
     }
@@ -470,21 +471,21 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        self.circumradius_with_center(&circumcenter)
+        Ok(self.circumradius_with_center(&circumcenter))
     }
 
     /// Alternative method that accepts precomputed circumcenter
-    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
+    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> T
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let vertex_coords: [T; D] = (&self.vertices[0]).into();
         let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
-        Ok(na::distance(
+        na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
             &na::Point::<T, D>::from(vertex_coords_f64),
-        ))
+        )
     }
 
     /// The function `circumsphere_contains` checks if a given vertex is
@@ -519,7 +520,7 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        let circumradius = self.circumradius_with_center(&circumcenter)?;
+        let circumradius = self.circumradius_with_center(&circumcenter);
         // Use implicit conversion from vertex to coordinates, then convert to f64
         let vertex_coords: [T; D] = (&vertex).into();
         let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
@@ -741,7 +742,7 @@ mod tests {
         assert!(cell.data.is_none());
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -785,7 +786,7 @@ mod tests {
         assert!(cell.is_err());
 
         // Human readable output for cargo test -- --nocapture
-        println!("{:?}", cell);
+        println!("{cell:?}");
     }
 
     #[test]
@@ -828,7 +829,7 @@ mod tests {
         assert_eq!(cell.data.unwrap(), "three-one cell");
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -894,7 +895,7 @@ mod tests {
             .point(Point::origin())
             .build()
             .unwrap();
-        let new_cell = Cell::from_facet_and_vertex(facet, vertex5).unwrap();
+        let new_cell = Cell::from_facet_and_vertex(&facet, vertex5).unwrap();
 
         assert!(new_cell.vertices().contains(&vertex1));
         assert!(new_cell.vertices().contains(&vertex2));
@@ -902,7 +903,7 @@ mod tests {
         assert!(new_cell.vertices().contains(&vertex5));
 
         // Human readable output for cargo test -- --nocapture
-        println!("New Cell: {:?}", new_cell);
+        println!("New Cell: {new_cell:?}");
     }
 
     #[test]
@@ -938,8 +939,8 @@ mod tests {
         assert_eq!(values[0], cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("values: {:?}", values);
-        println!("cells = {:?}", cell);
+        println!("values: {values:?}");
+        println!("cells = {cell:?}");
     }
 
     #[test]
@@ -1019,7 +1020,7 @@ mod tests {
         assert!(cell.contains_vertex(vertex4));
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1063,7 +1064,7 @@ mod tests {
         assert!(cell.contains_vertex_of(&cell2));
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1083,7 +1084,7 @@ mod tests {
         assert_eq!(circumcenter, Point::new([0.5, 0.5, 0.5]));
 
         // Human readable output for cargo test -- --nocapture
-        println!("Circumcenter: {:?}", circumcenter);
+        println!("Circumcenter: {circumcenter:?}");
     }
 
     #[test]
@@ -1144,7 +1145,7 @@ mod tests {
         assert_eq!(circumradius, radius);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Circumradius: {:?}", circumradius);
+        println!("Circumradius: {circumradius:?}");
     }
 
     #[test]
@@ -1182,7 +1183,7 @@ mod tests {
         assert!(cell.circumsphere_contains(vertex5).unwrap());
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1220,7 +1221,7 @@ mod tests {
         assert!(!cell.circumsphere_contains(vertex5).unwrap());
 
         // Human readable output for cargo test -- --nocapture
-        println!("Cell: {:?}", cell);
+        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -1253,14 +1254,14 @@ mod tests {
         let facets = cell.facets();
 
         assert_eq!(facets.len(), 4);
-        for facet in facets.iter() {
+        for facet in &facets {
             // assert!(cell.facets().contains(facet));
             let facet_vertices = facet.vertices();
             assert!(cell.facets().iter().any(|f| f.vertices() == facet_vertices));
         }
 
         // Human readable output for cargo test -- --nocapture
-        println!("Facets: {:?}", facets);
+        println!("Facets: {facets:?}");
     }
 
     #[test]
@@ -1298,7 +1299,7 @@ mod tests {
         assert_eq!(deserialized, cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {:?}", serialized);
+        println!("Serialized: {serialized:?}");
     }
 
     #[test]
@@ -1757,7 +1758,7 @@ mod tests {
             .data(42)
             .build()
             .unwrap();
-        let debug_str = format!("{:?}", cell);
+        let debug_str = format!("{cell:?}");
 
         assert!(debug_str.contains("Cell"));
         assert!(debug_str.contains("vertices"));
@@ -2260,7 +2261,7 @@ mod tests {
             .unwrap();
 
         let circumcenter = cell.circumcenter().unwrap();
-        let radius_with_center = cell.circumradius_with_center(&circumcenter).unwrap();
+        let radius_with_center = cell.circumradius_with_center(&circumcenter);
         let radius_direct = cell.circumradius().unwrap();
 
         assert!((radius_with_center - radius_direct).abs() < 1e-10);
@@ -2300,8 +2301,10 @@ mod tests {
         }
 
         // All vertices should be represented in facets
-        let all_facet_vertices: std::collections::HashSet<_> =
-            facets.iter().flat_map(|f| f.vertices()).collect();
+        let all_facet_vertices: std::collections::HashSet<_> = facets
+            .iter()
+            .flat_map(super::super::facet::Facet::vertices)
+            .collect();
         assert!(all_facet_vertices.contains(&vertex1));
         assert!(all_facet_vertices.contains(&vertex2));
         assert!(all_facet_vertices.contains(&vertex3));
@@ -2382,7 +2385,7 @@ mod tests {
             .unwrap();
 
         // Create new cell from facet and vertex
-        let new_cell = Cell::from_facet_and_vertex(facet, new_vertex).unwrap();
+        let new_cell = Cell::from_facet_and_vertex(&facet, new_vertex).unwrap();
 
         // Verify the new cell contains the original facet vertices plus the new vertex
         assert!(new_cell.contains_vertex(vertex1));
@@ -2572,7 +2575,7 @@ mod tests {
             .unwrap();
 
         // Human readable output for cargo test -- --nocapture
-        println!("Valid Cell: {:?}", cell);
+        println!("Valid Cell: {cell:?}");
         assert!(cell.is_valid());
 
         // Test cell is_valid with invalid vertices (containing NaN)
@@ -2594,7 +2597,7 @@ mod tests {
             .unwrap();
 
         // Human readable output for cargo test -- --nocapture
-        println!("Invalid Cell: {:?}", invalid_cell);
+        println!("Invalid Cell: {invalid_cell:?}");
         assert!(!invalid_cell.is_valid());
 
         // Test cell is_valid with duplicate vertices
@@ -2612,7 +2615,7 @@ mod tests {
             .unwrap();
 
         // Human readable output for cargo test -- --nocapture
-        println!("Duplicate Vertices Cell: {:?}", duplicate_cell);
+        println!("Duplicate Vertices Cell: {duplicate_cell:?}");
         assert!(!duplicate_cell.is_valid());
     }
 }

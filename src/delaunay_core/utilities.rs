@@ -19,6 +19,7 @@ use uuid::Uuid;
 /// let uuid = make_uuid();
 /// assert_eq!(uuid.get_version_num(), 4);
 /// ```
+#[must_use]
 pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }
@@ -56,11 +57,12 @@ pub fn make_uuid() -> Uuid {
 /// ];
 /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 /// let hashmap = Vertex::into_hashmap(vertices);
-/// let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
+/// let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
 /// assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
 /// ```
-pub fn find_extreme_coordinates<T, U, const D: usize>(
-    vertices: HashMap<Uuid, Vertex<T, U, D>>,
+#[must_use]
+pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHasher>(
+    vertices: &HashMap<Uuid, Vertex<T, U, D>, S>,
     ordering: Ordering,
 ) -> [T; D]
 where
@@ -108,10 +110,10 @@ where
 /// ```
 /// use d_delaunay::delaunay_core::utilities::vec_to_array;
 /// let vec = vec![1.0, 2.0, 3.0];
-/// let array = vec_to_array::<3>(vec).unwrap();
+/// let array = vec_to_array::<3>(&vec).unwrap();
 /// assert_eq!(array, [1.0, 2.0, 3.0]);
 /// ```
-pub fn vec_to_array<const D: usize>(vec: Vec<f64>) -> Result<[f64; D], anyhow::Error> {
+pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], anyhow::Error> {
     if vec.len() != D {
         return Err(anyhow::Error::msg(
             "Vector length does not match array dimension!",
@@ -137,7 +139,7 @@ mod tests {
         assert_ne!(uuid, make_uuid());
 
         // Human readable output for cargo test -- --nocapture
-        println!("make_uuid = {:?}", uuid);
+        println!("make_uuid = {uuid:?}");
         println!("uuid version: {:?}\n", uuid.get_version_num());
     }
 
@@ -150,12 +152,12 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
-        let min_coords = find_extreme_coordinates(hashmap, Ordering::Less);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
 
         assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("min_coords = {:?}", min_coords);
+        println!("min_coords = {min_coords:?}");
     }
 
     #[test]
@@ -167,18 +169,18 @@ mod tests {
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         assert_eq!(max_coords, [7.0, 8.0, 6.0]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("max_coords = {:?}", max_coords);
+        println!("max_coords = {max_coords:?}");
     }
 
     #[test]
     fn utilities_vec_to_array_success() {
         let vec = vec![1.0, 2.0, 3.0];
-        let result = vec_to_array::<3>(vec);
+        let result = vec_to_array::<3>(&vec);
 
         assert!(result.is_ok());
         let array = result.unwrap();
@@ -188,7 +190,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_wrong_length() {
         let vec = vec![1.0, 2.0]; // Length 2, but expecting 3
-        let result = vec_to_array::<3>(vec);
+        let result = vec_to_array::<3>(&vec);
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -201,7 +203,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_empty() {
         let vec: Vec<f64> = vec![];
-        let result = vec_to_array::<3>(vec);
+        let result = vec_to_array::<3>(&vec);
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -214,7 +216,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_too_long() {
         let vec = vec![1.0, 2.0, 3.0, 4.0, 5.0]; // Length 5, but expecting 3
-        let result = vec_to_array::<3>(vec);
+        let result = vec_to_array::<3>(&vec);
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -227,7 +229,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_1d() {
         let vec = vec![42.0];
-        let result = vec_to_array::<1>(vec);
+        let result = vec_to_array::<1>(&vec);
 
         assert!(result.is_ok());
         let array = result.unwrap();
@@ -237,7 +239,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_large_dimension() {
         let vec = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-        let result = vec_to_array::<10>(vec);
+        let result = vec_to_array::<10>(&vec);
 
         assert!(result.is_ok());
         let array = result.unwrap();
@@ -247,7 +249,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_negative_values() {
         let vec = vec![-1.0, -2.0, -3.0];
-        let result = vec_to_array::<3>(vec);
+        let result = vec_to_array::<3>(&vec);
 
         assert!(result.is_ok());
         let array = result.unwrap();
@@ -257,7 +259,7 @@ mod tests {
     #[test]
     fn utilities_vec_to_array_zero() {
         let vec = vec![0.0, 0.0, 0.0];
-        let result = vec_to_array::<3>(vec);
+        let result = vec_to_array::<3>(&vec);
 
         assert!(result.is_ok());
         let array = result.unwrap();
@@ -267,8 +269,8 @@ mod tests {
     #[test]
     fn utilities_find_extreme_coordinates_empty() {
         let empty_hashmap: HashMap<Uuid, Vertex<f64, Option<()>, 3>> = HashMap::new();
-        let min_coords = find_extreme_coordinates(empty_hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(empty_hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Greater);
 
         // With empty hashmap, should return default values [0.0, 0.0, 0.0]
         assert_eq!(min_coords, [0.0, 0.0, 0.0]);
@@ -281,8 +283,8 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
 
-        let min_coords = find_extreme_coordinates(hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         // With single point, min and max should be the same
         assert_eq!(min_coords, [5.0, -3.0, 7.0]);
@@ -296,7 +298,7 @@ mod tests {
         let hashmap = Vertex::into_hashmap(vertices);
 
         // Using Ordering::Equal should return the first vertex's coordinates unchanged
-        let coords = find_extreme_coordinates(hashmap, Ordering::Equal);
+        let coords = find_extreme_coordinates(&hashmap, Ordering::Equal);
         // The first vertex in the iteration (order is not guaranteed in HashMap)
         // but the result should be one of the input coordinates
         assert!(coords == [1.0, 2.0, 3.0] || coords == [4.0, 5.0, 6.0]);
@@ -312,8 +314,8 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 2>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
 
-        let min_coords = find_extreme_coordinates(hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         assert_eq!(min_coords, [1.0, 2.0]);
         assert_eq!(max_coords, [3.0, 5.0]);
@@ -325,8 +327,8 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 1>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
 
-        let min_coords = find_extreme_coordinates(hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         assert_eq!(min_coords, [-5.0]);
         assert_eq!(max_coords, [10.0]);
@@ -353,8 +355,8 @@ mod tests {
             .collect();
         let hashmap = Vertex::into_hashmap(vertices);
 
-        let min_coords = find_extreme_coordinates(hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         assert_eq!(min_coords, [-2.0, -1.0, 1.0]);
         assert_eq!(max_coords, [4.0, 5.0, 3.0]);
@@ -370,8 +372,8 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
 
-        let min_coords = find_extreme_coordinates(hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         // All points are identical, so min and max should be the same
         assert_eq!(min_coords, [2.0, 3.0, 4.0]);
@@ -388,8 +390,8 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
         let hashmap = Vertex::into_hashmap(vertices);
 
-        let min_coords = find_extreme_coordinates(hashmap.clone(), Ordering::Less);
-        let max_coords = find_extreme_coordinates(hashmap, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         assert_eq!(min_coords, [-1e9, -1e6, -1e15]);
         assert_eq!(max_coords, [1e15, 1e9, 1e12]);

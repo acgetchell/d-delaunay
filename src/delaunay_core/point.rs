@@ -84,6 +84,7 @@ where
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
     /// ```
+    #[must_use]
     #[inline]
     pub fn dim(&self) -> usize {
         D
@@ -121,6 +122,7 @@ where
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
     /// ```
+    #[must_use]
     pub fn origin() -> Self
     where
         T: num_traits::Zero + Copy,
@@ -356,7 +358,7 @@ where
     #[inline]
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
-        let coords_u: [U; D] = coords.map(|coord| coord.into());
+        let coords_u: [U; D] = coords.map(std::convert::Into::into);
         Self { coords: coords_u }
     }
 }
@@ -460,7 +462,7 @@ mod tests {
         assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Default: {:?}", point);
+        println!("Default: {point:?}");
     }
 
     #[test]
@@ -470,7 +472,7 @@ mod tests {
         assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Point: {:?}", point);
+        println!("Point: {point:?}");
     }
 
     #[test]
@@ -538,7 +540,7 @@ mod tests {
         assert_eq!(deserialized, point);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {:?}", serialized);
+        println!("Serialized: {serialized:?}");
     }
 
     #[test]
@@ -768,7 +770,7 @@ mod tests {
     #[test]
     fn point_debug_format() {
         let point = Point::new([1.0, 2.0, 3.0]);
-        let debug_str = format!("{:?}", point);
+        let debug_str = format!("{point:?}");
 
         assert!(debug_str.contains("Point"));
         assert!(debug_str.contains("coords"));

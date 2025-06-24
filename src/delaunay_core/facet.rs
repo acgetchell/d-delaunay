@@ -238,7 +238,7 @@ where
             .vertices()
             .iter()
             .filter(|v| **v != self.vertex)
-            .cloned()
+            .copied()
             .collect()
     }
 }
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(facet.cell(), &cell);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Facet: {:?}", facet);
+        println!("Facet: {facet:?}");
     }
 
     #[test]
@@ -410,7 +410,7 @@ mod tests {
         assert_eq!(facet_vertices[2], vertices[3]);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Facet: {:?}", facet);
+        println!("Facet: {facet:?}");
     }
 
     #[test]
@@ -448,7 +448,7 @@ mod tests {
         assert_eq!(deserialized, facet);
 
         // Human readable output for cargo test -- --nocapture
-        println!("Serialized = {:?}", serialized);
+        println!("Serialized = {serialized:?}");
     }
 
     #[test]
@@ -566,7 +566,7 @@ mod tests {
             .build()
             .unwrap();
         let facet = Facet::new(cell.clone(), vertex1).unwrap();
-        let debug_str = format!("{:?}", facet);
+        let debug_str = format!("{facet:?}");
 
         assert!(debug_str.contains("Facet"));
         assert!(debug_str.contains("cell"));
@@ -750,8 +750,8 @@ mod tests {
         let cell_error = FacetError::CellDoesNotContainVertex;
         let simplex_error = FacetError::CellIsZeroSimplex;
 
-        let cell_debug = format!("{:?}", cell_error);
-        let simplex_debug = format!("{:?}", simplex_error);
+        let cell_debug = format!("{cell_error:?}");
+        let simplex_debug = format!("{simplex_error:?}");
 
         assert!(cell_debug.contains("CellDoesNotContainVertex"));
         assert!(simplex_debug.contains("CellIsZeroSimplex"));

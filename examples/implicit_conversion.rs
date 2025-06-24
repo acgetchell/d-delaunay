@@ -35,11 +35,11 @@ fn main() {
 
     // Before: You had to call .coordinates() explicitly
     let coords_explicit: [f64; 3] = vertex.point().coordinates();
-    println!("Explicit coordinates: {:?}", coords_explicit);
+    println!("Explicit coordinates: {coords_explicit:?}");
 
     // After: You can now use implicit conversion from the vertex
     let coords_from_vertex: [f64; 3] = vertex.into();
-    println!("Implicit conversion from vertex: {:?}", coords_from_vertex);
+    println!("Implicit conversion from vertex: {coords_from_vertex:?}");
 
     // Create another vertex for reference conversion
     let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
@@ -49,10 +49,7 @@ fn main() {
 
     // You can also convert from a reference to preserve the original vertex
     let coords_from_ref: [f64; 3] = (&another_vertex).into();
-    println!(
-        "Implicit conversion from vertex reference: {:?}",
-        coords_from_ref
-    );
+    println!("Implicit conversion from vertex reference: {coords_from_ref:?}");
     println!(
         "Original vertex still available: {:?}",
         another_vertex.point().coordinates()
@@ -61,15 +58,12 @@ fn main() {
     // Point implicit conversion also works
     let point = Point::new([7.0, 8.0, 9.0]);
     let coords_from_point: [f64; 3] = point.into();
-    println!("Implicit conversion from point: {:?}", coords_from_point);
+    println!("Implicit conversion from point: {coords_from_point:?}");
 
     // And from point reference
     let another_point = Point::new([10.0, 11.0, 12.0]);
     let coords_from_point_ref: [f64; 3] = (&another_point).into();
-    println!(
-        "Implicit conversion from point reference: {:?}",
-        coords_from_point_ref
-    );
+    println!("Implicit conversion from point reference: {coords_from_point_ref:?}");
     println!(
         "Original point still available: {:?}",
         another_point.coordinates()
