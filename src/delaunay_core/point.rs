@@ -23,6 +23,21 @@ use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
+/// Enum representing validation errors for a [`Point`].
+#[derive(Error, Debug, PartialEq, Clone)]
+pub enum PointValidationError {
+    /// A coordinate is invalid (NaN or infinite).
+    #[error("Invalid coordinate at index {coordinate_index} in dimension {dimension}: {coordinate_value}")]
+    InvalidCoordinate {
+        /// Index of the invalid coordinate in the point.
+        coordinate_index: usize,
+        /// Value of the invalid coordinate, presented as a string.
+        coordinate_value: String,
+        /// The dimensionality (number of coordinates) of the point.
+        dimension: usize,
+    },
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialOrd, Serialize)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
@@ -165,7 +180,7 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), PointValidationError>
     where
-        T: FiniteCheck + Copy + std::fmt::Debug,
+        T: FiniteCheck + Copy + Debug,
     {
         // Verify all coordinates are finite
         for (index, &coord) in self.coords.iter().enumerate() {
@@ -281,21 +296,6 @@ where
             coord.hash_coord(state);
         }
     }
-}
-
-/// Enum representing validation errors for a [`Point`].
-#[derive(Error, Debug, PartialEq, Clone)]
-pub enum PointValidationError {
-    /// A coordinate is invalid (NaN or infinite).
-    #[error("Invalid coordinate at index {coordinate_index} in dimension {dimension}: {coordinate_value}")]
-    InvalidCoordinate {
-        /// Index of the invalid coordinate in the point.
-        coordinate_index: usize,
-        /// Value of the invalid coordinate, presented as a string.
-        coordinate_value: String,
-        /// The dimensionality (number of coordinates) of the point.
-        dimension: usize,
-    },
 }
 
 /// Helper trait for OrderedFloat-based equality comparison that handles NaN properly

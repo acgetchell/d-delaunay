@@ -4,6 +4,14 @@ use anyhow::Result;
 use peroxide::prelude::*;
 use thiserror::Error;
 
+/// Error type for matrix operations.
+#[derive(Debug, Error)]
+pub enum MatrixError {
+    /// Matrix is singular.
+    #[error("Matrix is singular!")]
+    SingularMatrix,
+}
+
 /// Inverts a matrix.
 ///
 /// # Arguments
@@ -41,14 +49,6 @@ pub fn invert(matrix: &Matrix) -> Result<Matrix, anyhow::Error> {
         row: inv.row,
         shape: inv.shape,
     })
-}
-
-/// Error type for matrix operations.
-#[derive(Debug, Error)]
-pub enum MatrixError {
-    /// Matrix is singular.
-    #[error("Matrix is singular!")]
-    SingularMatrix,
 }
 
 #[cfg(test)]

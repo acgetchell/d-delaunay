@@ -7,14 +7,33 @@ use super::{
     matrix::invert,
     point::{OrderedEq, Point},
     utilities::{make_uuid, vec_to_array},
-    vertex::Vertex,
+    vertex::{Vertex, VertexValidationError},
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
+use thiserror::Error;
 use uuid::Uuid;
+
+/// Errors that can occur during cell validation.
+#[derive(Clone, Debug, Error, PartialEq)]
+pub enum CellValidationError {
+    /// The cell has an invalid vertex.
+    #[error("Invalid vertex: {source}")]
+    InvalidVertex {
+        /// The underlying vertex validation error.
+        #[from]
+        source: VertexValidationError,
+    },
+    /// The cell has an invalid (nil) UUID.
+    #[error("Invalid UUID: cell has nil UUID which is not allowed")]
+    InvalidUuid,
+    /// The cell contains duplicate vertices.
+    #[error("Duplicate vertices: cell contains non-unique vertices which is not allowed")]
+    DuplicateVertices,
+}
 
 #[derive(Builder, Clone, Debug, Default, Deserialize, Serialize)]
 #[builder(build_fn(validate = "Self::validate"))]
@@ -319,11 +338,20 @@ where
     ///
     /// # Returns
     ///
-    /// True if the [Cell] is valid; the `Vertices` are correct (all coordinates
-    /// are finite and UUIDs are valid), all vertices are distinct from one another,
-    /// the cell `UUID` is valid and not nil, the `neighbors` contains `UUID`s of
-    /// neighboring [Cell]s, and the `neighbors` are indexed such that the index
-    /// of the [Vertex] opposite the neighboring cell is the same.
+    /// A Result indicating whether the [Cell] is valid. Returns `Ok(())` if valid,
+    /// or a `CellValidationError` if invalid. The validation checks that:
+    /// - All vertices are valid (coordinates are finite and UUIDs are valid)
+    /// - All vertices are distinct from one another
+    /// - The cell UUID is valid and not nil
+    /// - The neighbors contain UUIDs of neighboring [Cell]s
+    /// - The neighbors are indexed such that the index of the [Vertex] opposite
+    ///   the neighboring cell is the same
+    ///
+    /// # Errors
+    ///
+    /// Returns `CellValidationError::InvalidVertex` if any vertex is invalid,
+    /// `CellValidationError::InvalidUuid` if the cell's UUID is nil, or
+    /// `CellValidationError::DuplicateVertices` if the cell contains duplicate vertices.
     ///
     /// # Example
     ///
@@ -335,25 +363,29 @@ where
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
-    /// assert!(cell.is_valid());
+    /// assert!(cell.is_valid().is_ok());
     /// ```
-    pub fn is_valid(&self) -> bool
+    pub fn is_valid(&self) -> Result<(), CellValidationError>
     where
         T: super::point::FiniteCheck + super::point::HashCoordinate + Copy,
     {
         // Check if all vertices are valid
-        let vertices_valid = self.vertices.iter().all(|vertex| (*vertex).is_valid());
+        for vertex in &self.vertices {
+            vertex.is_valid()?;
+        }
 
         // Check if UUID is not nil
-        let uuid_valid = !self.uuid.is_nil();
+        if self.uuid.is_nil() {
+            return Err(CellValidationError::InvalidUuid);
+        }
 
         // Check if all vertices are distinct from one another
-        let vertices_distinct = {
-            let mut seen = std::collections::HashSet::new();
-            self.vertices.iter().all(|vertex| seen.insert(*vertex))
-        };
+        let mut seen = std::collections::HashSet::new();
+        if !self.vertices.iter().all(|vertex| seen.insert(*vertex)) {
+            return Err(CellValidationError::DuplicateVertices);
+        }
 
-        vertices_valid && uuid_valid && vertices_distinct
+        Ok(())
         // TODO: Additional validation can be added here:
         // - Validate neighbors structure if present
         // - Validate that the cell forms a valid simplex
@@ -2611,7 +2643,7 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Valid Cell: {cell:?}");
-        assert!(cell.is_valid());
+        assert!(cell.is_valid().is_ok());
 
         // Test cell is_valid with invalid vertices (containing NaN)
         let vertex_invalid = VertexBuilder::default()
@@ -2633,7 +2665,7 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Invalid Cell: {invalid_cell:?}");
-        assert!(!invalid_cell.is_valid());
+        assert!(invalid_cell.is_valid().is_err());
 
         // Test cell is_valid with duplicate vertices
         let vertex_dup = VertexBuilder::default()
@@ -2651,6 +2683,37 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Duplicate Vertices Cell: {duplicate_cell:?}");
-        assert!(!duplicate_cell.is_valid());
+        let duplicate_result = duplicate_cell.is_valid();
+        assert!(duplicate_result.is_err());
+
+        // Verify that we get the correct error type for duplicate vertices
+        match duplicate_result {
+            Err(CellValidationError::DuplicateVertices) => {
+                println!("✓ Correctly detected duplicate vertices");
+            }
+            Err(other_error) => {
+                panic!(
+                    "Expected DuplicateVertices error, but got: {:?}",
+                    other_error
+                );
+            }
+            Ok(_) => {
+                panic!("Expected error for duplicate vertices, but validation passed");
+            }
+        }
+
+        // Verify that we get the correct error type for invalid vertex
+        let invalid_result = invalid_cell.is_valid();
+        match invalid_result {
+            Err(CellValidationError::InvalidVertex { source: _ }) => {
+                println!("✓ Correctly detected invalid vertex");
+            }
+            Err(other_error) => {
+                panic!("Expected InvalidVertex error, but got: {:?}", other_error);
+            }
+            Ok(_) => {
+                panic!("Expected error for invalid vertex, but validation passed");
+            }
+        }
     }
 }
