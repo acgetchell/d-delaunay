@@ -1491,6 +1491,7 @@ mod tests {
 
         // Create different NaN values
         let nan1 = f64::NAN;
+        #[allow(clippy::zero_divided_by_zero)]
         let nan2 = 0.0f64 / 0.0f64; // Another way to create NaN
         let nan3 = f64::INFINITY - f64::INFINITY; // Yet another way
 
@@ -1510,6 +1511,7 @@ mod tests {
 
         // Test with f32 as well
         let f32_nan1 = f32::NAN;
+        #[allow(clippy::zero_divided_by_zero)]
         let f32_nan2 = 0.0f32 / 0.0f32;
 
         let point_f32_1 = Point::new([f32_nan1]);

@@ -79,7 +79,7 @@ where
     }
 }
 
-// Basic implementation block for simpler methods that don't require ComplexField
+// Basic implementation block with minimal trait bounds for common methods
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -105,6 +105,7 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
     /// assert_eq!(cell.number_of_vertices(), 3);
     /// ```
+    #[inline]
     pub fn number_of_vertices(&self) -> usize {
         self.vertices.len()
     }
@@ -173,6 +174,7 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
     /// assert_eq!(cell.dim(), 2);
     /// ```
+    #[inline]
     pub fn dim(&self) -> usize {
         self.vertices.len() - 1
     }
@@ -254,24 +256,7 @@ where
     pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
-}
 
-// Advanced implementation block for methods that require ComplexField
-impl<T, U, V, const D: usize> Cell<T, U, V, D>
-where
-    T: Clone
-        + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
-        + Sum,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    f64: From<T>,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
     /// The function `from_facet_and_vertex` creates a new [Cell] object from a [Facet] and a [Vertex].
     ///
     /// # Arguments:
@@ -367,7 +352,24 @@ where
         // - Validate that the cell forms a valid simplex
         // - Validate neighbor indices match vertex ordering
     }
+}
 
+// Advanced implementation block for methods requiring ComplexField
+impl<T, U, V, const D: usize> Cell<T, U, V, D>
+where
+    T: Clone
+        + ComplexField<RealField = T>
+        + Copy
+        + Default
+        + PartialEq
+        + PartialOrd
+        + OrderedEq
+        + Sum,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    f64: From<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
     /// The function `circumcenter` returns the circumcenter of the cell.
     ///
     /// The circumcenter is the unique point equidistant from all vertices of
@@ -431,62 +433,44 @@ where
             return Err(anyhow::Error::msg("Not a simplex!"));
         }
 
+        // Build matrix A and vector B for the linear system
         let mut matrix = zeros(dim, dim);
+        let mut b = zeros(dim, 1);
         let coords_0: [T; D] = (&self.vertices[0]).into();
+        let coords_0_f64: [f64; D] = coords_0.map(std::convert::Into::into);
+
         for i in 0..dim {
             let coords_i: [T; D] = (&self.vertices[i + 1]).into();
+            let coords_i_f64: [f64; D] = coords_i.map(std::convert::Into::into);
+
+            // Fill matrix row
             for j in 0..dim {
                 matrix[(i, j)] = (coords_i[j] - coords_0[j]).into();
             }
-        }
 
-        let a_inv = invert(&matrix)?;
-        let mut b = zeros(dim, 1);
-
-        // Precompute coords_0 once to avoid repeated conversion
-        let coords_0: [T; D] = (&self.vertices[0]).into();
-        let coords_0_f64: [f64; D] = coords_0.map(|x| x.into());
-
-        for i in 0..dim {
-            // Use implicit conversion from vertex to coordinates, then convert to f64
-            let coords_i_plus_1: [T; D] = (&self.vertices[i + 1]).into();
-            let coords_i_plus_1_f64: [f64; D] = coords_i_plus_1.map(|x| x.into());
+            // Fill vector element
             b[(i, 0)] = na::distance_squared(
-                &na::Point::from(coords_i_plus_1_f64),
+                &na::Point::from(coords_i_f64),
                 &na::Point::from(coords_0_f64),
             );
         }
 
+        let a_inv = invert(&matrix)?;
         let solution = a_inv * b * 0.5;
-
-        let solution_vec = solution.col(0).to_vec();
+        let solution_vec = solution.col(0).clone();
         let solution_array = vec_to_array(solution_vec).map_err(anyhow::Error::msg)?;
 
-        let solution_point: Point<f64, D> = Point::<f64, D>::from(solution_array);
-
-        Ok(solution_point)
+        Ok(Point::<f64, D>::from(solution_array))
     }
 
     /// The function `circumradius` returns the circumradius of the cell.
-    /// The circumradius is the distance from the circumcenter to any vertex.
-    ///
-    /// # Returns:
-    ///
-    /// If successful, returns an Ok containing the circumradius of the cell,
-    /// otherwise returns an Err with an error message.
-    fn circumradius(&self) -> Result<T, anyhow::Error>
+    pub fn circumradius(&self) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        // Use implicit conversion from vertex to coordinates, then convert to f64
-        let vertex_coords: [T; D] = (&self.vertices[0]).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
-        Ok(na::distance(
-            &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords_f64),
-        ))
+        self.circumradius_with_center(&circumcenter)
     }
 
     /// Alternative method that accepts precomputed circumcenter
@@ -495,9 +479,8 @@ where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        // Use implicit conversion from vertex to coordinates, then convert to f64
         let vertex_coords: [T; D] = (&self.vertices[0]).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
         Ok(na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
             &na::Point::<T, D>::from(vertex_coords_f64),
@@ -539,7 +522,7 @@ where
         let circumradius = self.circumradius_with_center(&circumcenter)?;
         // Use implicit conversion from vertex to coordinates, then convert to f64
         let vertex_coords: [T; D] = (&vertex).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(|x| x.into());
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
         let radius = na::distance(
             &na::Point::<T, D>::from(circumcenter.coordinates()),
             &na::Point::<T, D>::from(vertex_coords_f64),
@@ -632,13 +615,23 @@ where
     /// assert_eq!(facets.len(), 4);
     /// ```
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
-        let mut facets: Vec<Facet<T, U, V, D>> = Vec::new();
-        for vertex in self.vertices.iter() {
-            facets.push(Facet::new(self.clone(), *vertex).unwrap());
-        }
-
-        facets
+        self.vertices
+            .iter()
+            .map(|vertex| Facet::new(self.clone(), *vertex).unwrap())
+            .collect()
     }
+}
+
+/// Helper function to sort vertices for comparison and hashing
+fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
+where
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    let mut sorted = vertices.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted
 }
 
 /// Equality of cells is based on equality of sorted vector of vertices.
@@ -651,11 +644,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        let mut left = self.vertices.clone();
-        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let mut right = other.vertices.clone();
-        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        left == right
+        sorted_vertices::<T, U, D>(&self.vertices) == sorted_vertices::<T, U, D>(&other.vertices)
     }
 }
 
@@ -679,11 +668,8 @@ where
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let mut left = self.vertices.clone();
-        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let mut right = other.vertices.clone();
-        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        left.partial_cmp(&right)
+        sorted_vertices::<T, U, D>(&self.vertices)
+            .partial_cmp(&sorted_vertices::<T, U, D>(&other.vertices))
     }
 }
 
@@ -700,14 +686,8 @@ where
         // Hash the UUID first
         self.uuid.hash(state);
 
-        // Sort vertices for consistent hashing regardless of order
-        let mut sorted_vertices = self.vertices.clone();
-        // The trait bounds on `V` include both `PartialOrd` and `Ord`, which guarantee a total order for the vertices.
-        // This ensures that `partial_cmp` will always return `Some(Ordering)`, making the use of `unwrap()` safe here.
-        sorted_vertices.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        // Hash vertices after sorting
-        for vertex in &sorted_vertices {
+        // Hash sorted vertices for consistent ordering
+        for vertex in &sorted_vertices::<T, U, D>(&self.vertices) {
             vertex.hash(state);
         }
 

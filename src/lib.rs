@@ -5,9 +5,10 @@
 //! inspired by [CGAL](https://www.cgal.org).
 //!
 //! # Features
-//! * d-dimensional Delaunay triangulations
-//! * Arbitrary data types associated with vertices and cells
-//! * Serialization/Deserialization with [serde](https://serde.rs)
+//!
+//! - d-dimensional Delaunay triangulations
+//! - Arbitrary data types associated with vertices and cells
+//! - Serialization/Deserialization with [serde](https://serde.rs)
 
 #[macro_use]
 extern crate derive_builder;
@@ -37,7 +38,7 @@ pub mod delaunay_core {
 /// Traits are checked at compile time, so this function is only used for
 /// testing.
 #[allow(clippy::extra_unused_type_parameters)]
-fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
+pub fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true
 }
 

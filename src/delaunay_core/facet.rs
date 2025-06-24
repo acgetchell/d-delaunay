@@ -286,11 +286,12 @@ mod tests {
     use super::*;
     use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
 
+    // Define type aliases for complex types
+    type TestVertex3D = Vertex<f64, Option<()>, 3>;
+    type TestCell3D = Cell<f64, Option<()>, Option<()>, 3>;
+
     // Helper function to create a standard tetrahedron (3D cell with 4 vertices)
-    fn create_tetrahedron() -> (
-        Cell<f64, Option<()>, Option<()>, 3>,
-        Vec<Vertex<f64, Option<()>, 3>>,
-    ) {
+    fn create_tetrahedron() -> (TestCell3D, Vec<TestVertex3D>) {
         let vertices = vec![
             VertexBuilder::default()
                 .point(Point::new([0.0, 0.0, 0.0]))
@@ -315,12 +316,12 @@ mod tests {
             .unwrap();
         (cell, vertices)
     }
+    // Define type aliases for 2D types
+    type TestVertex2D = Vertex<f64, Option<()>, 2>;
+    type TestCell2D = Cell<f64, Option<()>, Option<()>, 2>;
 
     // Helper function to create a triangle (2D cell with 3 vertices)
-    fn create_triangle() -> (
-        Cell<f64, Option<()>, Option<()>, 2>,
-        Vec<Vertex<f64, Option<()>, 2>>,
-    ) {
+    fn create_triangle() -> (TestCell2D, Vec<TestVertex2D>) {
         let vertices = vec![
             VertexBuilder::default()
                 .point(Point::new([0.0, 0.0]))

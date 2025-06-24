@@ -12,7 +12,7 @@ derive_builder = "0.20.1"
 nalgebra = "0.33.0"
 num-traits = "0.2.19"
 ordered-float = { version = "5.0.0", features = ["serde"] }
-peroxide = "0.39.7"
+peroxide = "0.39.8"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128" 
 serde_test = "1.0.177"
@@ -21,7 +21,7 @@ uuid = { version = "1.10.0", features = ["v4", "fast-rng", "macro-diagnostics", 
 
 [lints.rust]
 unsafe_code = "forbid"
-dead_code = "allow"
+dead_code = "warn"
 missing_docs = "warn"
 
 [lints.clippy]

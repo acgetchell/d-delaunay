@@ -315,8 +315,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
 
     // Helper function to create a basic vertex with given coordinates
     fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
@@ -359,13 +357,6 @@ mod tests {
         assert_eq!(vertex.dim(), expected_dim);
         assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
-    }
-
-    // Helper function to get hash value
-    fn get_hash<T: Hash>(value: &T) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        value.hash(&mut hasher);
-        hasher.finish()
     }
 
     #[test]
