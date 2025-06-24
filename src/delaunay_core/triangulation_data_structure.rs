@@ -1244,60 +1244,82 @@ where
     }
 
     /// Internal method for validating neighbor relationships.
+    ///
+    /// This method is optimized for performance using:
+    /// - Early termination on validation failures
+    /// - `HashSet` reuse to avoid repeated allocations
+    /// - Efficient intersection counting without creating intermediate collections
     fn validate_neighbors_internal(&self) -> Result<(), TriangulationValidationError> {
+        // Pre-compute vertex UUIDs for all cells to avoid repeated computation
+        let mut cell_vertices: HashMap<Uuid, HashSet<Uuid>> =
+            HashMap::with_capacity(self.cells.len());
+
         for (cell_id, cell) in &self.cells {
-            let this_vertices: HashSet<_> = cell
+            let vertices: HashSet<Uuid> = cell
                 .vertices()
                 .iter()
                 .map(super::vertex::Vertex::uuid)
                 .collect();
+            cell_vertices.insert(*cell_id, vertices);
+        }
 
-            if let Some(neighbors) = &cell.neighbors {
-                if neighbors.len() > D + 1 {
+        for (cell_id, cell) in &self.cells {
+            let Some(neighbors) = &cell.neighbors else {
+                continue; // Skip cells without neighbors
+            };
+
+            // Early termination: check neighbor count first
+            if neighbors.len() > D + 1 {
+                return Err(TriangulationValidationError::InvalidNeighbors {
+                    message: format!(
+                        "Cell {:?} has too many neighbors: {}",
+                        cell_id,
+                        neighbors.len()
+                    ),
+                });
+            }
+
+            // Get this cell's vertices from pre-computed map
+            let this_vertices = &cell_vertices[cell_id];
+
+            for neighbor_id in neighbors {
+                // Early termination: check if neighbor exists
+                let Some(neighbor_cell) = self.cells.get(neighbor_id) else {
                     return Err(TriangulationValidationError::InvalidNeighbors {
-                        message: format!(
-                            "Cell {:?} has too many neighbors: {}",
-                            cell_id,
-                            neighbors.len()
-                        ),
+                        message: format!("Neighbor cell {neighbor_id:?} not found"),
                     });
-                }
+                };
 
-                for neighbor_id in neighbors {
-                    let Some(neighbor_cell) = self.cells.get(neighbor_id) else {
-                        return Err(TriangulationValidationError::InvalidNeighbors {
-                            message: format!("Neighbor cell {neighbor_id:?} not found"),
-                        });
-                    };
-
-                    // Mutual neighbor check
-                    let empty_neighbors = Vec::new();
-                    let neighbor_neighbors =
-                        neighbor_cell.neighbors.as_ref().unwrap_or(&empty_neighbors);
-                    if !neighbor_neighbors.contains(cell_id) {
+                // Early termination: mutual neighbor check using HashSet for O(1) lookup
+                if let Some(neighbor_neighbors) = &neighbor_cell.neighbors {
+                    let neighbor_set: HashSet<_> = neighbor_neighbors.iter().collect();
+                    if !neighbor_set.contains(cell_id) {
                         return Err(TriangulationValidationError::InvalidNeighbors {
                             message: format!(
                                 "Neighbor relationship not mutual: {cell_id:?} → {neighbor_id:?}"
                             ),
                         });
                     }
+                } else {
+                    // Neighbor has no neighbors, so relationship cannot be mutual
+                    return Err(TriangulationValidationError::InvalidNeighbors {
+                        message: format!(
+                            "Neighbor relationship not mutual: {cell_id:?} → {neighbor_id:?}"
+                        ),
+                    });
+                }
 
-                    // Shared facet check: should share exactly D vertices (i.e., D+1 simplex - 1)
-                    let neighbor_vertices: HashSet<_> = neighbor_cell
-                        .vertices()
-                        .iter()
-                        .map(super::vertex::Vertex::uuid)
-                        .collect();
-                    let shared: HashSet<_> =
-                        this_vertices.intersection(&neighbor_vertices).collect();
-                    if shared.len() != D {
-                        return Err(TriangulationValidationError::InvalidNeighbors {
-                            message: format!(
-                                "Neighbor {:?} does not share a facet with {:?} (shared {} vertices)",
-                                neighbor_id, cell_id, shared.len()
-                            ),
-                        });
-                    }
+                // Optimized shared facet check: count intersections without creating intermediate collections
+                let neighbor_vertices = &cell_vertices[neighbor_id];
+                let shared_count = this_vertices.intersection(neighbor_vertices).count();
+
+                // Early termination: check shared vertex count
+                if shared_count != D {
+                    return Err(TriangulationValidationError::InvalidNeighbors {
+                        message: format!(
+                            "Neighbor {neighbor_id:?} does not share a facet with {cell_id:?} (shared {shared_count} vertices)"
+                        ),
+                    });
                 }
             }
         }
