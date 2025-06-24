@@ -5,6 +5,7 @@ use super::{
     utilities::make_uuid,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Debug;
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use uuid::Uuid;
 
@@ -218,10 +219,10 @@ where
     /// ```
     pub fn is_valid(self) -> bool
     where
-        T: super::point::FiniteCheck + Copy,
+        T: super::point::FiniteCheck + Copy + Debug,
     {
         // Check if the point is valid (all coordinates are finite)
-        let point_valid = self.point.is_valid();
+        let point_valid = self.point.is_valid().is_ok();
 
         // Check if UUID is not nil
         let uuid_valid = !self.uuid.is_nil();
@@ -357,7 +358,7 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + std::fmt::Debug,
+        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -1192,7 +1193,7 @@ mod tests {
         let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         assert!(!default_vertex.is_valid()); // Should be invalid due to nil UUID
         assert!(default_vertex.uuid().is_nil());
-        assert!(default_vertex.point().is_valid()); // Point itself is valid (zeros)
+        assert!(default_vertex.point().is_valid().is_ok()); // Point itself is valid (zeros)
 
         // Create a vertex with valid point but manually set nil UUID to test UUID validation
         let invalid_uuid_vertex: Vertex<f64, Option<()>, 3> = Vertex {
@@ -1202,7 +1203,7 @@ mod tests {
             data: None,
         };
         assert!(!invalid_uuid_vertex.is_valid()); // Should be invalid due to nil UUID
-        assert!(invalid_uuid_vertex.point().is_valid()); // Point is valid
+        assert!(invalid_uuid_vertex.point().is_valid().is_ok()); // Point is valid
         assert!(invalid_uuid_vertex.uuid().is_nil()); // UUID is nil
 
         // Test vertex with both invalid point and nil UUID
@@ -1213,7 +1214,7 @@ mod tests {
             data: None,
         };
         assert!(!invalid_both.is_valid()); // Should be invalid due to both issues
-        assert!(!invalid_both.point().is_valid()); // Point is invalid
+        assert!(invalid_both.point().is_valid().is_err()); // Point is invalid
         assert!(invalid_both.uuid().is_nil()); // UUID is nil
     }
 }

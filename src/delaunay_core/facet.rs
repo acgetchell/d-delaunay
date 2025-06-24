@@ -8,6 +8,7 @@
 
 use super::{cell::Cell, point::OrderedEq, vertex::Vertex};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
@@ -39,7 +40,7 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,

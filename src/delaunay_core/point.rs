@@ -19,7 +19,9 @@
 
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialOrd, Serialize)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
@@ -138,24 +140,44 @@ where
     ///
     /// # Returns
     ///
-    /// The `is_valid()` function returns a boolean indicating whether the
-    /// point is valid, meaning all coordinates are finite.
+    /// Returns `Ok(())` if all coordinates are finite, otherwise returns a
+    /// `PointValidationError` indicating which coordinate is invalid and why.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PointValidationError::InvalidCoordinate` if any coordinate
+    /// is NaN, infinite, or otherwise invalid.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::point::{Point, PointValidationError};
     /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// assert!(point.is_valid());
+    /// assert!(point.is_valid().is_ok());
+    ///
     /// let invalid_point = Point::new([1.0, f64::NAN, 3.0]);
-    /// assert!(!invalid_point.is_valid());
+    /// match invalid_point.is_valid() {
+    ///     Err(PointValidationError::InvalidCoordinate { coordinate_index, .. }) => {
+    ///         assert_eq!(coordinate_index, 1);
+    ///     }
+    ///     Ok(_) => panic!("Expected validation error"),
+    /// }
     /// ```
-    pub fn is_valid(&self) -> bool
+    pub fn is_valid(&self) -> Result<(), PointValidationError>
     where
-        T: FiniteCheck + Copy,
+        T: FiniteCheck + Copy + std::fmt::Debug,
     {
         // Verify all coordinates are finite
-        self.coords.iter().all(|&coord| coord.is_finite_generic())
+        for (index, &coord) in self.coords.iter().enumerate() {
+            if !coord.is_finite_generic() {
+                return Err(PointValidationError::InvalidCoordinate {
+                    coordinate_index: index,
+                    coordinate_value: format!("{coord:?}"),
+                    dimension: D,
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -259,6 +281,21 @@ where
             coord.hash_coord(state);
         }
     }
+}
+
+/// Enum representing validation errors for a [`Point`].
+#[derive(Error, Debug, PartialEq, Clone)]
+pub enum PointValidationError {
+    /// A coordinate is invalid (NaN or infinite).
+    #[error("Invalid coordinate at index {coordinate_index} in dimension {dimension}: {coordinate_value}")]
+    InvalidCoordinate {
+        /// Index of the invalid coordinate in the point.
+        coordinate_index: usize,
+        /// Value of the invalid coordinate, presented as a string.
+        coordinate_value: String,
+        /// The dimensionality (number of coordinates) of the point.
+        dimension: usize,
+    },
 }
 
 /// Helper trait for OrderedFloat-based equality comparison that handles NaN properly
@@ -425,7 +462,7 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + std::fmt::Debug,
+        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         assert_eq!(point.coordinates(), expected_coords);
@@ -1150,140 +1187,140 @@ mod tests {
     fn point_is_valid_f64() {
         // Test valid f64 points
         let valid_point = Point::new([1.0, 2.0, 3.0]);
-        assert!(valid_point.is_valid());
+        assert!(valid_point.is_valid().is_ok());
 
         let valid_negative = Point::new([-1.0, -2.0, -3.0]);
-        assert!(valid_negative.is_valid());
+        assert!(valid_negative.is_valid().is_ok());
 
         let valid_zero = Point::new([0.0, 0.0, 0.0]);
-        assert!(valid_zero.is_valid());
+        assert!(valid_zero.is_valid().is_ok());
 
         let valid_mixed = Point::new([1.0, -2.5, 0.0, 42.7]);
-        assert!(valid_mixed.is_valid());
+        assert!(valid_mixed.is_valid().is_ok());
 
         // Test invalid f64 points with NaN
         let invalid_nan_single = Point::new([1.0, f64::NAN, 3.0]);
-        assert!(!invalid_nan_single.is_valid());
+        assert!(invalid_nan_single.is_valid().is_err());
 
         let invalid_nan_all = Point::new([f64::NAN, f64::NAN, f64::NAN]);
-        assert!(!invalid_nan_all.is_valid());
+        assert!(invalid_nan_all.is_valid().is_err());
 
         let invalid_nan_first = Point::new([f64::NAN, 2.0, 3.0]);
-        assert!(!invalid_nan_first.is_valid());
+        assert!(invalid_nan_first.is_valid().is_err());
 
         let invalid_nan_last = Point::new([1.0, 2.0, f64::NAN]);
-        assert!(!invalid_nan_last.is_valid());
+        assert!(invalid_nan_last.is_valid().is_err());
 
         // Test invalid f64 points with infinity
         let invalid_pos_inf = Point::new([1.0, f64::INFINITY, 3.0]);
-        assert!(!invalid_pos_inf.is_valid());
+        assert!(invalid_pos_inf.is_valid().is_err());
 
         let invalid_neg_inf = Point::new([1.0, f64::NEG_INFINITY, 3.0]);
-        assert!(!invalid_neg_inf.is_valid());
+        assert!(invalid_neg_inf.is_valid().is_err());
 
         let invalid_both_inf = Point::new([f64::INFINITY, f64::NEG_INFINITY]);
-        assert!(!invalid_both_inf.is_valid());
+        assert!(invalid_both_inf.is_valid().is_err());
 
         // Test mixed invalid cases
         let invalid_nan_and_inf = Point::new([f64::NAN, f64::INFINITY, 1.0]);
-        assert!(!invalid_nan_and_inf.is_valid());
+        assert!(invalid_nan_and_inf.is_valid().is_err());
     }
 
     #[test]
     fn point_is_valid_f32() {
         // Test valid f32 points
         let valid_point = Point::new([1.0f32, 2.0f32, 3.0f32]);
-        assert!(valid_point.is_valid());
+        assert!(valid_point.is_valid().is_ok());
 
         let valid_negative = Point::new([-1.5f32, -2.5f32]);
-        assert!(valid_negative.is_valid());
+        assert!(valid_negative.is_valid().is_ok());
 
         let valid_zero = Point::new([0.0f32]);
-        assert!(valid_zero.is_valid());
+        assert!(valid_zero.is_valid().is_ok());
 
         // Test invalid f32 points with NaN
         let invalid_nan = Point::new([1.0f32, f32::NAN]);
-        assert!(!invalid_nan.is_valid());
+        assert!(invalid_nan.is_valid().is_err());
 
         let invalid_all_nan = Point::new([f32::NAN, f32::NAN, f32::NAN, f32::NAN]);
-        assert!(!invalid_all_nan.is_valid());
+        assert!(invalid_all_nan.is_valid().is_err());
 
         // Test invalid f32 points with infinity
         let invalid_pos_inf = Point::new([f32::INFINITY, 2.0f32]);
-        assert!(!invalid_pos_inf.is_valid());
+        assert!(invalid_pos_inf.is_valid().is_err());
 
         let invalid_neg_inf = Point::new([1.0f32, f32::NEG_INFINITY]);
-        assert!(!invalid_neg_inf.is_valid());
+        assert!(invalid_neg_inf.is_valid().is_err());
 
         // Test edge cases with very small and large values (but finite)
         let valid_small = Point::new([f32::MIN_POSITIVE, -f32::MIN_POSITIVE]);
-        assert!(valid_small.is_valid());
+        assert!(valid_small.is_valid().is_ok());
 
         let valid_large = Point::new([f32::MAX, -f32::MAX]);
-        assert!(valid_large.is_valid());
+        assert!(valid_large.is_valid().is_ok());
     }
 
     #[test]
     fn point_is_valid_integers() {
         // All integer types should always be valid (no NaN or infinity)
         let valid_i32 = Point::new([1i32, 2i32, 3i32]);
-        assert!(valid_i32.is_valid());
+        assert!(valid_i32.is_valid().is_ok());
 
         let valid_negative_i32 = Point::new([-1i32, -2i32, -3i32]);
-        assert!(valid_negative_i32.is_valid());
+        assert!(valid_negative_i32.is_valid().is_ok());
 
         let valid_zero_i32 = Point::new([0i32, 0i32]);
-        assert!(valid_zero_i32.is_valid());
+        assert!(valid_zero_i32.is_valid().is_ok());
 
         let valid_u64 = Point::new([u64::MAX, u64::MIN, 42u64]);
-        assert!(valid_u64.is_valid());
+        assert!(valid_u64.is_valid().is_ok());
 
         let valid_i8 = Point::new([i8::MAX, i8::MIN, 0i8, -1i8]);
-        assert!(valid_i8.is_valid());
+        assert!(valid_i8.is_valid().is_ok());
 
         let valid_isize = Point::new([isize::MAX, isize::MIN]);
-        assert!(valid_isize.is_valid());
+        assert!(valid_isize.is_valid().is_ok());
 
         // Test with various integer types
         let valid_u8 = Point::new([255u8, 0u8, 128u8]);
-        assert!(valid_u8.is_valid());
+        assert!(valid_u8.is_valid().is_ok());
 
         let valid_i16 = Point::new([32767i16, -32768i16, 0i16]);
-        assert!(valid_i16.is_valid());
+        assert!(valid_i16.is_valid().is_ok());
 
         let valid_u32 = Point::new([u32::MAX, 0u32, 42u32]);
-        assert!(valid_u32.is_valid());
+        assert!(valid_u32.is_valid().is_ok());
     }
 
     #[test]
     fn point_is_valid_different_dimensions() {
         // Test 1D points
         let valid_1d_f64 = Point::new([42.0]);
-        assert!(valid_1d_f64.is_valid());
+        assert!(valid_1d_f64.is_valid().is_ok());
 
         let invalid_1d_nan = Point::new([f64::NAN]);
-        assert!(!invalid_1d_nan.is_valid());
+        assert!(invalid_1d_nan.is_valid().is_err());
 
         let valid_1d_int = Point::new([42i32]);
-        assert!(valid_1d_int.is_valid());
+        assert!(valid_1d_int.is_valid().is_ok());
 
         // Test 2D points
         let valid_2d = Point::new([1.0, 2.0]);
-        assert!(valid_2d.is_valid());
+        assert!(valid_2d.is_valid().is_ok());
 
         let invalid_2d = Point::new([1.0, f64::INFINITY]);
-        assert!(!invalid_2d.is_valid());
+        assert!(invalid_2d.is_valid().is_err());
 
         // Test higher dimensional points
         let valid_5d = Point::new([1.0, 2.0, 3.0, 4.0, 5.0]);
-        assert!(valid_5d.is_valid());
+        assert!(valid_5d.is_valid().is_ok());
 
         let invalid_5d = Point::new([1.0, 2.0, f64::NAN, 4.0, 5.0]);
-        assert!(!invalid_5d.is_valid());
+        assert!(invalid_5d.is_valid().is_err());
 
         // Test 10D point
         let valid_10d = Point::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]);
-        assert!(valid_10d.is_valid());
+        assert!(valid_10d.is_valid().is_ok());
 
         let invalid_10d = Point::new([
             1.0,
@@ -1297,35 +1334,35 @@ mod tests {
             9.0,
             10.0,
         ]);
-        assert!(!invalid_10d.is_valid());
+        assert!(invalid_10d.is_valid().is_err());
     }
 
     #[test]
     fn point_is_valid_edge_cases() {
         // Test with very small finite values
         let tiny_valid = Point::new([f64::MIN_POSITIVE, -f64::MIN_POSITIVE, 0.0]);
-        assert!(tiny_valid.is_valid());
+        assert!(tiny_valid.is_valid().is_ok());
 
         // Test with very large finite values
         let large_valid = Point::new([f64::MAX, -f64::MAX]);
-        assert!(large_valid.is_valid());
+        assert!(large_valid.is_valid().is_ok());
 
         // Test subnormal numbers (should be valid)
         let subnormal = f64::MIN_POSITIVE / 2.0;
         let subnormal_point = Point::new([subnormal, -subnormal]);
-        assert!(subnormal_point.is_valid());
+        assert!(subnormal_point.is_valid().is_ok());
 
         // Test zero and negative zero
         let zero_point = Point::new([0.0, -0.0]);
-        assert!(zero_point.is_valid());
+        assert!(zero_point.is_valid().is_ok());
 
         // Mixed valid and invalid in same point should be invalid
         let mixed_invalid = Point::new([1.0, 2.0, 3.0, f64::NAN, 5.0]);
-        assert!(!mixed_invalid.is_valid());
+        assert!(mixed_invalid.is_valid().is_err());
 
         // All coordinates must be valid for point to be valid
         let one_invalid = Point::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, f64::INFINITY]);
-        assert!(!one_invalid.is_valid());
+        assert!(one_invalid.is_valid().is_err());
     }
 
     #[test]
@@ -1884,14 +1921,14 @@ mod tests {
         let point_20d = Point::new(coords_20d);
         assert_eq!(point_20d.dim(), 20);
         assert_relative_eq!(point_20d.coordinates().as_slice(), coords_20d.as_slice());
-        assert!(point_20d.is_valid());
+        assert!(point_20d.is_valid().is_ok());
 
         // Test 25D point
         let coords_25d = [2.5; 25];
         let point_25d = Point::new(coords_25d);
         assert_eq!(point_25d.dim(), 25);
         assert_relative_eq!(point_25d.coordinates().as_slice(), coords_25d.as_slice());
-        assert!(point_25d.is_valid());
+        assert!(point_25d.is_valid().is_ok());
 
         // Test 32D point with mixed values (max supported by std traits)
         let mut coords_32d = [0.0; 32];
@@ -1901,13 +1938,13 @@ mod tests {
         let point_32d = Point::new(coords_32d);
         assert_eq!(point_32d.dim(), 32);
         assert_relative_eq!(point_32d.coordinates().as_slice(), coords_32d.as_slice());
-        assert!(point_32d.is_valid());
+        assert!(point_32d.is_valid().is_ok());
 
         // Test high dimensional point with NaN
         let mut coords_with_nan = [1.0; 25];
         coords_with_nan[12] = f64::NAN;
         let point_with_nan = Point::new(coords_with_nan);
-        assert!(!point_with_nan.is_valid());
+        assert!(point_with_nan.is_valid().is_err());
 
         // Test equality for high dimensional points
         let point_20d_copy = Point::new([1.0; 20]);
@@ -1919,7 +1956,7 @@ mod tests {
         let point_30d_a = Point::new(coords_30d_a);
         let point_30d_b = Point::new(coords_30d_b);
         assert_eq!(point_30d_a, point_30d_b);
-        assert!(point_30d_a.is_valid());
+        assert!(point_30d_a.is_valid().is_ok());
     }
 
     #[test]
@@ -1928,26 +1965,26 @@ mod tests {
 
         // Test with very large f64 values
         let large_point = Point::new([f64::MAX, f64::MAX / 2.0, 1e308]);
-        assert!(large_point.is_valid());
+        assert!(large_point.is_valid().is_ok());
         assert_relative_eq!(large_point.coordinates()[0], f64::MAX);
 
         // Test with very small f64 values
         let small_point = Point::new([f64::MIN, f64::MIN_POSITIVE, 1e-308]);
-        assert!(small_point.is_valid());
+        assert!(small_point.is_valid().is_ok());
 
         // Test with subnormal numbers
         let subnormal = f64::MIN_POSITIVE / 2.0;
         let subnormal_point = Point::new([subnormal, -subnormal, 0.0]);
-        assert!(subnormal_point.is_valid());
+        assert!(subnormal_point.is_valid().is_ok());
 
         // Test with integer extremes
         let extreme_int_point = Point::new([i64::MAX, i64::MIN, 0i64]);
-        assert!(extreme_int_point.is_valid());
+        assert!(extreme_int_point.is_valid().is_ok());
         assert_eq!(extreme_int_point.coordinates(), [i64::MAX, i64::MIN, 0i64]);
 
         // Test with unsigned integer extremes
         let extreme_uint_point = Point::new([u64::MAX, u64::MIN, 42u64]);
-        assert!(extreme_uint_point.is_valid());
+        assert!(extreme_uint_point.is_valid().is_ok());
         assert_eq!(
             extreme_uint_point.coordinates(),
             [u64::MAX, u64::MIN, 42u64]
@@ -1955,7 +1992,7 @@ mod tests {
 
         // Test f32 extremes
         let extreme_f32_point = Point::new([f32::MAX, f32::MIN, f32::MIN_POSITIVE]);
-        assert!(extreme_f32_point.is_valid());
+        assert!(extreme_f32_point.is_valid().is_ok());
     }
 
     #[test]
@@ -2081,7 +2118,7 @@ mod tests {
             point_0d.coordinates().as_slice(),
             ([] as [f64; 0]).as_slice()
         );
-        assert!(point_0d.is_valid());
+        assert!(point_0d.is_valid().is_ok());
 
         // Test equality for 0D points
         let point_0d_2: Point<f64, 0> = Point::new([]);
@@ -2095,7 +2132,7 @@ mod tests {
         // Test with different types
         let point_0d_int: Point<i32, 0> = Point::new([]);
         assert_eq!(point_0d_int.dim(), 0);
-        assert!(point_0d_int.is_valid());
+        assert!(point_0d_int.is_valid().is_ok());
 
         // Test origin for 0D
         let origin_0d: Point<f64, 0> = Point::origin();
@@ -2208,6 +2245,186 @@ mod tests {
             "Hash distribution with negatives: {} unique hashes",
             hashes.len()
         );
+    }
+
+    #[test]
+    fn point_validation_error_details() {
+        // Test PointValidationError with specific error details
+
+        // Test invalid coordinate at specific index
+        let invalid_point = Point::new([1.0, f64::NAN, 3.0]);
+        let result = invalid_point.is_valid();
+        assert!(result.is_err());
+
+        if let Err(PointValidationError::InvalidCoordinate {
+            coordinate_index,
+            coordinate_value,
+            dimension,
+        }) = result
+        {
+            assert_eq!(coordinate_index, 1);
+            assert_eq!(dimension, 3);
+            assert!(coordinate_value.contains("NaN"));
+        } else {
+            panic!("Expected InvalidCoordinate error");
+        }
+
+        // Test with infinity at different positions
+        let inf_point = Point::new([f64::INFINITY, 2.0, 3.0, 4.0]);
+        let result = inf_point.is_valid();
+        if let Err(PointValidationError::InvalidCoordinate {
+            coordinate_index,
+            coordinate_value,
+            dimension,
+        }) = result
+        {
+            assert_eq!(coordinate_index, 0);
+            assert_eq!(dimension, 4);
+            assert!(coordinate_value.contains("inf"));
+        } else {
+            panic!("Expected InvalidCoordinate error");
+        }
+
+        // Test with negative infinity at last position
+        let neg_inf_point = Point::new([1.0, 2.0, f64::NEG_INFINITY]);
+        let result = neg_inf_point.is_valid();
+        if let Err(PointValidationError::InvalidCoordinate {
+            coordinate_index,
+            coordinate_value,
+            dimension,
+        }) = result
+        {
+            assert_eq!(coordinate_index, 2);
+            assert_eq!(dimension, 3);
+            assert!(coordinate_value.contains("inf"));
+        }
+
+        // Test f32 validation errors
+        let invalid_f32_point = Point::new([1.0f32, f32::NAN, 3.0f32]);
+        let result = invalid_f32_point.is_valid();
+        if let Err(PointValidationError::InvalidCoordinate {
+            coordinate_index,
+            coordinate_value,
+            dimension,
+        }) = result
+        {
+            assert_eq!(coordinate_index, 1);
+            assert_eq!(dimension, 3);
+            assert!(coordinate_value.contains("NaN"));
+        }
+    }
+
+    #[test]
+    fn point_validation_error_display() {
+        // Test error message formatting
+        let invalid_point = Point::new([1.0, f64::NAN, 3.0]);
+        let result = invalid_point.is_valid();
+
+        if let Err(error) = result {
+            let error_msg = format!("{error}");
+            assert!(error_msg.contains("Invalid coordinate at index 1"));
+            assert!(error_msg.contains("in dimension 3"));
+            assert!(error_msg.contains("NaN"));
+        } else {
+            panic!("Expected validation error");
+        }
+
+        // Test with infinity
+        let inf_point = Point::new([f64::INFINITY]);
+        let result = inf_point.is_valid();
+
+        if let Err(error) = result {
+            let error_msg = format!("{error}");
+            assert!(error_msg.contains("Invalid coordinate at index 0"));
+            assert!(error_msg.contains("in dimension 1"));
+            assert!(error_msg.contains("inf"));
+        }
+    }
+
+    #[test]
+    fn point_validation_error_clone_and_eq() {
+        // Test that PointValidationError can be cloned and compared
+        let invalid_point = Point::new([f64::NAN, 2.0]);
+        let result1 = invalid_point.is_valid();
+        let result2 = invalid_point.is_valid();
+
+        assert!(result1.is_err());
+        assert!(result2.is_err());
+
+        let error1 = result1.unwrap_err();
+        let error2 = result2.unwrap_err();
+
+        // Test Clone
+        let error1_clone = error1.clone();
+        assert_eq!(error1, error1_clone);
+
+        // Test PartialEq
+        assert_eq!(error1, error2);
+
+        // Test Debug
+        let debug_output = format!("{error1:?}");
+        assert!(debug_output.contains("InvalidCoordinate"));
+        assert!(debug_output.contains("coordinate_index"));
+        assert!(debug_output.contains("dimension"));
+    }
+
+    #[test]
+    fn point_validation_all_coordinate_types() {
+        // Test validation with different coordinate types
+
+        // All integer types should always be valid
+        let int_types_valid = [
+            Point::new([1i8, 2i8]).is_valid().is_ok(),
+            Point::new([1i16, 2i16]).is_valid().is_ok(),
+            Point::new([1i32, 2i32]).is_valid().is_ok(),
+            Point::new([1i64, 2i64]).is_valid().is_ok(),
+            Point::new([1i128, 2i128]).is_valid().is_ok(),
+            Point::new([1isize, 2isize]).is_valid().is_ok(),
+            Point::new([1u8, 2u8]).is_valid().is_ok(),
+            Point::new([1u16, 2u16]).is_valid().is_ok(),
+            Point::new([1u32, 2u32]).is_valid().is_ok(),
+            Point::new([1u64, 2u64]).is_valid().is_ok(),
+            Point::new([1u128, 2u128]).is_valid().is_ok(),
+            Point::new([1usize, 2usize]).is_valid().is_ok(),
+        ];
+
+        for valid in int_types_valid {
+            assert!(valid, "Integer type should always be valid");
+        }
+
+        // Floating point types can be invalid
+        assert!(Point::new([1.0f32, 2.0f32]).is_valid().is_ok());
+        assert!(Point::new([1.0f64, 2.0f64]).is_valid().is_ok());
+        assert!(Point::new([f32::NAN, 2.0f32]).is_valid().is_err());
+        assert!(Point::new([f64::NAN, 2.0f64]).is_valid().is_err());
+    }
+
+    #[test]
+    fn point_validation_first_invalid_coordinate() {
+        // Test that validation returns the FIRST invalid coordinate found
+        let multi_invalid = Point::new([1.0, f64::NAN, f64::INFINITY, f64::NAN]);
+        let result = multi_invalid.is_valid();
+
+        if let Err(PointValidationError::InvalidCoordinate {
+            coordinate_index, ..
+        }) = result
+        {
+            // Should return the first invalid coordinate (index 1, not 2 or 3)
+            assert_eq!(coordinate_index, 1);
+        } else {
+            panic!("Expected InvalidCoordinate error");
+        }
+
+        // Test with invalid at index 0
+        let first_invalid = Point::new([f64::INFINITY, f64::NAN, 3.0]);
+        let result = first_invalid.is_valid();
+
+        if let Err(PointValidationError::InvalidCoordinate {
+            coordinate_index, ..
+        }) = result
+        {
+            assert_eq!(coordinate_index, 0);
+        }
     }
 
     #[test]

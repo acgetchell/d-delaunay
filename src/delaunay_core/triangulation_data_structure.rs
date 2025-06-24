@@ -16,6 +16,7 @@ use nalgebra as na;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{min, Ordering, PartialEq};
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::ops::{AddAssign, Div, SubAssign};
 use std::{collections::HashMap, hash::Hash, iter::Sum};
 use uuid::Uuid;
@@ -26,7 +27,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -800,7 +801,7 @@ pub fn validate_neighbors<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq,
     U: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + std::hash::Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -884,7 +885,7 @@ pub fn validate_unique_cells<T, U, V, const D: usize>(
     tds: &Tds<T, U, V, D>,
 ) -> Result<(), anyhow::Error>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + Into<f64> + OrderedEq, // for pretty printing
+    T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + Into<f64> + OrderedEq, // for pretty printing
     U: Clone + Copy + Eq + Hash + Ord,
     V: Clone + Copy + Eq + Hash + Ord,
     [T; D]: Copy + Default + DeserializeOwned + Serialize,
@@ -1185,5 +1186,42 @@ mod tests {
         assert_eq!(result.number_of_vertices(), 7);
         assert!(result.number_of_cells() >= 1, "Should have at least 1 cell");
         result.is_valid().unwrap();
+    }
+
+    #[test]
+    #[ignore] // This test can be slow due to the large number of points
+    fn tds_large_triangulation() {
+        use rand::Rng;
+
+        // Create a large number of random points in 3D
+        let mut rng = rand::thread_rng();
+        let points: Vec<Point<f64, 3>> = (0..100)
+            .map(|_| {
+                Point::new([
+                    rng.gen::<f64>() * 100.0,
+                    rng.gen::<f64>() * 100.0,
+                    rng.gen::<f64>() * 100.0,
+                ])
+            })
+            .collect();
+
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let result = tds.bowyer_watson().unwrap_or_else(|err| {
+            panic!("Error creating large triangulation: {err:?}");
+        });
+
+        println!(
+            "Large TDS: {} vertices, {} cells",
+            result.number_of_vertices(),
+            result.number_of_cells()
+        );
+
+        assert!(result.number_of_vertices() >= 100);
+        assert!(result.number_of_cells() > 0);
+
+        // Validate the triangulation
+        result.is_valid().unwrap();
+
+        println!("Large triangulation is valid.");
     }
 }
