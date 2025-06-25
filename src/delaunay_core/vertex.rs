@@ -1171,11 +1171,11 @@ mod tests {
             .unwrap();
         assert!(valid_zero_i32.is_valid().is_ok());
 
-        let valid_u64: Vertex<u64, Option<()>, 2> = VertexBuilder::default()
+        let valid_unsigned: Vertex<u64, Option<()>, 2> = VertexBuilder::default()
             .point(Point::new([u64::MAX, u64::MIN]))
             .build()
             .unwrap();
-        assert!(valid_u64.is_valid().is_ok());
+        assert!(valid_unsigned.is_valid().is_ok());
     }
 
     #[test]
@@ -1221,7 +1221,7 @@ mod tests {
         let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         match default_vertex.is_valid() {
             Err(VertexValidationError::InvalidUuid) => (), // Expected
-            other => panic!("Expected InvalidUuid error, got: {:?}", other),
+            other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(default_vertex.uuid().is_nil());
         assert!(default_vertex.point().is_valid().is_ok()); // Point itself is valid (zeros)
@@ -1235,7 +1235,7 @@ mod tests {
         };
         match invalid_uuid_vertex.is_valid() {
             Err(VertexValidationError::InvalidUuid) => (), // Expected
-            other => panic!("Expected InvalidUuid error, got: {:?}", other),
+            other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(invalid_uuid_vertex.point().is_valid().is_ok()); // Point is valid
         assert!(invalid_uuid_vertex.uuid().is_nil()); // UUID is nil
@@ -1249,7 +1249,7 @@ mod tests {
         };
         match invalid_both.is_valid() {
             Err(VertexValidationError::InvalidPoint { .. }) => (), // Expected - point checked first
-            other => panic!("Expected InvalidPoint error, got: {:?}", other),
+            other => panic!("Expected InvalidPoint error, got: {other:?}"),
         }
         assert!(invalid_both.point().is_valid().is_err()); // Point is invalid
         assert!(invalid_both.uuid().is_nil()); // UUID is nil

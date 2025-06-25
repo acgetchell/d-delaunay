@@ -2719,9 +2719,9 @@ mod tests {
                 println!("✓ Correctly detected invalid vertex");
             }
             Err(other_error) => {
-                panic!("Expected InvalidVertex error, but got: {:?}", other_error);
+                panic!("Expected InvalidVertex error, but got: {other_error:?}");
             }
-            Ok(_) => {
+            Ok(()) => {
                 panic!("Expected error for invalid vertex, but validation passed");
             }
         }
@@ -2763,9 +2763,9 @@ mod tests {
                 println!("✓ Correctly detected invalid UUID");
             }
             Err(other_error) => {
-                panic!("Expected InvalidUuid error, but got: {:?}", other_error);
+                panic!("Expected InvalidUuid error, but got: {other_error:?}");
             }
-            Ok(_) => {
+            Ok(()) => {
                 panic!("Expected error for invalid UUID, but validation passed");
             }
         }
@@ -2807,12 +2807,9 @@ mod tests {
                 println!("✓ Correctly detected duplicate vertices");
             }
             Err(other_error) => {
-                panic!(
-                    "Expected DuplicateVertices error, but got: {:?}",
-                    other_error
-                );
+                panic!("Expected DuplicateVertices error, but got: {other_error:?}");
             }
-            Ok(_) => {
+            Ok(()) => {
                 panic!("Expected error for duplicate vertices, but validation passed");
             }
         }
@@ -2850,17 +2847,13 @@ mod tests {
                 assert_eq!(expected, 4); // D+1 = 3+1 = 4
                 assert_eq!(dimension, 3);
                 println!(
-                    "✓ Correctly detected insufficient vertices: {} instead of {} for {}D",
-                    actual, expected, dimension
+                    "✓ Correctly detected insufficient vertices: {actual} instead of {expected} for {dimension}D"
                 );
             }
             Err(other_error) => {
-                panic!(
-                    "Expected InsufficientVertices error, but got: {:?}",
-                    other_error
-                );
+                panic!("Expected InsufficientVertices error, but got: {other_error:?}");
             }
-            Ok(_) => {
+            Ok(()) => {
                 panic!("Expected error for insufficient vertices, but validation passed");
             }
         }

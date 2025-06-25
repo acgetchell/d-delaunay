@@ -2459,8 +2459,11 @@ mod tests {
 
         // Test Clone and Copy
         #[allow(clippy::redundant_clone)]
-        let _cloned = point.clone();
-        let _copied = point;
+        let cloned = point.clone();
+        let copied = point;
+
+        // Verify copy worked by using the copied value
+        assert_eq!(copied.dim(), cloned.dim());
 
         // Test that point can be used in collections requiring Hash + Eq
         let mut set = std::collections::HashSet::new();
