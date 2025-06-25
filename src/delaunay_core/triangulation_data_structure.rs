@@ -1090,16 +1090,18 @@ where
                             if facets_are_adjacent(facet1, facet2) {
                                 neighbor_map
                                     .get_mut(&cell1_id)
-                                    .ok_or(TriangulationValidationError::NotNeighbors {
-                                        cell1: cell1_id,
-                                        cell2: cell2_id,
+                                    .ok_or(TriangulationValidationError::FailedToCreateCell {
+                                        message: format!(
+                                            "Failed to access neighbor map for cell {cell1_id:?}"
+                                        ),
                                     })?
                                     .push(cell2_id);
                                 neighbor_map
                                     .get_mut(&cell2_id)
-                                    .ok_or(TriangulationValidationError::NotNeighbors {
-                                        cell1: cell2_id,
-                                        cell2: cell1_id,
+                                    .ok_or(TriangulationValidationError::FailedToCreateCell {
+                                        message: format!(
+                                            "Failed to access neighbor map for cell {cell2_id:?}"
+                                        ),
                                     })?
                                     .push(cell1_id);
                             }
@@ -1464,10 +1466,9 @@ where
 
                 // Early termination: check shared vertex count
                 if shared_count != D {
-                    return Err(TriangulationValidationError::InvalidNeighbors {
-                        message: format!(
-                            "Neighbor {neighbor_id:?} does not share a facet with {cell_id:?} (shared {shared_count} vertices)"
-                        ),
+                    return Err(TriangulationValidationError::NotNeighbors {
+                        cell1: *cell_id,
+                        cell2: *neighbor_id,
                     });
                 }
             }
@@ -2833,7 +2834,7 @@ mod tests {
         let result = tds.is_valid();
         assert!(matches!(
             result,
-            Err(TriangulationValidationError::InvalidNeighbors { .. })
+            Err(TriangulationValidationError::NotNeighbors { .. })
         ));
     }
 
