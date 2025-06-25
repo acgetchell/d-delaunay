@@ -43,6 +43,7 @@
         "sarif",
         "serde",
         "simplicial",
+        "slotmap",
         "spacelike",
         "strsim",
         "supercell",

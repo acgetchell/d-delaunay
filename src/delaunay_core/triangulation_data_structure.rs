@@ -4,6 +4,7 @@
 //! constructs Delaunay triangulations using the Bowyer-Watson algorithm.
 //! The implementation is generic over dimension D and supports arbitrary
 //! numeric types and vertex/cell data.
+
 //!
 //! # Quick Start
 //!
@@ -366,14 +367,12 @@ where
     ///
     /// The function `add` returns `Ok(())` if the vertex was successfully
     /// added to the [`HashMap`], or an error message if the vertex already
-    /// exists or if there is a [Uuid] collision.
+    /// exists in the triangulation.
     ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - A vertex with the same coordinates already exists in the triangulation
-    /// - A vertex with the same UUID already exists (UUID collision)
-    ///
     /// # Examples
     ///
     /// Successfully add a vertex to an empty triangulation:
@@ -968,7 +967,7 @@ where
         let mut cells_to_remove_duplicates = Vec::new();
 
         for (cell_id, cell) in &self.cells {
-            // Create a sorted vector of vertex UUIDs as a key for uniqueness
+            // Create a sorted vector of vertex keys as a key for uniqueness
             let mut vertex_keys: Vec<VertexKey> = cell.vertices().iter().map(|v| v.key()).collect();
             vertex_keys.sort();
 
@@ -1055,7 +1054,7 @@ where
     }
 
     fn assign_incident_cells(&mut self) {
-        // Create a map from vertex UUID to incident cell UUIDs
+        // Create a map from vertex key to incident cell keys
         let mut vertex_to_cells: HashMap<VertexKey, Vec<CellKey>> = HashMap::new();
 
         // Initialize the map with all vertices
@@ -1096,7 +1095,7 @@ where
 
         // First pass: identify duplicate cells
         for (cell_id, cell) in &self.cells {
-            // Create a sorted vector of vertex UUIDs as a key for uniqueness
+            // Create a sorted vector of vertex keys as a key for uniqueness
             let mut vertex_keys: Vec<VertexKey> = cell.vertices().iter().map(|v| v.key()).collect();
             vertex_keys.sort();
 
@@ -1210,18 +1209,11 @@ where
     /// # Errors
     ///
     /// Returns a `TriangulationValidationError` if:
-    /// - Any cell is invalid (contains invalid vertices, has nil UUID, or contains duplicate vertices)
+    /// - Any cell is invalid (contains invalid vertices or contains duplicate vertices)
     /// - Neighbor relationships are not mutual between cells
     /// - Cells have too many neighbors for their dimension
     /// - Neighboring cells don't share the proper number of vertices
     /// - Duplicate cells exist (cells with identical vertex sets)
-    ///
-    /// # Validation Checks
-    ///
-    /// This function performs comprehensive validation including:
-    /// 1. Cell validation (calling `is_valid()` on each cell)
-    /// 2. Neighbor relationship validation
-    /// 3. Cell uniqueness validation
     ///
     /// # Examples
     ///
@@ -1309,9 +1301,16 @@ where
     /// ];
     ///
     /// let invalid_cell = CellBuilder::default().vertices(vertices).build().unwrap();
-    /// tds.cells.insert(invalid_cell.uuid(), invalid_cell);
+    /// let cell_key = tds.cells.insert(invalid_cell);
     ///
     /// // Validation should fail
+    /// match tds.is_valid() {
+    ///     Err(TriangulationValidationError::InvalidCell { .. }) => {
+    ///         // Expected error due to infinite coordinate
+    ///     }
+    ///     _ => panic!("Expected InvalidCell error"),
+    /// }
+    /// ```
     /// match tds.is_valid() {
     ///     Err(TriangulationValidationError::InvalidCell { .. }) => {
     ///         // Expected error due to infinite coordinate
@@ -1441,28 +1440,25 @@ mod tests {
     }
 
     #[test]
-    fn test_add_vertex_uuid_collision() {
+    fn test_add_vertex_collision() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let point1 = Point::new([1.0, 2.0, 3.0]);
         let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
-        let uuid1 = vertex1.uuid();
         tds.add(vertex1).unwrap();
 
-        // Create a new vertex with different coordinates but same UUID
+        // Create a new vertex with different coordinates
         let point2 = Point::new([4.0, 5.0, 6.0]); // Different coordinates
         let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
 
-        // Manually insert the second vertex with the first vertex's UUID to simulate UUID collision
-        let collision_result = tds.vertices.insert(uuid1, vertex2);
-        assert!(collision_result.is_some()); // Should return the old value (vertex1)
+        // Insert the second vertex and get its key
+        let key2 = tds.vertices.insert(vertex2.clone());
 
-        // Since we can't directly test the add() method's UUID collision path due to the coordinate check,
-        // let's test that the vertices HashMap correctly handles UUID collisions
-        assert_eq!(tds.vertices.len(), 1); // Should still have only 1 vertex
+        // Should have two vertices now
+        assert_eq!(tds.vertices.len(), 2);
 
-        // The vertex at uuid1 should now be vertex2 (the collision overwrote vertex1)
-        let stored_vertex = tds.vertices.get(&uuid1).unwrap();
+        // Check that vertex2 was stored correctly
+        let stored_vertex = tds.vertices.get(key2).unwrap();
         let stored_coords: [f64; 3] = stored_vertex.into();
         #[allow(clippy::float_cmp)]
         {
@@ -1512,9 +1508,8 @@ mod tests {
     fn test_supercell_empty_vertices() {
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
-        let supercell = tds.supercell();
+        let supercell = self.supercell();
         assert_eq!(supercell.vertices().len(), 4); // Should create a 3D simplex with 4 vertices
-        assert!(supercell.uuid() != uuid::Uuid::nil());
     }
 
     #[test]
@@ -1575,8 +1570,8 @@ mod tests {
         ];
 
         let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
-        cell.neighbors = Some(vec![Uuid::nil()]); // Invalid neighbor
-        tds.cells.insert(cell.uuid(), cell.clone());
+        cell.neighbors = Some(vec![]); // Invalid neighbor
+        let invalid_cell_key = tds.cells.insert(invalid_cell.clone());
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -1644,7 +1639,7 @@ mod tests {
         ];
 
         let cell = CellBuilder::default().vertices(vertices).build().unwrap();
-        tds.cells.insert(cell.uuid(), cell);
+        tds.cells.insert(cell);
 
         assert_eq!(tds.number_of_cells(), 1);
     }
@@ -1930,7 +1925,7 @@ mod tests {
             .build()
             .unwrap();
 
-        tds.cells.insert(invalid_cell.uuid(), invalid_cell.clone());
+        let invalid_cell_key = tds.cells.insert(invalid_cell.clone());
 
         // Test that validation fails with InvalidCell error
         let validation_result = tds.is_valid();
@@ -1938,7 +1933,7 @@ mod tests {
 
         match validation_result.unwrap_err() {
             TriangulationValidationError::InvalidCell { cell_id, source } => {
-                assert_eq!(cell_id, invalid_cell.uuid());
+                assert_eq!(cell_id, invalid_cell_key);
                 println!(
                     "Successfully caught InvalidCell error: cell_id={:?}, source={:?}",
                     cell_id, source
@@ -2168,15 +2163,11 @@ mod tests {
         let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
 
         // Add too many neighbors (5 neighbors for 3D should fail)
-        cell.neighbors = Some(vec![
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-            Uuid::new_v4(),
-        ]);
+        let cell_key = tds.cells.insert(cell.clone());
+        let neighbor_key = tds.cells.insert(cell.clone());
+        cell.neighbors = Some(vec![neighbor_key]); // Invalid neighbor
 
-        tds.cells.insert(cell.uuid(), cell);
+        tds.cells.insert(cell);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2206,7 +2197,7 @@ mod tests {
         ];
 
         let cell = CellBuilder::default().vertices(vertices).build().unwrap();
-        tds.cells.insert(cell.uuid(), cell);
+        tds.cells.insert(cell);
 
         let result = tds.is_valid();
         // Should now get InvalidCell error because cell validation detects insufficient vertices
@@ -2263,10 +2254,9 @@ mod tests {
         let cell2 = CellBuilder::default().vertices(vertices2).build().unwrap();
 
         // Make cell1 point to cell2 as neighbor, but not vice versa
-        cell1.neighbors = Some(vec![cell2.uuid()]);
-
-        tds.cells.insert(cell1.uuid(), cell1);
-        tds.cells.insert(cell2.uuid(), cell2);
+        let cell2_key = tds.cells.insert(cell2);
+        cell.neighbors = Some(vec![cell2_key]);
+        tds.cells.insert(cell);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2528,7 +2518,7 @@ mod tests {
         // let mut result = tds.bowyer_watson().unwrap();
 
         // Clear existing neighbors to test assignment logic
-        let cell_ids: Vec<Uuid> = result.cells.keys().copied().collect();
+        let cell_ids: Vec<CellKey> = result.cells.keys().collect();
         for cell_id in cell_ids {
             if let Some(cell) = result.cells.get_mut(&cell_id) {
                 cell.neighbors = None;
@@ -2567,9 +2557,9 @@ mod tests {
         // let mut result = tds.bowyer_watson().unwrap();
 
         // Clear existing incident cells to test assignment logic
-        let vertex_ids: Vec<Uuid> = result.vertices.keys().copied().collect();
-        for vertex_id in vertex_ids {
-            if let Some(vertex) = result.vertices.get_mut(&vertex_id) {
+        let vertex_keys: Vec<VertexKey> = result.vertices.keys().collect();
+        for vertex_key in vertex_keys {
+            if let Some(vertex) = result.vertices.get_mut(vertex_key) {
                 vertex.incident_cell = None;
             }
         }
@@ -2613,7 +2603,7 @@ mod tests {
                 .vertices(vertices.clone())
                 .build()
                 .unwrap();
-            result.cells.insert(duplicate_cell.uuid(), duplicate_cell);
+            result.cells.insert(duplicate_cell);
         }
 
         assert_eq!(result.number_of_cells(), original_cell_count + 3);
@@ -2713,9 +2703,10 @@ mod tests {
         let cell_key = tds.cells.insert(cell.clone());
 
         // Add exactly D neighbors (3 neighbors for 3D)
-        cell.neighbors = Some(vec![cell_key; 3]);
+        let neighbors = vec![cell_key; 3];
+        cell.neighbors = Some(neighbors);
 
-        // Update the cell with the neighbors
+        // Add the cell back with its updated neighbors
         let _ = tds.cells.insert(cell);
 
         // This should pass validation (exactly D neighbors is valid)
@@ -2770,11 +2761,14 @@ mod tests {
         let mut cell2 = CellBuilder::default().vertices(vertices2).build().unwrap();
 
         // Make them claim to be neighbors
-        cell1.neighbors = Some(vec![cell2.uuid()]);
-        cell2.neighbors = Some(vec![cell1.uuid()]);
+        let cell2_key = tds.cells.insert(cell2.clone());
+        cell1.neighbors = Some(vec![cell2_key]);
 
-        tds.cells.insert(cell1.uuid(), cell1);
-        tds.cells.insert(cell2.uuid(), cell2);
+        let cell1_key = tds.cells.insert(cell1.clone());
+        cell2.neighbors = Some(vec![cell1_key]);
+
+        tds.cells.insert(cell1);
+        tds.cells.insert(cell2);
 
         // Should fail validation because they only share 2 vertices, not 3 (D=3)
         let result = tds.is_valid();
