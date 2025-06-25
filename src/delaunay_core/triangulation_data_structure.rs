@@ -45,6 +45,20 @@ pub enum TriangulationValidationError {
         /// Description of the duplicate cell validation failure.
         message: String,
     },
+    /// Failed to create a cell during triangulation.
+    #[error("Failed to create cell: {message}")]
+    FailedToCreateCell {
+        /// Description of the cell creation failure.
+        message: String,
+    },
+    /// Cells are not neighbors as expected
+    #[error("Cells {cell1:?} and {cell2:?} are not neighbors")]
+    NotNeighbors {
+        /// The first cell UUID.
+        cell1: Uuid,
+        /// The second cell UUID.
+        cell2: Uuid,
+    },
 }
 
 /// Helper function to check if two facets are adjacent (share the same vertices)
@@ -195,11 +209,11 @@ where
     ordered_float::OrderedFloat<f64>: From<T>,
 {
     /// The function creates a new instance of a triangulation data structure
-    /// with given points, initializing the vertices and cells.
+    /// with given vertices, initializing the vertices and cells.
     ///
     /// # Arguments
     ///
-    /// * `points`: A container of [Point]s with which to initialize the
+    /// * `vertices`: A container of [Vertex]s with which to initialize the
     ///   triangulation.
     ///
     /// # Returns
@@ -207,35 +221,61 @@ where
     /// A Delaunay triangulation with cells and neighbors aligned, and vertices
     /// associated with cells.
     ///
+    /// # Errors
+    ///
+    /// Returns a `TriangulationValidationError` if:
+    /// - Triangulation computation fails during the Bowyer-Watson algorithm
+    /// - Cell creation or validation fails
+    /// - Neighbor assignment or duplicate cell removal fails
+    ///
     /// # Examples
     ///
-    /// Create a new triangulation data structure with 3D points:
+    /// Create a new triangulation data structure with 3D vertices:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let points = vec![
-    ///     Point::new([0.0, 0.0, 0.0]),
-    ///     Point::new([1.0, 0.0, 0.0]),
-    ///     Point::new([0.0, 1.0, 0.0]),
-    ///     Point::new([0.0, 0.0, 1.0]),
+    /// let vertices = vec![
+    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
+    ///     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
+    ///     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
+    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Check basic structure
     /// assert_eq!(tds.number_of_vertices(), 4);
-    /// assert_eq!(tds.number_of_cells(), 0); // Cells are created later with bowyer_watson()
+    /// assert_eq!(tds.number_of_cells(), 1); // Cells are automatically created via triangulation
     /// assert_eq!(tds.dim(), 3);
+    ///
+    /// // Verify cell creation and structure
+    /// let cells: Vec<_> = tds.cells.values().collect();
+    /// assert!(!cells.is_empty(), "Should have created at least one cell");
+    ///
+    /// // Check that the cell has the correct number of vertices (D+1 for a simplex)
+    /// let cell = &cells[0];
+    /// assert_eq!(cell.vertices().len(), 4, "3D cell should have 4 vertices");
+    ///
+    /// // Verify triangulation validity
+    /// assert!(tds.is_valid().is_ok(), "Triangulation should be valid after creation");
+    ///
+    /// // Check that all vertices are associated with the cell
+    /// for vertex in cell.vertices() {
+    ///     assert!(tds.vertices.contains_key(&vertex.uuid()), "Cell vertex should exist in triangulation");
+    /// }
     /// ```
     ///
     /// Create an empty triangulation:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
-    /// let points: Vec<Point<f64, 3>> = Vec::new();
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+    /// let vertices: Vec<Vertex<f64, usize, 3>> = Vec::new();
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 0);
     /// assert_eq!(tds.dim(), -1);
     /// ```
@@ -244,28 +284,37 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let points = vec![
-    ///     Point::new([0.0, 0.0]),
-    ///     Point::new([1.0, 0.0]),
-    ///     Point::new([0.5, 1.0]),
+    /// let vertices = vec![
+    ///     VertexBuilder::default().point(Point::new([0.0, 0.0])).build().unwrap(),
+    ///     VertexBuilder::default().point(Point::new([1.0, 0.0])).build().unwrap(),
+    ///     VertexBuilder::default().point(Point::new([0.5, 1.0])).build().unwrap(),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 2> = Tds::new(points);
+    /// let tds: Tds<f64, usize, usize, 2> = Tds::new(&vertices).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 3);
     /// assert_eq!(tds.dim(), 2);
     /// ```
-    #[must_use]
-    pub fn new(points: Vec<Point<T, D>>) -> Self {
-        // handle case where vertices are constructed with data
-        let vertices = Vertex::into_hashmap(Vertex::from_points(points));
-        // let cells_vec = bowyer_watson(vertices);
-        let cells = HashMap::new();
-        // assign_neighbors(cells_vec);
-        // assign_incident_cells(vertices);
+    pub fn new(vertices: &[Vertex<T, U, D>]) -> Result<Self, TriangulationValidationError>
+    where
+        OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        let mut tds = Self {
+            vertices: Vertex::into_hashmap(vertices.to_owned()),
+            cells: HashMap::new(),
+        };
 
-        Self { vertices, cells }
+        // Initialize cells using Bowyer-Watson triangulation
+        let cells_vector = tds.bowyer_watson_logic(vertices)?;
+        tds.cells = cells_vector
+            .into_iter()
+            .map(|cell| (cell.uuid(), cell))
+            .collect();
+
+        Ok(tds)
     }
 
     /// The `add` function checks if a [Vertex] with the same coordinates already
@@ -296,7 +345,7 @@ where
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex = VertexBuilder::default().point(point).build().unwrap();
     ///
@@ -312,7 +361,7 @@ where
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex1 = VertexBuilder::default().point(point).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(point).build().unwrap(); // Same coordinates
@@ -329,7 +378,7 @@ where
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// let vertices = vec![
     ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
@@ -380,7 +429,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 0);
     /// ```
     ///
@@ -391,7 +440,7 @@ where
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let vertex1 = VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([4.0, 5.0, 6.0])).build().unwrap();
     ///
@@ -407,6 +456,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -415,7 +465,8 @@ where
     ///     Point::new([0.0, 0.0, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+    /// let vertices = Vertex::from_points(points);
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 4);
     /// ```
     #[must_use]
@@ -438,7 +489,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.dim(), -1); // Empty triangulation
     /// ```
     ///
@@ -449,7 +500,7 @@ where
     /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Start empty
     /// assert_eq!(tds.dim(), -1);
@@ -480,6 +531,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// // 2D triangulation
     /// let points_2d = vec![
@@ -487,7 +539,8 @@ where
     ///     Point::new([1.0, 0.0]),
     ///     Point::new([0.5, 1.0]),
     /// ];
-    /// let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(points_2d);
+    /// let vertices_2d = Vertex::from_points(points_2d);
+    /// let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(&vertices_2d).unwrap();
     /// assert_eq!(tds_2d.dim(), 2);
     ///
     /// // 4D triangulation with 6 vertices (capped at D=4)
@@ -499,7 +552,8 @@ where
     ///     Point::new([0.0, 0.0, 0.0, 1.0]),
     ///     Point::new([1.0, 1.0, 1.0, 1.0]),
     /// ];
-    /// let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(points_4d);
+    /// let vertices_4d = Vertex::from_points(points_4d);
+    /// let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(&vertices_4d).unwrap();
     /// assert_eq!(tds_4d.dim(), 4);
     /// ```
     #[must_use]
@@ -525,6 +579,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -533,8 +588,9 @@ where
     ///     Point::new([0.0, 0.0, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-    /// assert_eq!(tds.number_of_cells(), 0); // No cells until triangulation is performed
+    /// let vertices = Vertex::from_points(points);
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+    /// assert_eq!(tds.number_of_cells(), 1); // Cells are automatically created via triangulation
     /// ```
     ///
     /// Count cells after triangulation:
@@ -542,6 +598,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -550,8 +607,8 @@ where
     ///     Point::new([0.0, 0.0, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-    /// let triangulated = tds.bowyer_watson().unwrap();
+    /// let vertices = Vertex::from_points(points);
+    /// let triangulated: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     /// assert_eq!(triangulated.number_of_cells(), 1); // One tetrahedron for 4 points in 3D
     /// ```
     ///
@@ -561,11 +618,8 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
-    /// assert_eq!(tds.number_of_cells(), 0);
-    ///
-    /// let triangulated = tds.bowyer_watson().unwrap();
-    /// assert_eq!(triangulated.number_of_cells(), 0); // Still no cells for empty input
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+    /// assert_eq!(tds.number_of_cells(), 0); // No cells for empty input
     /// ```
     #[must_use]
     pub fn number_of_cells(&self) -> usize {
@@ -729,6 +783,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -737,8 +792,8 @@ where
     ///     Point::new([0.0, 0.0, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-    /// let result = tds.bowyer_watson().unwrap();
+    /// let vertices = Vertex::from_points(points);
+    /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     ///
     /// assert_eq!(result.number_of_vertices(), 4);
     /// assert_eq!(result.number_of_cells(), 1); // One tetrahedron
@@ -750,10 +805,11 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points: Vec<Point<f64, 3>> = Vec::new();
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-    /// let result = tds.bowyer_watson().unwrap();
+    /// let vertices = Vertex::from_points(points);
+    /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     ///
     /// assert_eq!(result.number_of_vertices(), 0);
     /// assert_eq!(result.number_of_cells(), 0);
@@ -764,6 +820,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0]),
@@ -771,8 +828,8 @@ where
     ///     Point::new([0.5, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 2> = Tds::new(points);
-    /// let result = tds.bowyer_watson().unwrap();
+    /// let vertices = Vertex::from_points(points);
+    /// let result: Tds<f64, usize, usize, 2> = Tds::new(&vertices).unwrap();
     ///
     /// assert_eq!(result.number_of_vertices(), 3);
     /// assert_eq!(result.number_of_cells(), 1); // One triangle
@@ -783,6 +840,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -792,102 +850,126 @@ where
     ///     Point::new([1.0, 1.0, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-    /// let result = tds.bowyer_watson().unwrap();
+    /// let vertices = Vertex::from_points(points);
+    /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     ///
     /// assert_eq!(result.number_of_vertices(), 5);
     /// assert!(result.number_of_cells() >= 1);
     /// ```
-    pub fn bowyer_watson(mut self) -> Result<Self, anyhow::Error>
+    /// Private method that performs Bowyer-Watson triangulation on a set of vertices
+    /// and returns a vector of cells
+    fn bowyer_watson_logic(
+        &mut self,
+        vertices: &[Vertex<T, U, D>],
+    ) -> Result<Vec<Cell<T, U, V, D>>, TriangulationValidationError>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        // If no vertices, return empty triangulation
-        if self.vertices.is_empty() {
-            return Ok(self);
+        if vertices.is_empty() {
+            return Ok(vec![]);
         }
 
-        // For cases with a small number of vertices, use a direct combinatorial approach
-        // This is more reliable than the full Bowyer-Watson algorithm for small cases
-        if self.vertices.len() > D && self.vertices.len() <= D + 5 {
-            let vertices: Vec<_> = self.vertices.values().copied().collect();
-            let mut created_cells = 0;
+        // Store original vertices in self for use by helper methods
+        self.vertices = Vertex::into_hashmap(vertices.to_owned());
 
-            // Generate all possible combinations of D+1 vertices
-            let combinations = generate_combinations(&vertices, D + 1);
+        // For cases with a small number of vertices, use direct combinatorial approach
+        if vertices.len() > D && vertices.len() <= D + 5 {
+            let mut created_cells = 0;
+            let combinations = generate_combinations(vertices, D + 1);
 
             for combination in combinations {
-                // Try to create a cell with these vertices
-                if let Ok(cell) = CellBuilder::default()
-                    .vertices(combination)
-                    .build()
-                    .map_err(|e| anyhow::Error::msg(format!("Failed to create cell: {e:?}")))
-                {
+                if let Ok(cell) = CellBuilder::default().vertices(combination).build() {
                     self.cells.insert(cell.uuid(), cell);
                     created_cells += 1;
                 }
             }
 
             if created_cells > 0 {
-                // Remove duplicate cells (cells with identical vertex sets)
-                self.remove_duplicate_cells();
-
-                // Assign neighbors between adjacent cells
-                self.assign_neighbors();
-
-                // Assign incident cells to vertices
+                self.remove_duplicate_cells()?;
+                self.assign_neighbors()?;
                 self.assign_incident_cells();
-
-                return Ok(self);
+                return Ok(self.cells.values().cloned().collect());
             }
-
-            // If the combinatorial approach didn't work, fall through to the full algorithm
         }
 
         // For more complex cases, use the full Bowyer-Watson algorithm
-        // Create super-cell that contains all vertices
-        let supercell = self.supercell()?;
+        let supercell =
+            self.supercell()
+                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                    message: format!("Failed to create supercell: {e}"),
+                })?;
+
         let supercell_vertices: HashSet<Uuid> = supercell
             .vertices()
             .iter()
             .map(super::vertex::Vertex::uuid)
             .collect();
-        let supercell_uuid = supercell.uuid();
-        self.cells.insert(supercell_uuid, supercell.clone());
 
-        // Collect input vertices into a vector to avoid borrowing conflicts
-        let input_vertices: Vec<_> = self.vertices.values().copied().collect();
+        self.cells.insert(supercell.uuid(), supercell.clone());
 
-        // Iterate over each input vertex and insert it into the triangulation
-        for vertex in &input_vertices {
-            // Skip if this vertex is already part of supercell vertices
+        for vertex in vertices {
             if supercell_vertices.contains(&vertex.uuid()) {
                 continue;
             }
 
-            let (bad_cells, boundary_facets) = self.find_bad_cells_and_boundary_facets(vertex)?;
+            let (bad_cells, boundary_facets) = self
+                .find_bad_cells_and_boundary_facets(vertex)
+                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                    message: format!("Error finding bad cells and boundary facets: {e}"),
+                })?;
 
-            // Remove bad cells
             for bad_cell_id in bad_cells {
                 self.cells.remove(&bad_cell_id);
             }
 
-            // Create new cells using the boundary facets and the new vertex
             for facet in &boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
+                let new_cell = Cell::from_facet_and_vertex(facet, *vertex).map_err(|e| {
+                    TriangulationValidationError::FailedToCreateCell {
+                        message: format!("Error creating cell from facet and vertex: {e}"),
+                    }
+                })?;
                 self.cells.insert(new_cell.uuid(), new_cell);
             }
         }
 
-        // Remove cells that contain vertices of the supercell
         self.remove_cells_containing_supercell_vertices(&supercell);
-
-        // Assign neighbors between adjacent cells
-        self.assign_neighbors();
-
-        // Assign incident cells to vertices
+        self.remove_duplicate_cells()?;
+        self.assign_neighbors()?;
         self.assign_incident_cells();
+
+        Ok(self.cells.values().cloned().collect())
+    }
+
+    /// Create a Delaunay triangulation using the Bowyer-Watson algorithm
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. Use `Tds::new(&vertices)` instead, which automatically
+    /// performs triangulation during construction.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `TriangulationValidationError` if:
+    /// - Supercell creation fails
+    /// - Circumsphere calculations fail during the algorithm
+    /// - Cell creation from facets and vertices fails
+    /// - Duplicate cell removal fails
+    /// - Neighbor assignment fails
+    #[deprecated(since = "0.2.0", note = "Use `Tds::new(&vertices)` instead")]
+    pub fn bowyer_watson(mut self) -> Result<Self, TriangulationValidationError>
+    where
+        OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        // Simply use the existing triangulation logic
+        let vertices: Vec<_> = self.vertices.values().copied().collect();
+
+        // Use our internal logic to compute the triangulation
+        let cells = self.bowyer_watson_logic(&vertices)?;
+
+        // Update the cells in the TDS
+        self.cells = cells.into_iter().map(|cell| (cell.uuid(), cell)).collect();
 
         Ok(self)
     }
@@ -994,7 +1076,7 @@ where
         }
     }
 
-    fn assign_neighbors(&mut self) {
+    fn assign_neighbors(&mut self) -> Result<(), TriangulationValidationError> {
         // Create a map to store neighbor relationships
         let mut neighbor_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
 
@@ -1023,8 +1105,22 @@ where
                             // Two cells are neighbors if they share a facet
                             // (same vertices but opposite orientation)
                             if facets_are_adjacent(facet1, facet2) {
-                                neighbor_map.get_mut(&cell1_id).unwrap().push(cell2_id);
-                                neighbor_map.get_mut(&cell2_id).unwrap().push(cell1_id);
+                                neighbor_map
+                                    .get_mut(&cell1_id)
+                                    .ok_or(TriangulationValidationError::FailedToCreateCell {
+                                        message: format!(
+                                            "Failed to access neighbor map for cell {cell1_id:?}"
+                                        ),
+                                    })?
+                                    .push(cell2_id);
+                                neighbor_map
+                                    .get_mut(&cell2_id)
+                                    .ok_or(TriangulationValidationError::FailedToCreateCell {
+                                        message: format!(
+                                            "Failed to access neighbor map for cell {cell2_id:?}"
+                                        ),
+                                    })?
+                                    .push(cell1_id);
                             }
                         }
                     }
@@ -1043,6 +1139,8 @@ where
                 }
             }
         }
+
+        Ok(())
     }
 
     fn assign_incident_cells(&mut self) {
@@ -1078,10 +1176,14 @@ where
     }
 
     /// Remove duplicate cells (cells with identical vertex sets)
-    fn remove_duplicate_cells(&mut self) {
+    ///
+    /// Returns the number of duplicate cells that were removed, or an error if
+    /// all duplicate cells could not be successfully removed.
+    fn remove_duplicate_cells(&mut self) -> Result<usize, TriangulationValidationError> {
         let mut unique_cells = HashMap::new();
         let mut cells_to_remove = Vec::new();
 
+        // First pass: identify duplicate cells
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
             let mut vertex_uuids: Vec<Uuid> = cell
@@ -1100,10 +1202,72 @@ where
             }
         }
 
-        // Remove duplicate cells
+        let duplicate_count = cells_to_remove.len();
+        let mut removed_count = 0;
+
+        // Second pass: remove duplicate cells and count successful removals
         for cell_id in cells_to_remove {
-            self.cells.remove(&cell_id);
+            if self.cells.remove(&cell_id).is_some() {
+                removed_count += 1;
+            }
         }
+
+        // Verify all duplicates were successfully removed
+        if removed_count != duplicate_count {
+            return Err(TriangulationValidationError::DuplicateCells {
+                message: format!(
+                    "Failed to remove all duplicate cells: attempted to remove {duplicate_count}, actually removed {removed_count}"
+                ),
+            });
+        }
+
+        Ok(removed_count)
+    }
+
+    /// Check for duplicate cells and return an error if any are found
+    ///
+    /// This is useful for validation where you want to detect duplicates
+    /// without automatically removing them.
+    fn validate_no_duplicate_cells(&self) -> Result<(), TriangulationValidationError> {
+        let mut unique_cells = HashMap::new();
+        let mut duplicates = Vec::new();
+
+        for (cell_id, cell) in &self.cells {
+            // Create a sorted vector of vertex UUIDs as a key for uniqueness
+            let mut vertex_uuids: Vec<Uuid> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
+            vertex_uuids.sort();
+
+            if let Some(existing_cell_id) = unique_cells.get(&vertex_uuids) {
+                // This is a duplicate cell
+                duplicates.push((*cell_id, *existing_cell_id, vertex_uuids.clone()));
+            } else {
+                // This is a unique cell
+                unique_cells.insert(vertex_uuids, *cell_id);
+            }
+        }
+
+        if !duplicates.is_empty() {
+            let duplicate_descriptions: Vec<String> = duplicates
+                .iter()
+                .map(|(cell1, cell2, vertices)| {
+                    format!("cells {cell1:?} and {cell2:?} with vertices {vertices:?}")
+                })
+                .collect();
+
+            return Err(TriangulationValidationError::DuplicateCells {
+                message: format!(
+                    "Found {} duplicate cell(s): {}",
+                    duplicates.len(),
+                    duplicate_descriptions.join(", ")
+                ),
+            });
+        }
+
+        Ok(())
     }
 
     /// Checks whether the triangulation data structure is valid.
@@ -1135,6 +1299,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -1143,11 +1308,11 @@ where
     ///     Point::new([0.0, 0.0, 1.0]),
     /// ];
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-    /// let triangulated = tds.bowyer_watson().unwrap();
-    ///
+    /// let vertices = Vertex::from_points(points);
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+    /// // Note: triangulation is automatically performed in Tds::new
     /// // Validation should pass for a properly triangulated structure
-    /// assert!(triangulated.is_valid().is_ok());
+    /// assert!(tds.is_valid().is_ok());
     /// ```
     ///
     /// Validate an empty triangulation:
@@ -1156,7 +1321,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Empty triangulation should be valid
     /// assert!(tds.is_valid().is_ok());
@@ -1167,6 +1332,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// // 2D triangulation
     /// let points_2d = vec![
@@ -1174,9 +1340,10 @@ where
     ///     Point::new([1.0, 0.0]),
     ///     Point::new([0.5, 1.0]),
     /// ];
-    /// let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(points_2d);
-    /// let triangulated_2d = tds_2d.bowyer_watson().unwrap();
-    /// assert!(triangulated_2d.is_valid().is_ok());
+    /// let vertices_2d = Vertex::from_points(points_2d);
+    /// let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(&vertices_2d).unwrap();
+    /// // Note: triangulation is automatically performed in Tds::new
+    /// assert!(tds_2d.is_valid().is_ok());
     ///
     /// // 4D triangulation
     /// let points_4d = vec![
@@ -1186,9 +1353,10 @@ where
     ///     Point::new([0.0, 0.0, 1.0, 0.0]),
     ///     Point::new([0.0, 0.0, 0.0, 1.0]),
     /// ];
-    /// let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(points_4d);
-    /// let triangulated_4d = tds_4d.bowyer_watson().unwrap();
-    /// assert!(triangulated_4d.is_valid().is_ok());
+    /// let vertices_4d = Vertex::from_points(points_4d);
+    /// let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(&vertices_4d).unwrap();
+    /// // Note: triangulation is automatically performed in Tds::new
+    /// assert!(tds_4d.is_valid().is_ok());
     /// ```
     ///
     /// Example of validation error handling:
@@ -1199,7 +1367,7 @@ where
     /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
     /// use d_delaunay::delaunay_core::cell::CellBuilder;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Create a cell with an invalid vertex (infinite coordinate)
     /// let vertices = vec![
@@ -1225,7 +1393,10 @@ where
         T: super::point::FiniteCheck + super::point::HashCoordinate + Copy + Debug,
         [T; D]: serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
-        // First, validate all cells
+        // First, validate cell uniqueness (quick check for duplicate cells)
+        self.validate_no_duplicate_cells()?;
+
+        // Then validate all cells
         for (cell_id, cell) in &self.cells {
             cell.is_valid()
                 .map_err(|source| TriangulationValidationError::InvalidCell {
@@ -1234,11 +1405,8 @@ where
                 })?;
         }
 
-        // Then validate neighbor relationships
+        // Finally validate neighbor relationships
         self.validate_neighbors_internal()?;
-
-        // Finally validate cell uniqueness
-        self.validate_unique_cells_internal()?;
 
         Ok(())
     }
@@ -1315,35 +1483,11 @@ where
 
                 // Early termination: check shared vertex count
                 if shared_count != D {
-                    return Err(TriangulationValidationError::InvalidNeighbors {
-                        message: format!(
-                            "Neighbor {neighbor_id:?} does not share a facet with {cell_id:?} (shared {shared_count} vertices)"
-                        ),
+                    return Err(TriangulationValidationError::NotNeighbors {
+                        cell1: *cell_id,
+                        cell2: *neighbor_id,
                     });
                 }
-            }
-        }
-        Ok(())
-    }
-
-    /// Internal method for validating cell uniqueness.
-    fn validate_unique_cells_internal(&self) -> Result<(), TriangulationValidationError> {
-        let mut seen: HashMap<Vec<Uuid>, Uuid> = HashMap::new();
-
-        for (cell_id, cell) in &self.cells {
-            // Check for duplicate cells (cells with identical vertex sets)
-            let mut key: Vec<Uuid> = cell
-                .vertices()
-                .iter()
-                .map(super::vertex::Vertex::uuid)
-                .collect();
-            key.sort_unstable();
-            if let Some(dup_id) = seen.insert(key.clone(), *cell_id) {
-                return Err(TriangulationValidationError::DuplicateCells {
-                    message: format!(
-                        "Duplicate cells detected – {cell_id:?} and {dup_id:?} share vertex set {key:?}"
-                    ),
-                });
             }
         }
         Ok(())
@@ -1359,7 +1503,7 @@ mod tests {
 
     #[test]
     fn test_add_vertex_already_exists() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let point = Point::new([1.0, 2.0, 3.0]);
         let vertex = VertexBuilder::default().point(point).build().unwrap();
@@ -1371,7 +1515,7 @@ mod tests {
 
     #[test]
     fn test_add_vertex_uuid_collision() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let point1 = Point::new([1.0, 2.0, 3.0]);
         let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
@@ -1401,7 +1545,7 @@ mod tests {
 
     #[test]
     fn test_dim_multiple_vertices() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Test empty triangulation
         assert_eq!(tds.dim(), -1);
@@ -1439,7 +1583,7 @@ mod tests {
 
     #[test]
     fn test_supercell_empty_vertices() {
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let supercell = tds.supercell().unwrap();
         assert_eq!(supercell.vertices().len(), 4); // Should create a 3D simplex with 4 vertices
@@ -1448,7 +1592,7 @@ mod tests {
 
     #[test]
     fn test_bowyer_watson_empty_vertices() {
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
         assert_eq!(tds.is_valid(), Ok(())); // Initially valid with no vertices
     }
 
@@ -1458,7 +1602,8 @@ mod tests {
             Point::new([-100.0, -100.0, -100.0]),
             Point::new([100.0, 100.0, 100.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         let supercell = tds.supercell().unwrap();
 
         // Assert that supercell has proper dimensions
@@ -1480,17 +1625,15 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let result = tds.bowyer_watson();
-        assert!(result.is_ok());
-        let result_tds = result.unwrap();
+        let vertices = Vertex::from_points(points);
+        let result_tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         assert_eq!(result_tds.number_of_vertices(), 4);
         assert_eq!(result_tds.number_of_cells(), 1);
     }
 
     #[test]
     fn test_is_valid_with_invalid_neighbors() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let point1 = Point::new([0.0, 0.0, 0.0]);
         let point2 = Point::new([1.0, 0.0, 0.0]);
@@ -1523,8 +1666,10 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result_tds = tds.bowyer_watson().expect("Triangulation failed");
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let mut result_tds = tds;
 
         // Add duplicate cell manually
         let vertices = result_tds.vertices.values().copied().collect::<Vec<_>>();
@@ -1535,7 +1680,9 @@ mod tests {
 
         assert_eq!(result_tds.number_of_cells(), 2); // One original, one duplicate
 
-        result_tds.remove_duplicate_cells();
+        let dupes = result_tds.remove_duplicate_cells();
+
+        assert_eq!(dupes.unwrap(), 1);
 
         assert_eq!(result_tds.number_of_cells(), 1); // Duplicates removed
     }
@@ -1543,19 +1690,17 @@ mod tests {
     #[test]
     fn test_bowyer_watson_empty() {
         let points: Vec<Point<f64, 3>> = Vec::new();
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
 
-        let result = tds.bowyer_watson();
-        assert!(result.is_ok());
-
-        let result_tds = result.unwrap();
-        assert_eq!(result_tds.number_of_vertices(), 0);
-        assert_eq!(result_tds.number_of_cells(), 0);
+        // Triangulation is automatically done in Tds::new
+        assert_eq!(tds.number_of_vertices(), 0);
+        assert_eq!(tds.number_of_cells(), 0);
     }
 
     #[test]
     fn test_number_of_cells() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
         assert_eq!(tds.number_of_cells(), 0);
 
         // Add a cell manually to test the count
@@ -1585,11 +1730,13 @@ mod tests {
             Point::new([7.0, 8.0, 9.0]),
             Point::new([10.0, 11.0, 12.0]),
         ];
+        let vertices = Vertex::from_points(points);
 
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
 
         assert_eq!(tds.number_of_vertices(), 4);
-        assert_eq!(tds.number_of_cells(), 0);
+        // After refactoring, Tds::new automatically triangulates, so we expect 1 cell
+        assert_eq!(tds.number_of_cells(), 1);
         assert_eq!(tds.dim(), 3);
 
         // Human readable output for cargo test -- --nocapture
@@ -1600,7 +1747,8 @@ mod tests {
     fn tds_add_dim() {
         let points: Vec<Point<f64, 3>> = Vec::new();
 
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
 
         assert_eq!(tds.number_of_vertices(), 0);
         assert_eq!(tds.number_of_cells(), 0);
@@ -1660,10 +1808,12 @@ mod tests {
             Point::new([7.0, 8.0, 9.0]),
             Point::new([10.0, 11.0, 12.0]),
         ];
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
 
         assert_eq!(tds.number_of_vertices(), 4);
-        assert_eq!(tds.cells.len(), 0);
+        // After refactoring, Tds::new automatically triangulates, so we expect 1 cell
+        assert_eq!(tds.cells.len(), 1);
         assert_eq!(tds.dim(), 3);
 
         let new_vertex1 = VertexBuilder::default()
@@ -1685,7 +1835,8 @@ mod tests {
             Point::new([7.0, 8.0, 9.0]),
             Point::new([10.0, 11.0, 12.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         let supercell = tds.supercell();
         let unwrapped_supercell =
             supercell.unwrap_or_else(|err| panic!("Error creating supercell: {err:?}!"));
@@ -1714,16 +1865,16 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         println!(
             "Initial TDS: {} vertices, {} cells",
             tds.number_of_vertices(),
             tds.number_of_cells()
         );
 
-        let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating triangulation: {err:?}");
-        });
+        // Triangulation is automatically done in Tds::new
+        let result = tds;
 
         println!(
             "Result TDS: {} vertices, {} cells",
@@ -1752,7 +1903,8 @@ mod tests {
             Point::new([1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
 
-        let tds: Tds<f64, usize, usize, 4> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 4> = Tds::new(&vertices).unwrap();
         println!("\n=== 4D BOWYER-WATSON TRIANGULATION TEST ===");
         println!(
             "Initial 4D TDS: {} vertices, {} cells",
@@ -1760,9 +1912,8 @@ mod tests {
             tds.number_of_cells()
         );
 
-        let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating 4D triangulation: {err:?}");
-        });
+        // Triangulation is automatically done in Tds::new
+        let result = tds;
 
         println!(
             "\nResult 4D TDS: {} vertices, {} cells",
@@ -1793,7 +1944,8 @@ mod tests {
             Point::new([1.0, 1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
 
-        let tds: Tds<f64, usize, usize, 5> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 5> = Tds::new(&vertices).unwrap();
         println!("\n=== 5D BOWYER-WATSON TRIANGULATION TEST ===");
         println!(
             "Initial 5D TDS: {} vertices, {} cells",
@@ -1801,9 +1953,8 @@ mod tests {
             tds.number_of_cells()
         );
 
-        let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating 5D triangulation: {err:?}");
-        });
+        // Triangulation is automatically done in Tds::new
+        let result = tds;
 
         println!(
             "\nResult 5D TDS: {} vertices, {} cells",
@@ -1824,7 +1975,7 @@ mod tests {
         use crate::delaunay_core::vertex::VertexBuilder;
 
         // Test validation with an invalid cell
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create a valid vertex
         let vertex1 = VertexBuilder::default()
@@ -1889,10 +2040,10 @@ mod tests {
             })
             .collect();
 
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let result = tds.bowyer_watson().unwrap_or_else(|err| {
-            panic!("Error creating large triangulation: {err:?}");
-        });
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let result = tds;
 
         println!(
             "Large TDS: {} vertices, {} cells",
@@ -1913,7 +2064,8 @@ mod tests {
     fn test_supercell_with_different_dimensions() {
         // Test 2D supercell creation
         let points_2d = vec![Point::new([0.0, 0.0]), Point::new([10.0, 10.0])];
-        let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(points_2d);
+        let vertices_2d = Vertex::from_points(points_2d);
+        let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(&vertices_2d).unwrap();
         let supercell_2d = tds_2d.supercell().unwrap();
         assert_eq!(supercell_2d.vertices().len(), 3); // Triangle for 2D
 
@@ -1922,7 +2074,8 @@ mod tests {
             Point::new([0.0, 0.0, 0.0, 0.0]),
             Point::new([5.0, 5.0, 5.0, 5.0]),
         ];
-        let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(points_4d);
+        let vertices_4d = Vertex::from_points(points_4d);
+        let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(&vertices_4d).unwrap();
         let supercell_4d = tds_4d.supercell().unwrap();
         assert_eq!(supercell_4d.vertices().len(), 5); // 4-simplex for 4D
     }
@@ -1936,11 +2089,13 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
             Point::new([1.0, 1.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let mut result = tds;
 
         // Manually assign neighbors to test the logic
-        result.assign_neighbors();
+        let _ = result.assign_neighbors();
 
         // Check that at least one cell has neighbors assigned
         let has_neighbors = result.cells.values().any(|cell| {
@@ -1965,8 +2120,10 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let mut result = tds;
 
         // Test incident cell assignment
         result.assign_incident_cells();
@@ -1994,8 +2151,10 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
             Point::new([1.0, 1.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let result = tds;
 
         if result.number_of_cells() >= 2 {
             let cell_vec: Vec<_> = result.cells.values().collect();
@@ -2059,7 +2218,7 @@ mod tests {
 
     #[test]
     fn test_validation_with_too_many_neighbors() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create a cell with too many neighbors (more than D+1=4)
         let vertices = vec![
@@ -2103,7 +2262,7 @@ mod tests {
 
     #[test]
     fn test_validation_with_wrong_vertex_count() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create a cell with wrong number of vertices (3 instead of 4 for 3D)
         let vertices = vec![
@@ -2134,7 +2293,7 @@ mod tests {
 
     #[test]
     fn test_validation_with_non_mutual_neighbors() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create two cells
         let vertices1 = vec![
@@ -2205,8 +2364,10 @@ mod tests {
             Point::new([1.0, 1.0, 1.0]), // center point
         ];
 
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let result = tds;
 
         assert_eq!(result.number_of_vertices(), 8);
         assert!(result.number_of_cells() >= 1);
@@ -2235,7 +2396,8 @@ mod tests {
             Point::new([1000.0, 1000.0, 1000.0]),
         ];
 
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         let supercell = tds.supercell().unwrap();
 
         // Verify supercell is even larger
@@ -2260,8 +2422,10 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
         ];
 
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let mut result = tds;
 
         if result.number_of_cells() > 0 {
             // Create a test vertex that might be inside/outside existing cells
@@ -2292,8 +2456,10 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
         ];
 
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // Triangulation is automatically done in Tds::new
+        let mut result = tds;
 
         let initial_cell_count = result.number_of_cells();
 
@@ -2324,7 +2490,8 @@ mod tests {
             Point::new([25.0, 30.0, 35.0]),
             Point::new([45.0, 50.0, 55.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         let supercell = tds.supercell().unwrap();
 
         // Verify that all supercell vertices are outside the input range
@@ -2352,7 +2519,8 @@ mod tests {
     fn test_create_supercell_simplex_non_3d() {
         // Test supercell creation for dimensions other than 3D
         let points_1d = vec![Point::new([5.0]), Point::new([15.0])];
-        let tds_1d: Tds<f64, usize, usize, 1> = Tds::new(points_1d);
+        let vertices_1d = Vertex::from_points(points_1d);
+        let tds_1d: Tds<f64, usize, usize, 1> = Tds::new(&vertices_1d).unwrap();
         let supercell_1d = tds_1d.supercell().unwrap();
         assert_eq!(supercell_1d.vertices().len(), 2); // 1D simplex has 2 vertices
 
@@ -2360,7 +2528,8 @@ mod tests {
             Point::new([0.0, 0.0, 0.0, 0.0, 0.0]),
             Point::new([10.0, 10.0, 10.0, 10.0, 10.0]),
         ];
-        let tds_5d: Tds<f64, usize, usize, 5> = Tds::new(points_5d);
+        let vertices_5d = Vertex::from_points(points_5d);
+        let tds_5d: Tds<f64, usize, usize, 5> = Tds::new(&vertices_5d).unwrap();
         let supercell_5d = tds_5d.supercell().unwrap();
         assert_eq!(supercell_5d.vertices().len(), 6); // 5D simplex has 6 vertices
     }
@@ -2376,8 +2545,9 @@ mod tests {
             Point::new([1.0, 1.0, 0.0]),
             Point::new([1.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // let result = tds.bowyer_watson().unwrap();
 
         assert_eq!(result.number_of_vertices(), 6);
         assert!(result.number_of_cells() >= 1);
@@ -2405,8 +2575,9 @@ mod tests {
             Point::new([1.0, 1.0, 1.0]),
             Point::new([3.0, 1.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // let result = tds.bowyer_watson().unwrap();
 
         assert_eq!(result.number_of_vertices(), 10);
         assert!(result.number_of_cells() >= 1);
@@ -2427,8 +2598,9 @@ mod tests {
             Point::new([0.0, 0.0, 1.0]),
             Point::new([1.0, 1.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // let mut result = tds.bowyer_watson().unwrap();
 
         // Clear existing neighbors to test assignment logic
         let cell_ids: Vec<Uuid> = result.cells.keys().copied().collect();
@@ -2439,7 +2611,7 @@ mod tests {
         }
 
         // Test neighbor assignment
-        result.assign_neighbors();
+        let _ = result.assign_neighbors();
 
         // Verify that neighbors were assigned
         let mut total_neighbor_links = 0;
@@ -2465,8 +2637,9 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // let mut result = tds.bowyer_watson().unwrap();
 
         // Clear existing incident cells to test assignment logic
         let vertex_ids: Vec<Uuid> = result.vertices.keys().copied().collect();
@@ -2502,8 +2675,9 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // let mut result = tds.bowyer_watson().unwrap();
 
         // Add multiple duplicate cells manually
         let original_cell_count = result.number_of_cells();
@@ -2519,11 +2693,22 @@ mod tests {
 
         assert_eq!(result.number_of_cells(), original_cell_count + 3);
 
-        // Remove duplicates
-        result.remove_duplicate_cells();
+        // Remove duplicates and capture the number removed
+        let duplicate_removal_result = result.remove_duplicate_cells();
+        assert!(duplicate_removal_result.is_ok());
+        let duplicates_removed = duplicate_removal_result.unwrap();
 
-        // Should be back to original count
+        println!(
+            "Successfully removed {} duplicate cells (original: {}, after adding: {}, final: {})",
+            duplicates_removed,
+            original_cell_count,
+            original_cell_count + 3,
+            result.number_of_cells()
+        );
+
+        // Should be back to original count and have removed exactly 3 duplicates
         assert_eq!(result.number_of_cells(), original_cell_count);
+        assert_eq!(duplicates_removed, 3);
     }
 
     #[test]
@@ -2534,8 +2719,9 @@ mod tests {
             Point::new([0.0, 2.0, 0.0]),
             Point::new([0.0, 0.0, 2.0]),
         ];
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(points);
-        let mut result = tds.bowyer_watson().unwrap();
+        let vertices = Vertex::from_points(points);
+        let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        // let mut result = tds.bowyer_watson().unwrap();
 
         if result.number_of_cells() > 0 {
             // Test with a vertex that should be inside the circumsphere
@@ -2575,7 +2761,7 @@ mod tests {
     #[test]
     fn test_validation_edge_cases() {
         // Test validation with cells that have exactly D neighbors
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let vertices = vec![
             VertexBuilder::default()
@@ -2614,7 +2800,7 @@ mod tests {
 
     #[test]
     fn test_validation_shared_facet_count() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(Vec::new());
+        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create two cells that share some but not enough vertices
         let shared_vertices = vec![
@@ -2665,7 +2851,7 @@ mod tests {
         let result = tds.is_valid();
         assert!(matches!(
             result,
-            Err(TriangulationValidationError::InvalidNeighbors { .. })
+            Err(TriangulationValidationError::NotNeighbors { .. })
         ));
     }
 
