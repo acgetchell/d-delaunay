@@ -1,14 +1,11 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
-use super::{
-    point::{OrderedEq, Point, PointValidationError},
-    utilities::make_uuid,
-};
+use super::point::{OrderedEq, Point, PointValidationError};
+use crate::delaunay_core::{CellKey, VertexKey};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use thiserror::Error;
-use uuid::Uuid;
 
 /// Errors that can occur during vertex validation.
 #[derive(Clone, Debug, Error, PartialEq)]
@@ -20,10 +17,12 @@ pub enum VertexValidationError {
         #[from]
         source: PointValidationError,
     },
-    /// The vertex has an invalid (nil) UUID.
-    #[error("Invalid UUID: vertex has nil UUID which is not allowed")]
-    InvalidUuid,
+    /// The vertex has an invalid (null) key.
+    #[error("Invalid key: vertex has null key which is not allowed")]
+    InvalidKey,
 }
+
+use slotmap::Key;
 
 #[derive(Builder, Clone, Copy, Debug, Default, Deserialize, Serialize)]
 /// The [Vertex] struct represents a vertex in a triangulation with a [Point],
@@ -34,12 +33,11 @@ pub enum VertexValidationError {
 ///
 /// - `point`: A generic [Point] representing the coordinates of
 ///   the vertex in a D-dimensional space.
-/// - `uuid`: A [Uuid] representing a universally unique identifier for the
-///   for the [Vertex]. This can be used to uniquely
-///   identify the vertex in a graph or any other data structure.
-/// - `incident_cell`: The `incident_cell` property is an optional [Uuid] that
-///   represents a `Cell` containing the [Vertex]. This is
-///   calculated by the `delaunay_core::triangulation_data_structure::Tds`.
+/// - `key`: The key into the vertex SlotMap. This uniquely identifies the vertex
+///   within its containing data structure.
+/// - `incident_cell`: The `incident_cell` property represents the key of a `Cell`
+///   containing the [Vertex]. This is calculated by the
+///   `delaunay_core::triangulation_data_structure::Tds`.
 /// - `data`: The `data` property is an optional field that can hold any
 ///   type `U`. It is used to store additional data associated with the vertex.
 ///
@@ -55,12 +53,12 @@ where
 {
     /// The coordinates of the vertex as a D-dimensional Point.
     point: Point<T, D>,
-    /// A universally unique identifier for the vertex.
-    #[builder(setter(skip), default = "make_uuid()")]
-    uuid: Uuid,
-    /// The [Uuid] of the `Cell` that the vertex is incident to.
+    /// The unique key identifying this vertex in the containing SlotMap.
+    #[builder(setter(skip), default = "VertexKey::null()")]
+    key: VertexKey,
+    /// The key of the `Cell` that the vertex is incident to.
     #[builder(setter(skip), default = "None")]
-    pub incident_cell: Option<Uuid>,
+    pub incident_cell: Option<CellKey>,
     /// Optional data associated with the vertex.
     #[builder(setter(into, strip_option), default)]
     pub data: Option<U>,
@@ -136,8 +134,8 @@ where
     /// ```
     #[inline]
     #[must_use]
-    pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<Uuid, Self> {
-        vertices.into_iter().map(|v| (v.uuid(), v)).collect()
+    pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<VertexKey, Self> {
+        vertices.into_iter().map(|v| (v.key(), v)).collect()
     }
 
     /// Returns the point coordinates of the vertex.
@@ -161,31 +159,30 @@ where
         &self.point
     }
 
-    /// Returns the UUID of the vertex.
+    /// Returns the key of the vertex.
     ///
     /// # Returns
     ///
-    /// The Uuid uniquely identifying this vertex.
+    /// The key uniquely identifying this vertex in its containing SlotMap.
     ///
     /// # Example
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// use uuid::Uuid;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
-    /// let vertex_uuid = vertex.uuid();
-    /// // UUID should be valid and unique
-    /// assert_ne!(vertex_uuid, Uuid::nil());
+    /// let vertex_key = vertex.key();
+    /// // Key should be valid and unique
+    /// assert!(!vertex_key.is_null());
     ///
-    /// // Creating another vertex should have a different UUID
+    /// // Creating another vertex should have a different key
     /// let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
-    /// assert_ne!(vertex.uuid(), another_vertex.uuid());
+    /// assert_ne!(vertex.key(), another_vertex.key());
     /// ```
     #[inline]
-    pub fn uuid(&self) -> Uuid {
-        self.uuid
+    pub fn key(&self) -> VertexKey {
+        self.key
     }
 
     /// The `dim` function returns the dimensionality of the [Vertex].
@@ -250,9 +247,9 @@ where
         // Check if the point is valid (all coordinates are finite)
         self.point.is_valid()?;
 
-        // Check if UUID is not nil
-        if self.uuid.is_nil() {
-            return Err(VertexValidationError::InvalidUuid);
+        // Check if key is not null
+        if self.key.is_null() {
+            return Err(VertexValidationError::InvalidKey);
         }
 
         Ok(())
@@ -342,7 +339,7 @@ where
     /// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.point.hash(state);
-        self.uuid.hash(state);
+        self.key.hash(state);
         self.incident_cell.hash(state);
         self.data.hash(state);
     }
@@ -392,7 +389,7 @@ mod tests {
     {
         assert_eq!(vertex.point().coordinates(), expected_coords);
         assert_eq!(vertex.dim(), expected_dim);
-        assert!(!vertex.uuid().is_nil());
+        assert!(!vertex.key().is_null());
         assert!(vertex.incident_cell.is_none());
     }
 
@@ -406,7 +403,7 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertex.dim(), 3);
-        assert!(vertex.uuid().is_nil());
+        assert!(vertex.key().is_null());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
 
@@ -427,7 +424,7 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid().is_nil());
+        assert!(!vertex.key().is_null());
         assert!(vertex.incident_cell.is_none());
         assert!(vertex.data.is_none());
 
@@ -453,7 +450,7 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid().is_nil());
+        assert!(!vertex.key().is_null());
         assert!(vertex.incident_cell.is_none());
         assert_eq!(vertex.data.unwrap(), 1);
 
@@ -523,8 +520,8 @@ mod tests {
 
         assert_eq!(values.len(), 3);
 
-        values.sort_by_key(super::Vertex::uuid);
-        vertices.sort_by_key(super::Vertex::uuid);
+        values.sort_by_key(super::Vertex::key);
+        vertices.sort_by_key(super::Vertex::key);
 
         assert_eq!(values, vertices);
 
@@ -632,7 +629,7 @@ mod tests {
         vertex2.hash(&mut hasher2);
         vertex3.hash(&mut hasher3);
 
-        // Different UUIDs mean different hashes even with same points
+        // Different keys mean different hashes even with same points
         assert_ne!(hasher1.finish(), hasher2.finish());
         assert_ne!(hasher1.finish(), hasher3.finish());
     }
@@ -669,9 +666,9 @@ mod tests {
             .unwrap();
         let cloned_vertex = vertex;
 
-        // Points should be equal but UUIDs should be the same (since we cloned)
+        // Points should be equal but keys should be the same (since we cloned)
         assert_eq!(vertex.point(), cloned_vertex.point());
-        assert_eq!(vertex.uuid(), cloned_vertex.uuid());
+        assert_eq!(vertex.key(), cloned_vertex.key());
         assert_eq!(vertex.incident_cell, cloned_vertex.incident_cell);
         assert_eq!(vertex.data, cloned_vertex.data);
         assert_eq!(vertex.dim(), cloned_vertex.dim());
@@ -718,7 +715,7 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid().is_nil());
+        assert!(!vertex.key().is_null());
     }
 
     #[test]
@@ -730,7 +727,7 @@ mod tests {
 
         assert_eq!(vertex.point().coordinates(), [1, 2, 3]);
         assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid().is_nil());
+        assert!(!vertex.key().is_null());
     }
 
     #[test]
@@ -937,7 +934,7 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertices[0].dim(), 3);
-        assert!(!vertices[0].uuid().is_nil());
+        assert!(!vertices[0].key().is_null());
     }
 
     #[test]
@@ -954,12 +951,12 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        let uuid = vertex.uuid();
+        let key = vertex.key();
         let vertices = vec![vertex];
         let hashmap = Vertex::into_hashmap(vertices);
 
         assert_eq!(hashmap.len(), 1);
-        assert!(hashmap.contains_key(&uuid));
+        assert!(hashmap.contains_key(&key));
         assert_relative_eq!(
             hashmap.get(&uuid).unwrap().point().coordinates().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
@@ -968,7 +965,7 @@ mod tests {
     }
 
     #[test]
-    fn vertex_uuid_uniqueness() {
+    fn vertex_key_uniqueness() {
         let vertex1: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
@@ -978,10 +975,10 @@ mod tests {
             .build()
             .unwrap();
 
-        // Same points but different UUIDs
-        assert_ne!(vertex1.uuid(), vertex2.uuid());
-        assert!(!vertex1.uuid().is_nil());
-        assert!(!vertex2.uuid().is_nil());
+        // Same points but different keys
+        assert_ne!(vertex1.key(), vertex2.key());
+        assert!(!vertex1.key().is_null());
+        assert!(!vertex2.key().is_null());
     }
 
     #[test]
@@ -1208,42 +1205,42 @@ mod tests {
     }
 
     #[test]
-    fn vertex_is_valid_uuid_check() {
-        // Test that vertex with valid point and UUID is valid
+    fn vertex_is_valid_key_check() {
+        // Test that vertex with valid point and key is valid
         let valid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
         assert!(valid_vertex.is_valid().is_ok());
-        assert!(!valid_vertex.uuid().is_nil());
+        assert!(!valid_vertex.key().is_null());
 
-        // Test that default vertex (which has nil UUID) is invalid
+        // Test that default vertex (which has null key) is invalid
         let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         match default_vertex.is_valid() {
-            Err(VertexValidationError::InvalidUuid) => (), // Expected
-            other => panic!("Expected InvalidUuid error, got: {other:?}"),
+            Err(VertexValidationError::InvalidKey) => (), // Expected
+            other => panic!("Expected InvalidKey error, got: {other:?}"),
         }
-        assert!(default_vertex.uuid().is_nil());
+        assert!(default_vertex.key().is_null());
         assert!(default_vertex.point().is_valid().is_ok()); // Point itself is valid (zeros)
 
-        // Create a vertex with valid point but manually set nil UUID to test UUID validation
-        let invalid_uuid_vertex: Vertex<f64, Option<()>, 3> = Vertex {
+        // Create a vertex with valid point but manually set null key to test key validation
+        let invalid_key_vertex: Vertex<f64, Option<()>, 3> = Vertex {
             point: Point::new([1.0, 2.0, 3.0]),
-            uuid: uuid::Uuid::nil(),
+            key: VertexKey::null(),
             incident_cell: None,
             data: None,
         };
-        match invalid_uuid_vertex.is_valid() {
-            Err(VertexValidationError::InvalidUuid) => (), // Expected
-            other => panic!("Expected InvalidUuid error, got: {other:?}"),
+        match invalid_key_vertex.is_valid() {
+            Err(VertexValidationError::InvalidKey) => (), // Expected
+            other => panic!("Expected InvalidKey error, got: {other:?}"),
         }
-        assert!(invalid_uuid_vertex.point().is_valid().is_ok()); // Point is valid
-        assert!(invalid_uuid_vertex.uuid().is_nil()); // UUID is nil
+        assert!(invalid_key_vertex.point().is_valid().is_ok()); // Point is valid
+        assert!(invalid_key_vertex.key().is_null()); // key is null
 
-        // Test vertex with both invalid point and nil UUID (should return point error first)
+        // Test vertex with both invalid point and null key (should return point error first)
         let invalid_both: Vertex<f64, Option<()>, 3> = Vertex {
             point: Point::new([f64::NAN, 2.0, 3.0]),
-            uuid: uuid::Uuid::nil(),
+            key: VertexKey::null(),
             incident_cell: None,
             data: None,
         };
@@ -1252,6 +1249,6 @@ mod tests {
             other => panic!("Expected InvalidPoint error, got: {other:?}"),
         }
         assert!(invalid_both.point().is_valid().is_err()); // Point is invalid
-        assert!(invalid_both.uuid().is_nil()); // UUID is nil
+        assert!(invalid_both.key().is_null()); // key is null
     }
 }

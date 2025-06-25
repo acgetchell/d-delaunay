@@ -6,16 +6,16 @@ use super::{
     facet::Facet,
     matrix::invert,
     point::{OrderedEq, Point},
-    utilities::{make_uuid, vec_to_array},
+    utilities::vec_to_array,
     vertex::{Vertex, VertexValidationError},
 };
+use crate::delaunay_core::CellKey;
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use thiserror::Error;
-use uuid::Uuid;
 
 /// Errors that can occur during cell validation.
 #[derive(Clone, Debug, Error, PartialEq)]
@@ -27,9 +27,9 @@ pub enum CellValidationError {
         #[from]
         source: VertexValidationError,
     },
-    /// The cell has an invalid (nil) UUID.
-    #[error("Invalid UUID: cell has nil UUID which is not allowed")]
-    InvalidUuid,
+    /// The cell has an invalid (null) key.
+    #[error("Invalid key: cell has null key which is not allowed")]
+    InvalidKey,
     /// The cell contains duplicate vertices.
     #[error("Duplicate vertices: cell contains non-unique vertices which is not allowed")]
     DuplicateVertices,
@@ -45,26 +45,27 @@ pub enum CellValidationError {
     },
 }
 
+use slotmap::Key;
+
 #[derive(Builder, Clone, Debug, Default, Deserialize, Serialize)]
 #[builder(build_fn(validate = "Self::validate"))]
 /// The [Cell] struct represents a d-dimensional
 /// [simplex](https://en.wikipedia.org/wiki/Simplex) with vertices, a unique
-/// identifier, optional neighbors, and optional data.
+/// key, optional neighbors, and optional data.
 ///
 /// # Properties
 ///
 /// - `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 ///   data U, and a constant D representing the number of dimensions.
-/// - `uuid`: The `uuid` property is of type [Uuid] and represents a
-///   universally unique identifier for a [Cell] in order to identify
-///   each instance.
-/// - `neighbors`: The `neighbors` property is an optional container of [Uuid]
-///   values. It represents the [Uuid]s of the neighboring cells that are connected
-///   to the current [Cell], indexed such that the `i-th` neighbor is opposite the
-///   `i-th` [Vertex].
+/// - `key`: The key into the cell SlotMap. This uniquely identifies the cell
+///   within its containing data structure.
+/// The `neighbors` property is an optional container of neighbor keys
+/// values. It represents the neighboring cells that are connected
+/// to the current [Cell], indexed such that the `i-th` neighbor is opposite the
+/// `i-th` [Vertex].
 /// - `data`: The `data` property is an optional field that can hold a value of
-///   type `V`. It allows storage of additional data associated with the [Cell];
-///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
+/// type `V`. It allows storage of additional data associated with the [Cell];
+/// the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -74,12 +75,12 @@ where
 {
     /// The vertices of the cell.
     vertices: Vec<Vertex<T, U, D>>,
-    /// The unique identifier of the cell.
-    #[builder(setter(skip), default = "make_uuid()")]
-    uuid: Uuid,
+    /// The unique key identifying this cell in the containing SlotMap.
+    #[builder(setter(skip), default = "CellKey::null()")]
+    key: CellKey,
     /// The neighboring cells connected to the current cell.
     #[builder(setter(skip), default = "None")]
-    pub neighbors: Option<Vec<Uuid>>,
+    pub neighbors: Option<Vec<CellKey>>,
     /// The optional data associated with the cell.
     #[builder(setter(into, strip_option), default)]
     pub data: Option<V>,
@@ -164,11 +165,11 @@ where
         &self.vertices
     }
 
-    /// Returns the UUID of the [Cell].
+    /// Returns the key of the Cell.
     ///
     /// # Returns
     ///
-    /// The Uuid uniquely identifying this cell.
+    /// The key uniquely identifying this cell in the SlotMap.
     ///
     /// # Example
     ///
@@ -176,14 +177,13 @@ where
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::delaunay_core::point::Point;
-    /// use uuid::Uuid;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1]).build().unwrap();
-    /// assert_ne!(cell.uuid(), Uuid::nil());
+    /// assert!(!cell.key().is_null());
     /// ```
     #[inline]
-    pub fn uuid(&self) -> Uuid {
-        self.uuid
+    pub fn key(&self) -> CellKey {
+        self.key
     }
 
     /// The `dim` function returns the dimensionality of the [Cell].
@@ -326,22 +326,22 @@ where
     ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
         vertices.push(vertex);
-        let uuid = make_uuid();
+        let key = CellKey::null();
         let neighbors = None;
         let data = None;
         Ok(Cell {
             vertices,
-            uuid,
+            key,
             neighbors,
             data,
         })
     }
 
     /// The function `into_hashmap` converts a [Vec] of cells into a [`HashMap`],
-    /// using the [Cell] [Uuid]s as keys.
+    /// using the [Cell] [key]s as keys.
     #[must_use]
-    pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
-        cells.into_iter().map(|c| (c.uuid, c)).collect()
+    pub fn into_hashmap(cells: Vec<Self>) -> HashMap<CellKey, Self> {
+        cells.into_iter().map(|c| (c.key, c)).collect()
     }
 
     /// The function `is_valid` checks if a [Cell] is valid.
@@ -395,9 +395,9 @@ where
             vertex.is_valid()?;
         }
 
-        // Check if UUID is not nil
-        if self.uuid.is_nil() {
-            return Err(CellValidationError::InvalidUuid);
+        // Check if key is not null
+        if self.key.is_null() {
+            return Err(CellValidationError::InvalidKey);
         }
 
         // Check if all vertices are distinct from one another
@@ -779,8 +779,8 @@ where
     Point<T, D>: Hash, // Add this bound to ensure Point implements Hash
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Hash the UUID first
-        self.uuid.hash(state);
+        // Hash the key first
+        self.key.hash(state);
 
         // Hash sorted vertices for consistent ordering
         for vertex in &sorted_vertices::<T, U, D>(&self.vertices) {
@@ -1438,8 +1438,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(cell1, cell2);
-        // Two cells with the same vertices but different uuids are equal
-        assert_ne!(cell1.uuid(), cell2.uuid());
+        // Two cells with the same vertices but different keys are equal
+        assert_ne!(cell1.key(), cell2.key());
         assert_eq!(cell1.vertices(), cell2.vertices());
         assert_eq!(cell2, cell3);
         assert_ne!(cell3, cell4);
@@ -1519,7 +1519,7 @@ mod tests {
         cell1.hash(&mut hasher1);
         cell2.hash(&mut hasher2);
 
-        // Different UUIDs mean different hashes even with same vertices
+        // Different keys mean different hashes even with same vertices
         assert_ne!(hasher1.finish(), hasher2.finish());
     }
 
@@ -1564,7 +1564,7 @@ mod tests {
         let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::default();
 
         assert!(cell.vertices().is_empty());
-        assert!(cell.uuid().is_nil());
+        assert!(cell.key().is_null());
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
     }
@@ -1587,7 +1587,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
-        assert!(!cell.uuid().is_nil());
+        assert!(!cell.key().is_null());
     }
 
     #[test]
@@ -1612,7 +1612,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 3);
         assert_eq!(cell.dim(), 2);
-        assert!(!cell.uuid().is_nil());
+        assert!(!cell.key().is_null());
     }
 
     #[test]
@@ -1645,7 +1645,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 5);
         assert_eq!(cell.dim(), 4);
-        assert!(!cell.uuid().is_nil());
+        assert!(!cell.key().is_null());
     }
 
     #[test]
@@ -1717,7 +1717,7 @@ mod tests {
     }
 
     #[test]
-    fn cell_uuid_uniqueness() {
+    fn cell_key_uniqueness() {
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
@@ -1740,10 +1740,10 @@ mod tests {
             .build()
             .unwrap();
 
-        // Same vertices but different UUIDs
-        assert_ne!(cell1.uuid(), cell2.uuid());
-        assert!(!cell1.uuid().is_nil());
-        assert!(!cell2.uuid().is_nil());
+        // Same vertices but different keys
+        assert_ne!(cell1.key(), cell2.key());
+        assert!(!cell1.key().is_null());
+        assert!(!cell2.key().is_null());
     }
 
     #[test]
@@ -1834,12 +1834,13 @@ mod tests {
         let hashmap = Cell::into_hashmap(cells);
 
         assert_eq!(hashmap.len(), 2);
-        assert!(hashmap.contains_key(&uuid1));
-        assert!(hashmap.contains_key(&uuid2));
+        assert!(hashmap.contains_key(&cell1.key()));
+        assert!(hashmap.contains_key(&cell2.key()));
     }
 
     #[test]
     fn cell_debug_format() {
+        // Test that debug format shows cell info
         let vertex1 = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
@@ -1858,7 +1859,7 @@ mod tests {
 
         assert!(debug_str.contains("Cell"));
         assert!(debug_str.contains("vertices"));
-        assert!(debug_str.contains("uuid"));
+        assert!(debug_str.contains("key"));
         assert!(debug_str.contains("1.0"));
         assert!(debug_str.contains("2.0"));
         assert!(debug_str.contains("3.0"));
@@ -2512,6 +2513,7 @@ mod tests {
             .unwrap();
         assert_eq!(cell_i64.number_of_vertices(), 2);
         assert_eq!(cell_i64.dim(), 1);
+        assert!(!cell_i64.key().is_null());
 
         // Test with f32
         let vertex1_f32 = VertexBuilder::default()
@@ -2533,6 +2535,7 @@ mod tests {
             .unwrap();
         assert_eq!(cell_f32.number_of_vertices(), 3);
         assert_eq!(cell_f32.dim(), 2);
+        assert!(!cell_f32.key().is_null());
     }
 
     #[test]
@@ -2728,8 +2731,8 @@ mod tests {
     }
 
     #[test]
-    fn cell_is_valid_invalid_uuid_error() {
-        // Test cell is_valid with nil UUID
+    fn cell_is_valid_invalid_key_error() {
+        // Test cell is_valid with null key
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
@@ -2746,27 +2749,27 @@ mod tests {
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let mut invalid_uuid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+        let mut invalid_key_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
 
-        // Manually set the UUID to nil to trigger the InvalidUuid error
-        invalid_uuid_cell.uuid = uuid::Uuid::nil();
+        // Manually set the key to null to trigger the InvalidKey error
+        invalid_key_cell.key = CellKey::null();
 
-        let invalid_uuid_result = invalid_uuid_cell.is_valid();
-        assert!(invalid_uuid_result.is_err());
+        let invalid_key_result = invalid_key_cell.is_valid();
+        assert!(invalid_key_result.is_err());
 
-        // Verify that we get the correct error type for invalid UUID
-        match invalid_uuid_result {
-            Err(CellValidationError::InvalidUuid) => {
-                println!("✓ Correctly detected invalid UUID");
+        // Verify that we get the correct error type for invalid key
+        match invalid_key_result {
+            Err(CellValidationError::InvalidKey) => {
+                println!("✓ Correctly detected invalid key");
             }
             Err(other_error) => {
-                panic!("Expected InvalidUuid error, but got: {other_error:?}");
+                panic!("Expected InvalidKey error, but got: {other_error:?}");
             }
             Ok(()) => {
-                panic!("Expected error for invalid UUID, but validation passed");
+                panic!("Expected error for invalid key, but validation passed");
             }
         }
     }
