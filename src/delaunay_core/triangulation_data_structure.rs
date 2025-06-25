@@ -245,9 +245,27 @@ where
     /// ];
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Check basic structure
     /// assert_eq!(tds.number_of_vertices(), 4);
     /// assert_eq!(tds.number_of_cells(), 1); // Cells are automatically created via triangulation
     /// assert_eq!(tds.dim(), 3);
+    ///
+    /// // Verify cell creation and structure
+    /// let cells: Vec<_> = tds.cells.values().collect();
+    /// assert!(!cells.is_empty(), "Should have created at least one cell");
+    ///
+    /// // Check that the cell has the correct number of vertices (D+1 for a simplex)
+    /// let cell = &cells[0];
+    /// assert_eq!(cell.vertices().len(), 4, "3D cell should have 4 vertices");
+    ///
+    /// // Verify triangulation validity
+    /// assert!(tds.is_valid().is_ok(), "Triangulation should be valid after creation");
+    ///
+    /// // Check that all vertices are associated with the cell
+    /// for vertex in cell.vertices() {
+    ///     assert!(tds.vertices.contains_key(&vertex.uuid()), "Cell vertex should exist in triangulation");
+    /// }
     /// ```
     ///
     /// Create an empty triangulation:
@@ -290,12 +308,11 @@ where
         };
 
         // Initialize cells using Bowyer-Watson triangulation
-        if let Ok(cells_vector) = tds.bowyer_watson_logic(vertices) {
-            tds.cells = cells_vector
-                .into_iter()
-                .map(|cell| (cell.uuid(), cell))
-                .collect();
-        }
+        let cells_vector = tds.bowyer_watson_logic(vertices)?;
+        tds.cells = cells_vector
+            .into_iter()
+            .map(|cell| (cell.uuid(), cell))
+            .collect();
 
         Ok(tds)
     }
