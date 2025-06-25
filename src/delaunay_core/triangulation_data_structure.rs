@@ -1,7 +1,33 @@
-//! Data and operations on d-dimensional triangulation data structures.
+//! A d-dimensional triangulation data structure for Delaunay triangulations.
 //!
-//! Intended to match functionality of the
-//! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
+//! This module provides a triangulation data structure that automatically
+//! constructs Delaunay triangulations using the Bowyer-Watson algorithm.
+//! The implementation is generic over dimension D and supports arbitrary
+//! numeric types and vertex/cell data.
+//!
+//! # Quick Start
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::delaunay_core::vertex::Vertex;
+//! use d_delaunay::delaunay_core::point::Point;
+//!
+//! // Create vertices from points
+//! let points = vec![
+//!     Point::new([0.0, 0.0, 0.0]),
+//!     Point::new([1.0, 0.0, 0.0]),
+//!     Point::new([0.0, 1.0, 0.0]),
+//!     Point::new([0.0, 0.0, 1.0]),
+//! ];
+//! let vertices = Vertex::from_points(points);
+//!
+//! // Create triangulation (automatically triangulated)
+//! let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+//!
+//! assert_eq!(tds.number_of_vertices(), 4);
+//! assert_eq!(tds.number_of_cells(), 1); // One tetrahedron
+//! assert!(tds.is_valid().is_ok());
+//! ```
 
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
@@ -61,7 +87,7 @@ pub enum TriangulationValidationError {
     },
 }
 
-/// Helper function to check if two facets are adjacent (share the same vertices)
+/// Checks if two facets share the same vertices (are adjacent).
 fn facets_are_adjacent<T, U, V, const D: usize>(
     facet1: &Facet<T, U, V, D>,
     facet2: &Facet<T, U, V, D>,
@@ -72,17 +98,10 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    // Two facets are adjacent if they have the same vertices
-    // (though they may have different orientations)
     let vertices1 = facet1.vertices();
     let vertices2 = facet2.vertices();
 
-    if vertices1.len() != vertices2.len() {
-        return false;
-    }
-
-    // Check if all vertices in facet1 are present in facet2
-    vertices1.iter().all(|v1| vertices2.contains(v1))
+    vertices1.len() == vertices2.len() && vertices1.iter().all(|v1| vertices2.contains(v1))
 }
 
 /// Generate all combinations of `k` vertices from the given vertex list
@@ -140,33 +159,41 @@ where
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-/// The `Tds` struct represents a triangulation data structure with vertices
-/// and cells, where the vertices and cells are identified by UUIDs.
+/// A d-dimensional triangulation data structure.
 ///
-/// # Properties
+/// The `Tds` represents a collection of vertices and maximal-dimensional cells
+/// that form a valid Delaunay triangulation. All vertices and cells are
+/// identified by unique UUIDs.
 ///
-/// - `vertices`: A [`HashMap`] that stores vertices with their corresponding
-///   [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
-///   U, and a constant D representing the dimension.
-/// - `cells`: The `cells` property is a [`HashMap`] that stores [Cell] objects.
-///   Each [Cell] has one or more [Vertex] objects with cell data of type V.
-///   Note the dimensionality of the cell may differ from D, though the [Tds]
-///   only stores cells of maximal dimensionality D and infers other lower
-///   dimensional cells (cf. [Facet]) from the maximal cells and their vertices.
+/// # Type Parameters
 ///
-/// For example, in 3 dimensions:
+/// - `T`: Numeric type for coordinates (e.g., `f64`)
+/// - `U`: Type for vertex data (e.g., `usize` for vertex IDs)
+/// - `V`: Type for cell data (e.g., `usize` for cell IDs)
+/// - `D`: Dimension constant (e.g., `3` for 3D triangulations)
 ///
-/// - A 0-dimensional cell is a [Vertex].
-/// - A 1-dimensional cell is an `Edge` given by the `Tetrahedron` and two
-///   [Vertex] endpoints.
-/// - A 2-dimensional cell is a [Facet] given by the `Tetrahedron` and the
-///   opposite [Vertex].
-/// - A 3-dimensional cell is a `Tetrahedron`, the maximal cell.
+/// # Structure
 ///
-/// A similar pattern holds for higher dimensions.
+/// - **Vertices**: Points in D-dimensional space with associated data
+/// - **Cells**: D-dimensional simplices (e.g., tetrahedra in 3D) with neighbor relationships
+/// - **Validation**: Automatic validation ensures neighbor consistency and cell validity
 ///
-/// In general, vertices are embedded into D-dimensional Euclidean space,
-/// and so the [Tds] is a finite simplicial complex.
+/// # Examples
+///
+/// Creating a 2D triangulation:
+/// ```rust
+/// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::delaunay_core::point::Point;
+///
+/// let points = vec![
+///     Point::new([0.0, 0.0]),
+///     Point::new([1.0, 0.0]),
+///     Point::new([0.5, 1.0]),
+/// ];
+/// let vertices = Vertex::from_points(points);
+/// let tds: Tds<f64, usize, usize, 2> = Tds::new(&vertices).unwrap();
+/// ```
 pub struct Tds<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -208,25 +235,23 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
-    /// The function creates a new instance of a triangulation data structure
-    /// with given vertices, initializing the vertices and cells.
+    /// Creates a new triangulation from the given vertices.
+    ///
+    /// This method automatically constructs a Delaunay triangulation using
+    /// the Bowyer-Watson algorithm, assigns neighbor relationships, and
+    /// validates the result.
     ///
     /// # Arguments
     ///
-    /// * `vertices`: A container of [Vertex]s with which to initialize the
-    ///   triangulation.
+    /// * `vertices` - Slice of vertices to triangulate
     ///
     /// # Returns
     ///
-    /// A Delaunay triangulation with cells and neighbors aligned, and vertices
-    /// associated with cells.
+    /// A complete triangulation with all cells, neighbors, and validations.
     ///
     /// # Errors
     ///
-    /// Returns a `TriangulationValidationError` if:
-    /// - Triangulation computation fails during the Bowyer-Watson algorithm
-    /// - Cell creation or validation fails
-    /// - Neighbor assignment or duplicate cell removal fails
+    /// Returns `TriangulationValidationError` if triangulation fails.
     ///
     /// # Examples
     ///
@@ -626,57 +651,46 @@ where
         self.cells.len()
     }
 
-    /// The `supercell` function creates a larger cell that contains all the
-    /// input vertices, with some padding added.
+    /// Creates a supercell that encompasses all vertices in the triangulation.
     ///
-    /// # Returns
-    ///
-    /// A [Cell] that encompasses all [Vertex] objects in the triangulation.
-    #[allow(clippy::unnecessary_wraps)]
-    fn supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
+    /// The supercell is a large simplex used in the Bowyer-Watson algorithm
+    /// to initialize the triangulation process.
+    fn supercell(&self) -> Cell<T, U, V, D> {
         if self.vertices.is_empty() {
-            // For empty input, create a default supercell
-            return Ok(Self::create_default_supercell());
+            return Self::create_default_supercell();
         }
 
-        // Find the bounding box of all input vertices
         let min_coords = find_extreme_coordinates(&self.vertices, Ordering::Less);
         let max_coords = find_extreme_coordinates(&self.vertices, Ordering::Greater);
 
-        // Convert coordinates to f64 for calculations
-        let mut center_f64 = [0.0f64; D];
-        let mut size_f64 = 0.0f64;
+        let (center, radius) = Self::calculate_bounding_sphere(&min_coords, &max_coords);
+        let points = Self::create_supercell_simplex(&center, radius);
+
+        CellBuilder::default()
+            .vertices(Vertex::from_points(points))
+            .build()
+            .unwrap()
+    }
+
+    /// Calculates the center and radius of a bounding sphere for the given coordinates.
+    fn calculate_bounding_sphere(min_coords: &[T; D], max_coords: &[T; D]) -> ([T; D], T) {
+        let mut center = [T::default(); D];
+        let mut max_size = 0.0f64;
 
         for i in 0..D {
             let min_f64: f64 = min_coords[i].into();
             let max_f64: f64 = max_coords[i].into();
-            center_f64[i] = f64::midpoint(min_f64, max_f64);
-            let dim_size = max_f64 - min_f64;
-            if dim_size > size_f64 {
-                size_f64 = dim_size;
+            let center_f64 = f64::midpoint(min_f64, max_f64);
+            center[i] = T::from(center_f64);
+
+            let size = max_f64 - min_f64;
+            if size > max_size {
+                max_size = size;
             }
         }
 
-        // Add significant padding to ensure all vertices are well inside
-        size_f64 += 20.0; // Add 20 units of padding
-        let radius_f64 = size_f64 / 2.0;
-
-        // Convert back to T
-        let mut center = [T::default(); D];
-        for i in 0..D {
-            center[i] = T::from(center_f64[i]);
-        }
-        let radius = T::from(radius_f64);
-
-        // Create a proper non-degenerate simplex (tetrahedron for 3D)
-        let points = Self::create_supercell_simplex(&center, radius);
-
-        let supercell = CellBuilder::default()
-            .vertices(Vertex::from_points(points))
-            .build()
-            .unwrap();
-
-        Ok(supercell)
+        let radius = T::from(f64::midpoint(max_size, 20.0)); // Add padding using midpoint
+        (center, radius)
     }
 
     /// Creates a default supercell for empty input
@@ -685,179 +699,57 @@ where
         let radius = T::from(20.0f64);
         let points = Self::create_supercell_simplex(&center, radius);
 
-        let supercell = CellBuilder::default()
+        CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap();
-
-        supercell
+            .unwrap()
     }
 
     /// Creates a well-formed simplex centered at the given point with the given radius
     fn create_supercell_simplex(center: &[T; D], radius: T) -> Vec<Point<T, D>> {
-        let mut points = Vec::new();
+        let radius_f64: f64 = radius.into();
+        let mut points = Vec::with_capacity(D + 1);
 
-        // For 3D, create a regular tetrahedron
-        if D == 3 {
-            // Create a regular tetrahedron with vertices at:
-            // (1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1)
-            // scaled by radius and translated by center
-            let tetrahedron_vertices = [
-                [1.0, 1.0, 1.0],
-                [1.0, -1.0, -1.0],
-                [-1.0, 1.0, -1.0],
-                [-1.0, -1.0, 1.0],
-            ];
+        // Create D+1 vertices for a D-dimensional simplex
+        // First vertex: all coordinates positive
+        let mut coords = [T::default(); D];
+        for i in 0..D {
+            let center_f64: f64 = center[i].into();
+            coords[i] = T::from(center_f64 + radius_f64);
+        }
+        points.push(Point::new(coords));
 
-            for vertex_coords in &tetrahedron_vertices {
-                let mut coords = [T::default(); D];
-                for i in 0..D {
-                    let center_f64: f64 = center[i].into();
-                    let radius_f64: f64 = radius.into();
-                    let coord_f64 = center_f64 + radius_f64 * vertex_coords[i];
-                    coords[i] = T::from(coord_f64);
-                }
-                points.push(Point::new(coords));
-            }
-        } else {
-            // For other dimensions, create a simplex using a generalized approach
-            // Create D+1 vertices for a D-dimensional simplex
-
-            // Create a regular simplex by placing vertices at the corners of a hypercube
-            // scaled and offset appropriately
-            let radius_f64: f64 = radius.into();
-
-            // First vertex: all coordinates positive
+        // Remaining D vertices: flip one coordinate at a time to negative
+        for dim in 0..D {
             let mut coords = [T::default(); D];
             for i in 0..D {
                 let center_f64: f64 = center[i].into();
-                coords[i] = T::from(center_f64 + radius_f64);
+                let offset = if i == dim { -radius_f64 } else { radius_f64 };
+                coords[i] = T::from(center_f64 + offset);
             }
             points.push(Point::new(coords));
-
-            // Remaining D vertices: flip one coordinate at a time to negative
-            for dim in 0..D {
-                let mut coords = [T::default(); D];
-                for i in 0..D {
-                    let center_f64: f64 = center[i].into();
-                    if i == dim {
-                        // This dimension gets negative offset
-                        coords[i] = T::from(center_f64 - radius_f64);
-                    } else {
-                        // Other dimensions get positive offset
-                        coords[i] = T::from(center_f64 + radius_f64);
-                    }
-                }
-                points.push(Point::new(coords));
-            }
         }
 
         points
     }
 
-    /// Performs the Bowyer-Watson algorithm to triangulate a set of vertices.
+    /// Performs the Bowyer-Watson algorithm to triangulate vertices.
     ///
-    /// # Returns
-    ///
-    /// A [Result] containing the updated [Tds] with the Delaunay triangulation, or an error message.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - Supercell creation fails
-    /// - Circumsphere calculations fail during the algorithm
-    /// - Cell creation from facets and vertices fails
+    /// This is the core triangulation algorithm that creates Delaunay cells
+    /// from the input vertices using incremental insertion.
     ///
     /// # Algorithm
     ///
-    /// The Bowyer-Watson algorithm works by:
-    /// 1. Creating a supercell that contains all input vertices
-    /// 2. For each input vertex, finding all cells whose circumsphere contains the vertex
-    /// 3. Removing these "bad" cells and creating new cells using the boundary facets
-    /// 4. Cleaning up supercell artifacts and assigning neighbor relationships
+    /// 1. For small vertex sets (≤ D+5), use direct combinatorial approach
+    /// 2. For larger sets, use full Bowyer-Watson:
+    ///    - Create a supercell containing all vertices
+    ///    - For each vertex, find "bad" cells (circumsphere contains vertex)
+    ///    - Remove bad cells and create new cells from boundary facets
+    ///    - Clean up and validate the result
     ///
-    /// # Examples
+    /// # Returns
     ///
-    /// Create a simple 3D triangulation:
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    ///
-    /// let points = vec![
-    ///     Point::new([0.0, 0.0, 0.0]),
-    ///     Point::new([1.0, 0.0, 0.0]),
-    ///     Point::new([0.0, 1.0, 0.0]),
-    ///     Point::new([0.0, 0.0, 1.0]),
-    /// ];
-    ///
-    /// let vertices = Vertex::from_points(points);
-    /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// assert_eq!(result.number_of_vertices(), 4);
-    /// assert_eq!(result.number_of_cells(), 1); // One tetrahedron
-    /// assert!(result.is_valid().is_ok());
-    /// ```
-    ///
-    /// Handle empty input:
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    ///
-    /// let points: Vec<Point<f64, 3>> = Vec::new();
-    /// let vertices = Vertex::from_points(points);
-    /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// assert_eq!(result.number_of_vertices(), 0);
-    /// assert_eq!(result.number_of_cells(), 0);
-    /// ```
-    ///
-    /// Create a 2D triangulation:
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    ///
-    /// let points = vec![
-    ///     Point::new([0.0, 0.0]),
-    ///     Point::new([1.0, 0.0]),
-    ///     Point::new([0.5, 1.0]),
-    /// ];
-    ///
-    /// let vertices = Vertex::from_points(points);
-    /// let result: Tds<f64, usize, usize, 2> = Tds::new(&vertices).unwrap();
-    ///
-    /// assert_eq!(result.number_of_vertices(), 3);
-    /// assert_eq!(result.number_of_cells(), 1); // One triangle
-    /// ```
-    ///
-    /// Complex 3D triangulation with multiple cells:
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    ///
-    /// let points = vec![
-    ///     Point::new([0.0, 0.0, 0.0]),
-    ///     Point::new([1.0, 0.0, 0.0]),
-    ///     Point::new([0.0, 1.0, 0.0]),
-    ///     Point::new([0.0, 0.0, 1.0]),
-    ///     Point::new([1.0, 1.0, 1.0]),
-    /// ];
-    ///
-    /// let vertices = Vertex::from_points(points);
-    /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// assert_eq!(result.number_of_vertices(), 5);
-    /// assert!(result.number_of_cells() >= 1);
-    /// ```
-    /// Private method that performs Bowyer-Watson triangulation on a set of vertices
-    /// and returns a vector of cells
+    /// Vector of valid Delaunay cells or an error.
     fn bowyer_watson_logic(
         &mut self,
         vertices: &[Vertex<T, U, D>],
@@ -873,32 +765,50 @@ where
         // Store original vertices in self for use by helper methods
         self.vertices = Vertex::into_hashmap(vertices.to_owned());
 
-        // For cases with a small number of vertices, use direct combinatorial approach
+        // For small vertex sets, use direct combinatorial approach
         if vertices.len() > D && vertices.len() <= D + 5 {
-            let mut created_cells = 0;
-            let combinations = generate_combinations(vertices, D + 1);
+            return self.triangulate_small_set(vertices);
+        }
 
-            for combination in combinations {
-                if let Ok(cell) = CellBuilder::default().vertices(combination).build() {
-                    self.cells.insert(cell.uuid(), cell);
-                    created_cells += 1;
-                }
-            }
+        // Use full Bowyer-Watson algorithm for larger sets
+        self.triangulate_large_set(vertices)
+    }
 
-            if created_cells > 0 {
-                self.remove_duplicate_cells()?;
-                self.assign_neighbors()?;
-                self.assign_incident_cells();
-                return Ok(self.cells.values().cloned().collect());
+    /// Triangulates a small set of vertices using direct combinatorial approach.
+    fn triangulate_small_set(
+        &mut self,
+        vertices: &[Vertex<T, U, D>],
+    ) -> Result<Vec<Cell<T, U, V, D>>, TriangulationValidationError> {
+        let mut created_cells = 0;
+        let combinations = generate_combinations(vertices, D + 1);
+
+        for combination in combinations {
+            if let Ok(cell) = CellBuilder::default().vertices(combination).build() {
+                self.cells.insert(cell.uuid(), cell);
+                created_cells += 1;
             }
         }
 
-        // For more complex cases, use the full Bowyer-Watson algorithm
-        let supercell =
-            self.supercell()
-                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
-                    message: format!("Failed to create supercell: {e}"),
-                })?;
+        if created_cells > 0 {
+            self.remove_duplicate_cells()?;
+            self.assign_neighbors()?;
+            self.assign_incident_cells();
+            return Ok(self.cells.values().cloned().collect());
+        }
+
+        Ok(vec![])
+    }
+
+    /// Triangulates a large set of vertices using the full Bowyer-Watson algorithm.
+    fn triangulate_large_set(
+        &mut self,
+        vertices: &[Vertex<T, U, D>],
+    ) -> Result<Vec<Cell<T, U, V, D>>, TriangulationValidationError>
+    where
+        OPoint<T, Const<D>>: From<[f64; D]>,
+        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    {
+        let supercell = self.supercell();
 
         let supercell_vertices: HashSet<Uuid> = supercell
             .vertices()
@@ -1585,7 +1495,7 @@ mod tests {
     fn test_supercell_empty_vertices() {
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
-        let supercell = tds.supercell().unwrap();
+        let supercell = tds.supercell();
         assert_eq!(supercell.vertices().len(), 4); // Should create a 3D simplex with 4 vertices
         assert!(supercell.uuid() != uuid::Uuid::nil());
     }
@@ -1604,7 +1514,7 @@ mod tests {
         ];
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-        let supercell = tds.supercell().unwrap();
+        let supercell = tds.supercell();
 
         // Assert that supercell has proper dimensions
         assert_eq!(supercell.vertices().len(), 4);
@@ -1837,9 +1747,7 @@ mod tests {
         ];
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-        let supercell = tds.supercell();
-        let unwrapped_supercell =
-            supercell.unwrap_or_else(|err| panic!("Error creating supercell: {err:?}!"));
+        let unwrapped_supercell = tds.supercell();
 
         assert_eq!(unwrapped_supercell.vertices().len(), 4);
 
@@ -2066,7 +1974,7 @@ mod tests {
         let points_2d = vec![Point::new([0.0, 0.0]), Point::new([10.0, 10.0])];
         let vertices_2d = Vertex::from_points(points_2d);
         let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(&vertices_2d).unwrap();
-        let supercell_2d = tds_2d.supercell().unwrap();
+        let supercell_2d = tds_2d.supercell();
         assert_eq!(supercell_2d.vertices().len(), 3); // Triangle for 2D
 
         // Test 4D supercell creation
@@ -2076,7 +1984,7 @@ mod tests {
         ];
         let vertices_4d = Vertex::from_points(points_4d);
         let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(&vertices_4d).unwrap();
-        let supercell_4d = tds_4d.supercell().unwrap();
+        let supercell_4d = tds_4d.supercell();
         assert_eq!(supercell_4d.vertices().len(), 5); // 4-simplex for 4D
     }
 
@@ -2398,7 +2306,7 @@ mod tests {
 
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-        let supercell = tds.supercell().unwrap();
+        let supercell = tds.supercell();
 
         // Verify supercell is even larger
         for vertex in supercell.vertices() {
@@ -2492,7 +2400,7 @@ mod tests {
         ];
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-        let supercell = tds.supercell().unwrap();
+        let supercell = tds.supercell();
 
         // Verify that all supercell vertices are outside the input range
         for vertex in supercell.vertices() {
@@ -2521,7 +2429,7 @@ mod tests {
         let points_1d = vec![Point::new([5.0]), Point::new([15.0])];
         let vertices_1d = Vertex::from_points(points_1d);
         let tds_1d: Tds<f64, usize, usize, 1> = Tds::new(&vertices_1d).unwrap();
-        let supercell_1d = tds_1d.supercell().unwrap();
+        let supercell_1d = tds_1d.supercell();
         assert_eq!(supercell_1d.vertices().len(), 2); // 1D simplex has 2 vertices
 
         let points_5d = vec![
@@ -2530,7 +2438,7 @@ mod tests {
         ];
         let vertices_5d = Vertex::from_points(points_5d);
         let tds_5d: Tds<f64, usize, usize, 5> = Tds::new(&vertices_5d).unwrap();
-        let supercell_5d = tds_5d.supercell().unwrap();
+        let supercell_5d = tds_5d.supercell();
         assert_eq!(supercell_5d.vertices().len(), 6); // 5D simplex has 6 vertices
     }
 
