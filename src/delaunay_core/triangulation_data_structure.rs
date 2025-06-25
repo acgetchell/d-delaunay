@@ -45,6 +45,20 @@ pub enum TriangulationValidationError {
         /// Description of the duplicate cell validation failure.
         message: String,
     },
+    /// Failed to create a cell during triangulation.
+    #[error("Failed to create cell: {message}")]
+    FailedToCreateCell {
+        /// Description of the cell creation failure.
+        message: String,
+    },
+    /// Cells are not neighbors as expected
+    #[error("Cells {cell1:?} and {cell2:?} are not neighbors")]
+    NotNeighbors {
+        /// The first cell UUID.
+        cell1: Uuid,
+        /// The second cell UUID.
+        cell2: Uuid,
+    },
 }
 
 /// Helper function to check if two facets are adjacent (share the same vertices)
@@ -813,7 +827,7 @@ where
     /// assert_eq!(result.number_of_vertices(), 5);
     /// assert!(result.number_of_cells() >= 1);
     /// ```
-    pub fn bowyer_watson(mut self) -> Result<Self, anyhow::Error>
+    pub fn bowyer_watson(mut self) -> Result<Self, TriangulationValidationError>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -846,10 +860,10 @@ where
 
             if created_cells > 0 {
                 // Remove duplicate cells (cells with identical vertex sets)
-                self.remove_duplicate_cells();
+                self.remove_duplicate_cells()?;
 
                 // Assign neighbors between adjacent cells
-                self.assign_neighbors();
+                self.assign_neighbors()?;
 
                 // Assign incident cells to vertices
                 self.assign_incident_cells();
@@ -862,7 +876,11 @@ where
 
         // For more complex cases, use the full Bowyer-Watson algorithm
         // Create super-cell that contains all vertices
-        let supercell = self.supercell()?;
+        let supercell =
+            self.supercell()
+                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                    message: format!("Failed to create supercell: {e}"),
+                })?;
         let supercell_vertices: HashSet<Uuid> = supercell
             .vertices()
             .iter()
@@ -881,7 +899,11 @@ where
                 continue;
             }
 
-            let (bad_cells, boundary_facets) = self.find_bad_cells_and_boundary_facets(vertex)?;
+            let (bad_cells, boundary_facets) = self
+                .find_bad_cells_and_boundary_facets(vertex)
+                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                    message: format!("Error finding bad cells and boundary facets: {e}"),
+                })?;
 
             // Remove bad cells
             for bad_cell_id in bad_cells {
@@ -890,7 +912,11 @@ where
 
             // Create new cells using the boundary facets and the new vertex
             for facet in &boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, *vertex)?;
+                let new_cell = Cell::from_facet_and_vertex(facet, *vertex).map_err(|e| {
+                    TriangulationValidationError::FailedToCreateCell {
+                        message: format!("Error creating cell from facet and vertex: {e}"),
+                    }
+                })?;
                 self.cells.insert(new_cell.uuid(), new_cell);
             }
         }
@@ -899,7 +925,7 @@ where
         self.remove_cells_containing_supercell_vertices(&supercell);
 
         // Assign neighbors between adjacent cells
-        self.assign_neighbors();
+        let _ = self.assign_neighbors();
 
         // Assign incident cells to vertices
         self.assign_incident_cells();
@@ -1009,7 +1035,7 @@ where
         }
     }
 
-    fn assign_neighbors(&mut self) {
+    fn assign_neighbors(&mut self) -> Result<(), TriangulationValidationError> {
         // Create a map to store neighbor relationships
         let mut neighbor_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
 
@@ -1038,8 +1064,20 @@ where
                             // Two cells are neighbors if they share a facet
                             // (same vertices but opposite orientation)
                             if facets_are_adjacent(facet1, facet2) {
-                                neighbor_map.get_mut(&cell1_id).unwrap().push(cell2_id);
-                                neighbor_map.get_mut(&cell2_id).unwrap().push(cell1_id);
+                                neighbor_map
+                                    .get_mut(&cell1_id)
+                                    .ok_or(TriangulationValidationError::NotNeighbors {
+                                        cell1: cell1_id,
+                                        cell2: cell2_id,
+                                    })?
+                                    .push(cell2_id);
+                                neighbor_map
+                                    .get_mut(&cell2_id)
+                                    .ok_or(TriangulationValidationError::NotNeighbors {
+                                        cell1: cell2_id,
+                                        cell2: cell1_id,
+                                    })?
+                                    .push(cell1_id);
                             }
                         }
                     }
@@ -1058,6 +1096,8 @@ where
                 }
             }
         }
+
+        Ok(())
     }
 
     fn assign_incident_cells(&mut self) {
@@ -1093,10 +1133,14 @@ where
     }
 
     /// Remove duplicate cells (cells with identical vertex sets)
-    fn remove_duplicate_cells(&mut self) {
+    ///
+    /// Returns the number of duplicate cells that were removed, or an error if
+    /// all duplicate cells could not be successfully removed.
+    fn remove_duplicate_cells(&mut self) -> Result<usize, TriangulationValidationError> {
         let mut unique_cells = HashMap::new();
         let mut cells_to_remove = Vec::new();
 
+        // First pass: identify duplicate cells
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
             let mut vertex_uuids: Vec<Uuid> = cell
@@ -1115,10 +1159,72 @@ where
             }
         }
 
-        // Remove duplicate cells
+        let duplicate_count = cells_to_remove.len();
+        let mut removed_count = 0;
+
+        // Second pass: remove duplicate cells and count successful removals
         for cell_id in cells_to_remove {
-            self.cells.remove(&cell_id);
+            if self.cells.remove(&cell_id).is_some() {
+                removed_count += 1;
+            }
         }
+
+        // Verify all duplicates were successfully removed
+        if removed_count != duplicate_count {
+            return Err(TriangulationValidationError::DuplicateCells {
+                message: format!(
+                    "Failed to remove all duplicate cells: attempted to remove {duplicate_count}, actually removed {removed_count}"
+                ),
+            });
+        }
+
+        Ok(removed_count)
+    }
+
+    /// Check for duplicate cells and return an error if any are found
+    ///
+    /// This is useful for validation where you want to detect duplicates
+    /// without automatically removing them.
+    fn validate_no_duplicate_cells(&self) -> Result<(), TriangulationValidationError> {
+        let mut unique_cells = HashMap::new();
+        let mut duplicates = Vec::new();
+
+        for (cell_id, cell) in &self.cells {
+            // Create a sorted vector of vertex UUIDs as a key for uniqueness
+            let mut vertex_uuids: Vec<Uuid> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
+            vertex_uuids.sort();
+
+            if let Some(existing_cell_id) = unique_cells.get(&vertex_uuids) {
+                // This is a duplicate cell
+                duplicates.push((*cell_id, *existing_cell_id, vertex_uuids.clone()));
+            } else {
+                // This is a unique cell
+                unique_cells.insert(vertex_uuids, *cell_id);
+            }
+        }
+
+        if !duplicates.is_empty() {
+            let duplicate_descriptions: Vec<String> = duplicates
+                .iter()
+                .map(|(cell1, cell2, vertices)| {
+                    format!("cells {cell1:?} and {cell2:?} with vertices {vertices:?}")
+                })
+                .collect();
+
+            return Err(TriangulationValidationError::DuplicateCells {
+                message: format!(
+                    "Found {} duplicate cell(s): {}",
+                    duplicates.len(),
+                    duplicate_descriptions.join(", ")
+                ),
+            });
+        }
+
+        Ok(())
     }
 
     /// Checks whether the triangulation data structure is valid.
@@ -1245,7 +1351,10 @@ where
         T: super::point::FiniteCheck + super::point::HashCoordinate + Copy + Debug,
         [T; D]: serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
-        // First, validate all cells
+        // First, validate cell uniqueness (quick check for duplicate cells)
+        self.validate_no_duplicate_cells()?;
+
+        // Then validate all cells
         for (cell_id, cell) in &self.cells {
             cell.is_valid()
                 .map_err(|source| TriangulationValidationError::InvalidCell {
@@ -1254,11 +1363,8 @@ where
                 })?;
         }
 
-        // Then validate neighbor relationships
+        // Finally validate neighbor relationships
         self.validate_neighbors_internal()?;
-
-        // Finally validate cell uniqueness
-        self.validate_unique_cells_internal()?;
 
         Ok(())
     }
@@ -1341,29 +1447,6 @@ where
                         ),
                     });
                 }
-            }
-        }
-        Ok(())
-    }
-
-    /// Internal method for validating cell uniqueness.
-    fn validate_unique_cells_internal(&self) -> Result<(), TriangulationValidationError> {
-        let mut seen: HashMap<Vec<Uuid>, Uuid> = HashMap::new();
-
-        for (cell_id, cell) in &self.cells {
-            // Check for duplicate cells (cells with identical vertex sets)
-            let mut key: Vec<Uuid> = cell
-                .vertices()
-                .iter()
-                .map(super::vertex::Vertex::uuid)
-                .collect();
-            key.sort_unstable();
-            if let Some(dup_id) = seen.insert(key.clone(), *cell_id) {
-                return Err(TriangulationValidationError::DuplicateCells {
-                    message: format!(
-                        "Duplicate cells detected – {cell_id:?} and {dup_id:?} share vertex set {key:?}"
-                    ),
-                });
             }
         }
         Ok(())
@@ -1558,7 +1641,9 @@ mod tests {
 
         assert_eq!(result_tds.number_of_cells(), 2); // One original, one duplicate
 
-        result_tds.remove_duplicate_cells();
+        let dupes = result_tds.remove_duplicate_cells();
+
+        assert_eq!(dupes.unwrap(), 1);
 
         assert_eq!(result_tds.number_of_cells(), 1); // Duplicates removed
     }
@@ -1975,7 +2060,7 @@ mod tests {
         let mut result = tds.bowyer_watson().unwrap();
 
         // Manually assign neighbors to test the logic
-        result.assign_neighbors();
+        let _ = result.assign_neighbors();
 
         // Check that at least one cell has neighbors assigned
         let has_neighbors = result.cells.values().any(|cell| {
@@ -2486,7 +2571,7 @@ mod tests {
         }
 
         // Test neighbor assignment
-        result.assign_neighbors();
+        let _ = result.assign_neighbors();
 
         // Verify that neighbors were assigned
         let mut total_neighbor_links = 0;
@@ -2568,11 +2653,22 @@ mod tests {
 
         assert_eq!(result.number_of_cells(), original_cell_count + 3);
 
-        // Remove duplicates
-        result.remove_duplicate_cells();
+        // Remove duplicates and capture the number removed
+        let duplicate_removal_result = result.remove_duplicate_cells();
+        assert!(duplicate_removal_result.is_ok());
+        let duplicates_removed = duplicate_removal_result.unwrap();
 
-        // Should be back to original count
+        println!(
+            "Successfully removed {} duplicate cells (original: {}, after adding: {}, final: {})",
+            duplicates_removed,
+            original_cell_count,
+            original_cell_count + 3,
+            result.number_of_cells()
+        );
+
+        // Should be back to original count and have removed exactly 3 duplicates
         assert_eq!(result.number_of_cells(), original_cell_count);
+        assert_eq!(duplicates_removed, 3);
     }
 
     #[test]
