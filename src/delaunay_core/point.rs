@@ -1913,6 +1913,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_precision_loss)]
     fn point_extreme_dimensions() {
         // Test with high dimensional points (limited by serde trait implementations)
 
@@ -1996,13 +1997,13 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::redundant_clone)]
     fn point_clone_and_copy_semantics() {
         // Test that Point correctly implements Clone and Copy
 
         let original = Point::new([1.0, 2.0, 3.0]);
 
         // Test explicit cloning
-        #[allow(clippy::redundant_clone)]
         let cloned = original.clone();
         assert_relative_eq!(
             original.coordinates().as_slice(),
@@ -2428,6 +2429,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::redundant_clone)]
     fn point_trait_completeness() {
         // Helper functions for compile-time trait checks
         fn assert_send<T: Send>(_: T) {}
