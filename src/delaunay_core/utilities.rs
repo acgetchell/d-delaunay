@@ -65,7 +65,8 @@ pub fn make_uuid() -> Uuid {
 /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 /// let hashmap = Vertex::into_hashmap(vertices);
 /// let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
-/// assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
+/// # use approx::assert_relative_eq;
+/// assert_relative_eq!(min_coords.as_slice(), [-1.0, -5.0, -9.0].as_slice(), epsilon = 1e-9);
 /// ```
 #[must_use]
 pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHasher>(
@@ -122,7 +123,8 @@ where
 /// use d_delaunay::delaunay_core::utilities::vec_to_array;
 /// let vec = vec![1.0, 2.0, 3.0];
 /// let array = vec_to_array::<3>(&vec).unwrap();
-/// assert_eq!(array, [1.0, 2.0, 3.0]);
+/// # use approx::assert_relative_eq;
+/// assert_relative_eq!(array.as_slice(), [1.0, 2.0, 3.0].as_slice(), epsilon = 1e-9);
 /// ```
 pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], anyhow::Error> {
     if vec.len() != D {
@@ -139,6 +141,7 @@ pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], anyhow::Err
 mod tests {
 
     use crate::delaunay_core::point::Point;
+    use approx::assert_relative_eq;
 
     use super::*;
 
@@ -165,7 +168,11 @@ mod tests {
         let hashmap = Vertex::into_hashmap(vertices);
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
 
-        assert_eq!(min_coords, [-1.0, -5.0, -9.0]);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [-1.0, -5.0, -9.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Human readable output for cargo test -- --nocapture
         println!("min_coords = {min_coords:?}");
@@ -182,7 +189,11 @@ mod tests {
         let hashmap = Vertex::into_hashmap(vertices);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
-        assert_eq!(max_coords, [7.0, 8.0, 6.0]);
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [7.0, 8.0, 6.0].as_slice(),
+            epsilon = 1e-9
+        );
 
         // Human readable output for cargo test -- --nocapture
         println!("max_coords = {max_coords:?}");
@@ -195,7 +206,7 @@ mod tests {
 
         assert!(result.is_ok());
         let array = result.unwrap();
-        assert_eq!(array, [1.0, 2.0, 3.0]);
+        assert_relative_eq!(array.as_slice(), [1.0, 2.0, 3.0].as_slice(), epsilon = 1e-9);
     }
 
     #[test]
@@ -244,7 +255,7 @@ mod tests {
 
         assert!(result.is_ok());
         let array = result.unwrap();
-        assert_eq!(array, [42.0]);
+        assert_relative_eq!(array.as_slice(), [42.0].as_slice(), epsilon = 1e-9);
     }
 
     #[test]
@@ -254,7 +265,11 @@ mod tests {
 
         assert!(result.is_ok());
         let array = result.unwrap();
-        assert_eq!(array, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]);
+        assert_relative_eq!(
+            array.as_slice(),
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -264,7 +279,11 @@ mod tests {
 
         assert!(result.is_ok());
         let array = result.unwrap();
-        assert_eq!(array, [-1.0, -2.0, -3.0]);
+        assert_relative_eq!(
+            array.as_slice(),
+            [-1.0, -2.0, -3.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -274,7 +293,7 @@ mod tests {
 
         assert!(result.is_ok());
         let array = result.unwrap();
-        assert_eq!(array, [0.0, 0.0, 0.0]);
+        assert_relative_eq!(array.as_slice(), [0.0, 0.0, 0.0].as_slice(), epsilon = 1e-9);
     }
 
     #[test]
@@ -284,8 +303,16 @@ mod tests {
         let max_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Greater);
 
         // With empty hashmap, should return default values [0.0, 0.0, 0.0]
-        assert_eq!(min_coords, [0.0, 0.0, 0.0]);
-        assert_eq!(max_coords, [0.0, 0.0, 0.0]);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [0.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -298,8 +325,16 @@ mod tests {
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         // With single point, min and max should be the same
-        assert_eq!(min_coords, [5.0, -3.0, 7.0]);
-        assert_eq!(max_coords, [5.0, -3.0, 7.0]);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [5.0, -3.0, 7.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [5.0, -3.0, 7.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -312,7 +347,17 @@ mod tests {
         let coords = find_extreme_coordinates(&hashmap, Ordering::Equal);
         // The first vertex in the iteration (order is not guaranteed in HashMap)
         // but the result should be one of the input coordinates
-        assert!(coords == [1.0, 2.0, 3.0] || coords == [4.0, 5.0, 6.0]);
+        let matches_first = approx::relative_eq!(
+            coords.as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
+        let matches_second = approx::relative_eq!(
+            coords.as_slice(),
+            [4.0, 5.0, 6.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert!(matches_first || matches_second);
     }
 
     #[test]
@@ -328,8 +373,8 @@ mod tests {
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
-        assert_eq!(min_coords, [1.0, 2.0]);
-        assert_eq!(max_coords, [3.0, 5.0]);
+        assert_relative_eq!(min_coords.as_slice(), [1.0, 2.0].as_slice(), epsilon = 1e-9);
+        assert_relative_eq!(max_coords.as_slice(), [3.0, 5.0].as_slice(), epsilon = 1e-9);
     }
 
     #[test]
@@ -341,8 +386,8 @@ mod tests {
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
-        assert_eq!(min_coords, [-5.0]);
-        assert_eq!(max_coords, [10.0]);
+        assert_relative_eq!(min_coords.as_slice(), [-5.0].as_slice(), epsilon = 1e-9);
+        assert_relative_eq!(max_coords.as_slice(), [10.0].as_slice(), epsilon = 1e-9);
     }
 
     #[test]
@@ -359,7 +404,7 @@ mod tests {
                 use crate::delaunay_core::vertex::VertexBuilder;
                 VertexBuilder::default()
                     .point(point)
-                    .data(i as i32)
+                    .data(i32::try_from(i).unwrap())
                     .build()
                     .unwrap()
             })
@@ -369,8 +414,16 @@ mod tests {
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
-        assert_eq!(min_coords, [-2.0, -1.0, 1.0]);
-        assert_eq!(max_coords, [4.0, 5.0, 3.0]);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [-2.0, -1.0, 1.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [4.0, 5.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -387,8 +440,16 @@ mod tests {
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         // All points are identical, so min and max should be the same
-        assert_eq!(min_coords, [2.0, 3.0, 4.0]);
-        assert_eq!(max_coords, [2.0, 3.0, 4.0]);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [2.0, 3.0, 4.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [2.0, 3.0, 4.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
@@ -404,8 +465,16 @@ mod tests {
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
-        assert_eq!(min_coords, [-1e9, -1e6, -1e15]);
-        assert_eq!(max_coords, [1e15, 1e9, 1e12]);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [-1e9, -1e6, -1e15].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [1e15, 1e9, 1e12].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     #[test]
