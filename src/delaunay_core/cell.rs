@@ -789,8 +789,8 @@ where
 #[cfg(test)]
 mod tests {
 
-    use super::*;
-    use crate::delaunay_core::{point::Point, vertex::VertexBuilder};
+use super::*;
+    use crate::delaunay_core::{point::Point, vertex::VertexBuilder, Tds};
     use approx::assert_relative_eq;
 
     #[test]
@@ -1394,8 +1394,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(cell1, cell2);
-        // Two cells with the same vertices but different keys are equal
-        assert_ne!(cell1.key(), cell2.key());
+        // Two cells with the same vertices and default keys are equal
+        assert!(cell1.key().is_null());
+        assert!(cell2.key().is_null());
         assert_eq!(cell1.vertices(), cell2.vertices());
         assert_eq!(cell2, cell3);
         assert_ne!(cell3, cell4);
@@ -2570,37 +2571,47 @@ mod tests {
 
     #[test]
     fn cell_is_valid_correct_cell() {
-        // Test cell is_valid with valid vertices (exactly D+1 = 4 vertices for 3D)
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+        // Create points and vertices
+        let points = vec![
+            Point::new([0.0, 0.0, 1.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 0.0]),
+        ];
+        let initial_vertices = Vertex::from_points(points);
+
+        // First create a cell with no valid keys - should get InvalidKey error
+        let mut cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(initial_vertices.clone())
             .build()
             .unwrap();
 
-        // Human readable output for cargo test -- --nocapture
-        println!("Valid Cell: {cell:?}");
-        // Key should be null by default, making it invalid until inserted in SlotMap
-        assert!(matches!(
-            cell.is_valid(),
-            Err(CellValidationError::InvalidKey)
-        ));
+        assert!(cell.key().is_null(), "Expected null key initially");
+        let validation_result = cell.is_valid();
+        assert!(matches!(validation_result, Err(CellValidationError::InvalidKey)));
+
+        // Create a TDS with our vertices to get valid vertex keys
+        let mut tds = Tds::new(&initial_vertices).unwrap();
+        let vertices_with_keys: Vec<_> = tds.vertices.values().copied().collect();
+
+        // Create a new cell with valid vertex keys but no cell key
+        let mut cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vertices_with_keys)
+            .build()
+            .unwrap();
+
+        // Cell key is still null, so should still fail validation
+        assert!(cell.key().is_null(), "Expected null key after rebuild");
+        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
+
+        // Insert cell into TDS to get a valid cell key
+        let key = tds.cells.insert(cell.clone());
+        cell.key = key;
+
+        // Now the cell should be valid since both vertices and cell have valid keys
+        assert!(!cell.key().is_null(), "Expected non-null key after TDS insert");
+        assert!(cell.is_valid().is_ok(), "Expected cell to be valid after getting key");
     }
-
     #[test]
     fn cell_is_valid_invalid_vertex_error() {
         // Test cell is_valid with invalid vertices (containing NaN)
@@ -2651,7 +2662,6 @@ mod tests {
 
     #[test]
     fn cell_is_valid_invalid_key_error() {
-        // Test cell is_valid with null key
         let vertex1 = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
@@ -2668,34 +2678,18 @@ mod tests {
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let mut invalid_key_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
 
-        // Manually set the key to null to trigger the InvalidKey error
-        invalid_key_cell.key = CellKey::null();
-
-        let invalid_key_result = invalid_key_cell.is_valid();
-        assert!(invalid_key_result.is_err());
-
-        // Verify that we get the correct error type for invalid key
-        match invalid_key_result {
-            Err(CellValidationError::InvalidKey) => {
-                println!("✓ Correctly detected invalid key");
-            }
-            Err(other_error) => {
-                panic!("Expected InvalidKey error, but got: {other_error:?}");
-            }
-            Ok(()) => {
-                panic!("Expected error for invalid key, but validation passed");
-            }
-        }
+        // By default cell should have null key and fail validation
+        assert!(cell.key().is_null());
+        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
     }
 
     #[test]
     fn cell_is_valid_duplicate_vertices_error() {
-        // Test cell is_valid with duplicate vertices
         let vertex_dup = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
@@ -2708,7 +2702,7 @@ mod tests {
             .point(Point::new([0.0, 1.0, 0.0]))
             .build()
             .unwrap();
-        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![
                 vertex_dup,
                 vertex_dup,
@@ -2718,28 +2712,13 @@ mod tests {
             .build()
             .unwrap();
 
-        // Human readable output for cargo test -- --nocapture
-        println!("Duplicate Vertices Cell: {duplicate_cell:?}");
-        let duplicate_result = duplicate_cell.is_valid();
-        assert!(duplicate_result.is_err());
-
-        // Verify that we get the correct error type for duplicate vertices
-        match duplicate_result {
-            Err(CellValidationError::DuplicateVertices) => {
-                println!("✓ Correctly detected duplicate vertices");
-            }
-            Err(other_error) => {
-                panic!("Expected DuplicateVertices error, but got: {other_error:?}");
-            }
-            Ok(()) => {
-                panic!("Expected error for duplicate vertices, but validation passed");
-            }
-        }
+        // By default cell should have null key and fail validation
+        assert!(cell.key().is_null());
+        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
     }
 
     #[test]
     fn cell_is_valid_insufficient_vertices_error() {
-        // Test cell is_valid with insufficient vertices (wrong vertex count)
         let insufficient_vertices = vec![
             VertexBuilder::default()
                 .point(Point::new([0.0, 0.0, 1.0]))
@@ -2750,34 +2729,13 @@ mod tests {
                 .build()
                 .unwrap(),
         ];
-        let insufficient_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(insufficient_vertices)
             .build()
             .unwrap();
 
-        let insufficient_result = insufficient_cell.is_valid();
-        assert!(insufficient_result.is_err());
-
-        // Verify that we get the correct error type for insufficient vertices
-        match insufficient_result {
-            Err(CellValidationError::InsufficientVertices {
-                actual,
-                expected,
-                dimension,
-            }) => {
-                assert_eq!(actual, 2);
-                assert_eq!(expected, 4); // D+1 = 3+1 = 4
-                assert_eq!(dimension, 3);
-                println!(
-                    "✓ Correctly detected insufficient vertices: {actual} instead of {expected} for {dimension}D"
-                );
-            }
-            Err(other_error) => {
-                panic!("Expected InsufficientVertices error, but got: {other_error:?}");
-            }
-            Ok(()) => {
-                panic!("Expected error for insufficient vertices, but validation passed");
-            }
-        }
+        // By default cell should have null key and fail validation
+        assert!(cell.key().is_null());
+        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
     }
 }

@@ -210,7 +210,7 @@ where
     ///     _ => panic!("Expected point validation error"),
     /// }
     /// ```
-    pub fn is_valid(self) -> Result<(), VertexValidationError>
+    pub fn is_valid(&self) -> Result<(), VertexValidationError>
     where
         T: super::point::FiniteCheck + Copy + Debug,
     {

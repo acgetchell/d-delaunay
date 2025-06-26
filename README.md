@@ -20,7 +20,8 @@ the [Rust] ecosystem.
 ## Features
 
 - [x]  d-dimensional [Delaunay triangulations]
-- [x]  Tested for 3-, 4-, and 5-dimensional triangulations
+- [x]  Tested up to 32-dimensional triangulations (max supported by std traits)
+- [x]  Run with `cargo clippy -- -W clippy::pedantic`
 - [x]  Arbitrary data types associated with vertices and cells
 - [x]  Serialization/Deserialization of all data structures to/from [JSON]
 
