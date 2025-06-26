@@ -4,7 +4,7 @@ use super::point::{OrderedEq, Point, PointValidationError};
 use crate::delaunay_core::{CellKey, VertexKey};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
-use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
+use std::{cmp::Ordering, hash::Hash, option::Option};
 use thiserror::Error;
 
 /// Errors that can occur during vertex validation.
@@ -33,7 +33,7 @@ use slotmap::Key;
 ///
 /// - `point`: A generic [Point] representing the coordinates of
 ///   the vertex in a D-dimensional space.
-/// - `key`: The key into the vertex SlotMap. This uniquely identifies the vertex
+/// - `key`: The key into the vertex `SlotMap`. This uniquely identifies the vertex
 ///   within its containing data structure.
 /// - `incident_cell`: The `incident_cell` property represents the key of a `Cell`
 ///   containing the [Vertex]. This is calculated by the
@@ -53,7 +53,7 @@ where
 {
     /// The coordinates of the vertex as a D-dimensional Point.
     point: Point<T, D>,
-    /// The unique key identifying this vertex in the containing SlotMap.
+    /// The unique key identifying this vertex in the containing `SlotMap`.
     #[builder(setter(skip), default = "VertexKey::null()")]
     key: VertexKey,
     /// The key of the `Cell` that the vertex is incident to.
@@ -108,36 +108,6 @@ where
             .collect()
     }
 
-    /// The function `into_hashmap` converts a vector of vertices into a
-    /// [`HashMap`], using the vertices [Uuid] as the key.
-    ///
-    /// # Arguments
-    ///
-    /// * `vertices`: `vertices` is a vector of `Vertex<T, U, D>`.
-    ///
-    /// # Returns
-    ///
-    /// The function `into_hashmap` returns a [`HashMap`] with the key type
-    /// [Uuid] and the value type [Vertex], i.e. `std::collections::HashMap<Uuid, Vertex<T, U, D>>`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::HashMap;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
-    /// let vertices = Vertex::<f64, Option<()>, 2>::from_points(points.clone());
-    /// let map: HashMap<_, _> = Vertex::into_hashmap(vertices);
-    /// assert_eq!(map.len(), 2);
-    /// assert!(map.values().all(|v| v.dim() == 2));
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn into_hashmap(vertices: Vec<Self>) -> HashMap<VertexKey, Self> {
-        vertices.into_iter().map(|v| (v.key(), v)).collect()
-    }
-
     /// Returns the point coordinates of the vertex.
     ///
     /// # Returns
@@ -163,7 +133,7 @@ where
     ///
     /// # Returns
     ///
-    /// The key uniquely identifying this vertex in its containing SlotMap.
+    /// The key uniquely identifying this vertex in its containing `SlotMap`.
     ///
     /// # Example
     ///
@@ -213,12 +183,12 @@ where
     /// `VertexValidationError` indicating the specific validation failure.
     /// A valid vertex has:
     /// - A valid [Point] with finite coordinates (no NaN or infinite values)
-    /// - A valid [Uuid] that is not nil
+    /// - A valid key that is not null
     ///
     /// # Errors
     ///
     /// Returns `VertexValidationError::InvalidPoint` if the point has invalid coordinates,
-    /// or `VertexValidationError::InvalidUuid` if the UUID is nil.
+    /// or `VertexValidationError::InvalidKey` if the vertex key is null.
     ///
     /// # Example
     ///
@@ -508,29 +478,6 @@ mod tests {
     }
 
     #[test]
-    fn vertex_into_hashmap() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-            Point::new([7.0, 8.0, 9.0]),
-        ];
-        let mut vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices.clone());
-        let mut values: Vec<Vertex<f64, Option<()>, 3>> = hashmap.into_values().collect();
-
-        assert_eq!(values.len(), 3);
-
-        values.sort_by_key(super::Vertex::key);
-        vertices.sort_by_key(super::Vertex::key);
-
-        assert_eq!(values, vertices);
-
-        // Human readable output for cargo test -- --nocapture
-        println!("values = {values:?}");
-        println!("vertices = {vertices:?}");
-    }
-
-    #[test]
     fn vertex_dim() {
         let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
@@ -762,7 +709,7 @@ mod tests {
 
         assert!(debug_str.contains("Vertex"));
         assert!(debug_str.contains("point"));
-        assert!(debug_str.contains("uuid"));
+        assert!(debug_str.contains("key"));
         assert!(debug_str.contains("1.0"));
         assert!(debug_str.contains("2.0"));
         assert!(debug_str.contains("3.0"));
@@ -935,33 +882,6 @@ mod tests {
         );
         assert_eq!(vertices[0].dim(), 3);
         assert!(!vertices[0].key().is_null());
-    }
-
-    #[test]
-    fn vertex_into_hashmap_empty() {
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vec::new();
-        let hashmap = Vertex::into_hashmap(vertices);
-
-        assert!(hashmap.is_empty());
-    }
-
-    #[test]
-    fn vertex_into_hashmap_single() {
-        let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
-        let key = vertex.key();
-        let vertices = vec![vertex];
-        let hashmap = Vertex::into_hashmap(vertices);
-
-        assert_eq!(hashmap.len(), 1);
-        assert!(hashmap.contains_key(&key));
-        assert_relative_eq!(
-            hashmap.get(&uuid).unwrap().point().coordinates().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
     }
 
     #[test]

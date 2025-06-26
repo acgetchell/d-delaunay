@@ -174,7 +174,7 @@ where
 ///
 /// The `Tds` represents a collection of vertices and maximal-dimensional cells
 /// that form a valid Delaunay triangulation. All vertices and cells are
-/// identified by unique keys provided by SlotMap.
+/// identified by unique keys provided by `SlotMap`.
 ///
 /// # Type Parameters
 ///
@@ -185,8 +185,8 @@ where
 ///
 /// # Structure
 ///
-/// - **Vertices**: Points in D-dimensional space with associated data, stored in a SlotMap
-/// - **Cells**: D-dimensional simplices (e.g., tetrahedra in 3D) with neighbor relationships, stored in a SlotMap
+/// - **Vertices**: Points in D-dimensional space with associated data, stored in a `SlotMap`
+/// - **Cells**: D-dimensional simplices (e.g., tetrahedra in 3D) with neighbor relationships, stored in a `SlotMap`
 /// - **Validation**: Automatic validation ensures neighbor consistency and cell validity
 ///
 /// # Examples
@@ -212,12 +212,12 @@ where
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// A [`SlotMap`] that stores [Vertex] objects with their corresponding [VertexKey]s.
+    /// A [`SlotMap`] that stores [Vertex] objects with their corresponding [`VertexKey`]s.
     /// Each [Vertex] has a [Point] of type T, vertex data of type U,
     /// and a constant D representing the dimension.
     pub vertices: SlotMap<VertexKey, Vertex<T, U, D>>,
 
-    /// A [`SlotMap`] that stores [Cell] objects with their corresponding [CellKey]s.
+    /// A [`SlotMap`] that stores [Cell] objects with their corresponding [`CellKey`]s.
     /// Each [Cell] has one or more [Vertex] objects and cell data of type V.
     /// Note the dimensionality of the cell may differ from D, though the [Tds]
     /// only stores cells of maximal dimensionality D and infers other lower
@@ -818,8 +818,11 @@ where
     {
         let supercell = self.supercell();
 
-        let supercell_vertices: HashSet<VertexKey> =
-            supercell.vertices().iter().map(|v| v.key()).collect();
+        let supercell_vertices: HashSet<VertexKey> = supercell
+            .vertices()
+            .iter()
+            .map(super::vertex::Vertex::key)
+            .collect();
 
         let _ = self.cells.insert(supercell.clone());
 
@@ -947,8 +950,11 @@ where
             .cells
             .iter()
             .filter(|(_, cell)| {
-                let cell_vertex_keys: HashSet<VertexKey> =
-                    cell.vertices().iter().map(|v| v.key()).collect();
+                let cell_vertex_keys: HashSet<VertexKey> = cell
+                    .vertices()
+                    .iter()
+                    .map(super::vertex::Vertex::key)
+                    .collect();
                 let has_only_input_vertices = cell_vertex_keys.is_subset(&input_vertex_keys);
 
                 // Remove cells that don't consist entirely of input vertices
@@ -968,7 +974,11 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex keys as a key for uniqueness
-            let mut vertex_keys: Vec<VertexKey> = cell.vertices().iter().map(|v| v.key()).collect();
+            let mut vertex_keys: Vec<VertexKey> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::key)
+                .collect();
             vertex_keys.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_keys) {
@@ -1096,7 +1106,11 @@ where
         // First pass: identify duplicate cells
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex keys as a key for uniqueness
-            let mut vertex_keys: Vec<VertexKey> = cell.vertices().iter().map(|v| v.key()).collect();
+            let mut vertex_keys: Vec<VertexKey> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::key)
+                .collect();
             vertex_keys.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_keys) {
@@ -1163,7 +1177,11 @@ where
         // Inside validate_no_duplicate_cells function
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex keys as a key for uniqueness
-            let mut vertex_keys: Vec<VertexKey> = cell.vertices().iter().map(|v| v.key()).collect();
+            let mut vertex_keys: Vec<VertexKey> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::key)
+                .collect();
             vertex_keys.sort();
 
             // Check for existing cell and store the result before modifying unique_cells
@@ -1311,13 +1329,6 @@ where
     ///     _ => panic!("Expected InvalidCell error"),
     /// }
     /// ```
-    /// match tds.is_valid() {
-    ///     Err(TriangulationValidationError::InvalidCell { .. }) => {
-    ///         // Expected error due to infinite coordinate
-    ///     }
-    ///     _ => panic!("Expected InvalidCell error"),
-    /// }
-    /// ```
     pub fn is_valid(&self) -> Result<(), TriangulationValidationError>
     where
         T: super::point::FiniteCheck + super::point::HashCoordinate + Copy + Debug,
@@ -1329,10 +1340,7 @@ where
         // Then validate all cells
         for (cell_id, cell) in &self.cells {
             cell.is_valid()
-                .map_err(|source| TriangulationValidationError::InvalidCell {
-                    cell_id: cell_id,
-                    source,
-                })?;
+                .map_err(|source| TriangulationValidationError::InvalidCell { cell_id, source })?;
         }
 
         // Finally validate neighbor relationships
@@ -1353,7 +1361,11 @@ where
             HashMap::with_capacity(self.cells.len());
 
         for (cell_id, cell) in &self.cells {
-            let vertices: HashSet<VertexKey> = cell.vertices().iter().map(|v| v.key()).collect();
+            let vertices: HashSet<VertexKey> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::key)
+                .collect();
             cell_vertices.insert(cell_id, vertices);
         }
 
@@ -1452,7 +1464,7 @@ mod tests {
         let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
 
         // Insert the second vertex and get its key
-        let key2 = tds.vertices.insert(vertex2.clone());
+        let key2 = tds.vertices.insert(vertex2);
 
         // Should have two vertices now
         assert_eq!(tds.vertices.len(), 2);
@@ -1508,7 +1520,7 @@ mod tests {
     fn test_supercell_empty_vertices() {
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
-        let supercell = self.supercell();
+        let supercell = tds.supercell();
         assert_eq!(supercell.vertices().len(), 4); // Should create a 3D simplex with 4 vertices
     }
 
@@ -1571,7 +1583,7 @@ mod tests {
 
         let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
         cell.neighbors = Some(vec![]); // Invalid neighbor
-        let invalid_cell_key = tds.cells.insert(invalid_cell.clone());
+        let invalid_cell_key = tds.cells.insert(cell.clone());
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -1596,9 +1608,7 @@ mod tests {
         // Add duplicate cell manually
         let vertices = result_tds.vertices.values().copied().collect::<Vec<_>>();
         let duplicate_cell = CellBuilder::default().vertices(vertices).build().unwrap();
-        result_tds
-            .cells
-            .insert(duplicate_cell.uuid(), duplicate_cell);
+        result_tds.cells.insert(duplicate_cell);
 
         assert_eq!(result_tds.number_of_cells(), 2); // One original, one duplicate
 
@@ -2255,8 +2265,8 @@ mod tests {
 
         // Make cell1 point to cell2 as neighbor, but not vice versa
         let cell2_key = tds.cells.insert(cell2);
-        cell.neighbors = Some(vec![cell2_key]);
-        tds.cells.insert(cell);
+        cell1.neighbors = Some(vec![cell2_key]);
+        tds.cells.insert(cell1);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2520,7 +2530,7 @@ mod tests {
         // Clear existing neighbors to test assignment logic
         let cell_ids: Vec<CellKey> = result.cells.keys().collect();
         for cell_id in cell_ids {
-            if let Some(cell) = result.cells.get_mut(&cell_id) {
+            if let Some(cell) = result.cells.get_mut(cell_id) {
                 cell.neighbors = None;
             }
         }

@@ -5,13 +5,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use slotmap::SlotMap;
 use std::{cmp::Ordering, hash::Hash};
 
-/// The function `find_extreme_coordinates` takes a SlotMap of vertices and
+/// The function `find_extreme_coordinates` takes a `SlotMap` of vertices and
 /// returns the minimum or maximum coordinates based on the specified
 /// ordering.
 ///
 /// # Arguments
 ///
-/// - `vertices`: A SlotMap containing [Vertex] objects.
+/// - `vertices`: A `SlotMap` containing [Vertex] objects.
 /// - `ordering`: The `ordering` parameter is of type [Ordering] and is used to
 ///   specify whether the function should find the minimum or maximum
 ///   coordinates. [Ordering] is an enum with three possible values: `Less`,
@@ -26,7 +26,7 @@ use std::{cmp::Ordering, hash::Hash};
 ///
 /// This function should not panic under normal circumstances as it handles
 /// the empty vertices case by returning default coordinates. However, it uses
-/// `.unwrap()` internally which could theoretically panic if the SlotMap
+/// `.unwrap()` internally which could theoretically panic if the `SlotMap`
 /// iterator behavior changes unexpectedly.
 ///
 /// # Example
@@ -139,7 +139,7 @@ mod tests {
             Point::new([7.0, 8.0, -9.0]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -163,7 +163,7 @@ mod tests {
             Point::new([7.0, 8.0, -9.0]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -299,7 +299,7 @@ mod tests {
     fn utilities_find_extreme_coordinates_single_point() {
         let points = vec![Point::new([5.0, -3.0, 7.0])];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -324,7 +324,7 @@ mod tests {
     fn utilities_find_extreme_coordinates_equal_ordering() {
         let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -354,7 +354,7 @@ mod tests {
             Point::new([2.0, 5.0]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 2>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -370,7 +370,7 @@ mod tests {
     fn utilities_find_extreme_coordinates_1d() {
         let points = vec![Point::new([10.0]), Point::new([-5.0]), Point::new([3.0])];
         let vertices: Vec<Vertex<f64, Option<()>, 1>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -401,7 +401,7 @@ mod tests {
                     .unwrap()
             })
             .collect();
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -429,7 +429,7 @@ mod tests {
             Point::new([2.0, 3.0, 4.0]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }
@@ -458,7 +458,7 @@ mod tests {
             Point::new([1e15, 1e9, 1e6]),
         ];
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let mut slotmap = SlotMap::with_key();
+        let mut slotmap: SlotMap<VertexKey, _> = SlotMap::with_key();
         for vertex in vertices {
             slotmap.insert(vertex);
         }

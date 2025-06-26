@@ -14,7 +14,7 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
+use std::{fmt::Debug, hash::Hash, iter::Sum};
 use thiserror::Error;
 
 /// Errors that can occur during cell validation.
@@ -57,15 +57,15 @@ use slotmap::Key;
 ///
 /// - `vertices`: A container of vertices. Each [Vertex] has a type T, optional
 ///   data U, and a constant D representing the number of dimensions.
-/// - `key`: The key into the cell SlotMap. This uniquely identifies the cell
+/// - `key`: The key into the cell `SlotMap`. This uniquely identifies the cell
 ///   within its containing data structure.
-/// The `neighbors` property is an optional container of neighbor keys
-/// values. It represents the neighboring cells that are connected
-/// to the current [Cell], indexed such that the `i-th` neighbor is opposite the
-/// `i-th` [Vertex].
+/// - `neighbors`: The property is an optional container of neighbor keys
+///   values. It represents the neighboring cells that are connected
+///   to the current [Cell], indexed such that the `i-th` neighbor is opposite the
+///   `i-th` [Vertex].
 /// - `data`: The `data` property is an optional field that can hold a value of
-/// type `V`. It allows storage of additional data associated with the [Cell];
-/// the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
+///   type `V`. It allows storage of additional data associated with the [Cell];
+///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
@@ -75,7 +75,7 @@ where
 {
     /// The vertices of the cell.
     vertices: Vec<Vertex<T, U, D>>,
-    /// The unique key identifying this cell in the containing SlotMap.
+    /// The unique key identifying this cell in the containing `SlotMap`.
     #[builder(setter(skip), default = "CellKey::null()")]
     key: CellKey,
     /// The neighboring cells connected to the current cell.
@@ -169,7 +169,7 @@ where
     ///
     /// # Returns
     ///
-    /// The key uniquely identifying this cell in the SlotMap.
+    /// The key uniquely identifying this cell in the `SlotMap`.
     ///
     /// # Example
     ///
@@ -337,13 +337,6 @@ where
         })
     }
 
-    /// The function `into_hashmap` converts a [Vec] of cells into a [`HashMap`],
-    /// using the [Cell] [key]s as keys.
-    #[must_use]
-    pub fn into_hashmap(cells: Vec<Self>) -> HashMap<CellKey, Self> {
-        cells.into_iter().map(|c| (c.key, c)).collect()
-    }
-
     /// The function `is_valid` checks if a [Cell] is valid.
     ///
     /// # Type Parameters
@@ -359,10 +352,10 @@ where
     ///
     /// A Result indicating whether the [Cell] is valid. Returns `Ok(())` if valid,
     /// or a `CellValidationError` if invalid. The validation checks that:
-    /// - All vertices are valid (coordinates are finite and UUIDs are valid)
+    /// - All vertices are valid (coordinates are finite and keys are valid)
     /// - All vertices are distinct from one another
-    /// - The cell UUID is valid and not nil
-    /// - The neighbors contain UUIDs of neighboring [Cell]s
+    /// - The cell key is valid and not null
+    /// - The neighbors contain keys of neighboring [Cell]s
     /// - The neighbors are indexed such that the index of the [Vertex] opposite
     ///   the neighboring cell is the same
     ///
@@ -1000,43 +993,6 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("New Cell: {new_cell:?}");
-    }
-
-    #[test]
-    fn cell_into_hashmap() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let hashmap = Cell::into_hashmap(vec![cell.clone()]);
-        let values: Vec<Cell<f64, i32, Option<()>, 3>> = hashmap.into_values().collect();
-
-        assert_eq!(values.len(), 1);
-        assert_eq!(values[0], cell);
-
-        // Human readable output for cargo test -- --nocapture
-        println!("values: {values:?}");
-        println!("cells = {cell:?}");
     }
 
     #[test]
@@ -1794,48 +1750,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(cell.data.unwrap(), 42);
-    }
-
-    #[test]
-    fn cell_into_hashmap_empty() {
-        let cells: Vec<Cell<f64, Option<()>, Option<()>, 3>> = Vec::new();
-        let hashmap = Cell::into_hashmap(cells);
-
-        assert!(hashmap.is_empty());
-    }
-
-    #[test]
-    fn cell_into_hashmap_multiple() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex2, vertex3])
-            .build()
-            .unwrap();
-
-        let uuid1 = cell1.uuid();
-        let uuid2 = cell2.uuid();
-        let cells = vec![cell1, cell2];
-        let hashmap = Cell::into_hashmap(cells);
-
-        assert_eq!(hashmap.len(), 2);
-        assert!(hashmap.contains_key(&cell1.key()));
-        assert!(hashmap.contains_key(&cell2.key()));
     }
 
     #[test]
