@@ -1476,7 +1476,8 @@ mod tests {
         cell2.hash(&mut hasher2);
 
         // Different keys mean different hashes even with same vertices
-        assert_ne!(hasher1.finish(), hasher2.finish());
+        // Same points with null keys should hash the same
+        assert_eq!(hasher1.finish(), hasher2.finish());
     }
 
     #[test]
@@ -1543,7 +1544,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
-        assert!(!cell.key().is_null());
+        assert!(cell.key().is_null());
     }
 
     #[test]
@@ -1568,7 +1569,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 3);
         assert_eq!(cell.dim(), 2);
-        assert!(!cell.key().is_null());
+        assert!(cell.key().is_null());
     }
 
     #[test]
@@ -1601,7 +1602,7 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 5);
         assert_eq!(cell.dim(), 4);
-        assert!(!cell.key().is_null());
+        assert!(cell.key().is_null());
     }
 
     #[test]
@@ -1698,8 +1699,8 @@ mod tests {
 
         // Same vertices but different keys
         assert_ne!(cell1.key(), cell2.key());
-        assert!(!cell1.key().is_null());
-        assert!(!cell2.key().is_null());
+        assert!(cell1.key().is_null());
+        assert!(cell2.key().is_null());
     }
 
     #[test]
@@ -2427,7 +2428,7 @@ mod tests {
             .unwrap();
         assert_eq!(cell_i64.number_of_vertices(), 2);
         assert_eq!(cell_i64.dim(), 1);
-        assert!(!cell_i64.key().is_null());
+        assert!(cell_i64.key().is_null());
 
         // Test with f32
         let vertex1_f32 = VertexBuilder::default()
@@ -2449,7 +2450,7 @@ mod tests {
             .unwrap();
         assert_eq!(cell_f32.number_of_vertices(), 3);
         assert_eq!(cell_f32.dim(), 2);
-        assert!(!cell_f32.key().is_null());
+        assert!(cell_f32.key().is_null());
     }
 
     #[test]
@@ -2593,7 +2594,11 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Valid Cell: {cell:?}");
-        assert!(cell.is_valid().is_ok());
+        // Key should be null by default, making it invalid until inserted in SlotMap
+        assert!(matches!(
+            cell.is_valid(),
+            Err(CellValidationError::InvalidKey)
+        ));
     }
 
     #[test]

@@ -54,7 +54,7 @@ where
     /// The coordinates of the vertex as a D-dimensional Point.
     point: Point<T, D>,
     /// The unique key identifying this vertex in the containing `SlotMap`.
-    #[builder(setter(skip), default = "VertexKey::null()")]
+    #[builder(default = "VertexKey::null()")]
     key: VertexKey,
     /// The key of the `Cell` that the vertex is incident to.
     #[builder(setter(skip), default = "None")]
@@ -359,7 +359,8 @@ mod tests {
     {
         assert_eq!(vertex.point().coordinates(), expected_coords);
         assert_eq!(vertex.dim(), expected_dim);
-        assert!(!vertex.key().is_null());
+        // VertexKey should be null by default (until inserted into a SlotMap)
+        assert!(vertex.key().is_null());
         assert!(vertex.incident_cell.is_none());
     }
 
@@ -367,14 +368,7 @@ mod tests {
     fn vertex_default() {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [0.0, 0.0, 0.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
-        assert!(vertex.key().is_null());
-        assert!(vertex.incident_cell.is_none());
+        test_basic_vertex_properties(&vertex, [0.0, 0.0, 0.0], 3);
         assert!(vertex.data.is_none());
 
         // Human readable output for cargo test -- --nocapture
@@ -388,14 +382,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.key().is_null());
-        assert!(vertex.incident_cell.is_none());
+        test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0], 3);
         assert!(vertex.data.is_none());
 
         // Can mutate later
@@ -414,14 +401,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.key().is_null());
-        assert!(vertex.incident_cell.is_none());
+        test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0], 3);
         assert_eq!(vertex.data.unwrap(), 1);
 
         // Human readable output for cargo test -- --nocapture
@@ -576,8 +556,9 @@ mod tests {
         vertex2.hash(&mut hasher2);
         vertex3.hash(&mut hasher3);
 
-        // Different keys mean different hashes even with same points
-        assert_ne!(hasher1.finish(), hasher2.finish());
+        // Same points with null keys should hash the same
+        assert_eq!(hasher1.finish(), hasher2.finish());
+        // Different points should hash differently, even with null keys
         assert_ne!(hasher1.finish(), hasher3.finish());
     }
 
@@ -656,13 +637,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [1.5, 2.5].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.key().is_null());
+        test_basic_vertex_properties(&vertex, [1.5, 2.5], 2);
     }
 
     #[test]
@@ -672,9 +647,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(vertex.point().coordinates(), [1, 2, 3]);
-        assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.key().is_null());
+        test_basic_vertex_properties(&vertex, [1, 2, 3], 3);
     }
 
     #[test]
@@ -808,12 +781,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [-1.0, -2.0, -3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
+        test_basic_vertex_properties(&vertex, [-1.0, -2.0, -3.0], 3);
     }
 
     #[test]
@@ -838,12 +806,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [1_000_000.0, 2_000_000.0, 3_000_000.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
+        test_basic_vertex_properties(&vertex, [1_000_000.0, 2_000_000.0, 3_000_000.0], 3);
     }
 
     #[test]
@@ -853,12 +816,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [0.000_001, 0.000_002, 0.000_003].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
+        test_basic_vertex_properties(&vertex, [0.000_001, 0.000_002, 0.000_003], 3);
     }
 
     #[test]
@@ -881,7 +839,7 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertices[0].dim(), 3);
-        assert!(!vertices[0].key().is_null());
+        assert!(vertices[0].key().is_null());
     }
 
     #[test]
@@ -895,10 +853,9 @@ mod tests {
             .build()
             .unwrap();
 
-        // Same points but different keys
-        assert_ne!(vertex1.key(), vertex2.key());
-        assert!(!vertex1.key().is_null());
-        assert!(!vertex2.key().is_null());
+        // Both keys should be null until inserted into SlotMap
+        assert!(vertex1.key().is_null());
+        assert!(vertex2.key().is_null());
     }
 
     #[test]
@@ -939,12 +896,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
-            [1.0, -2.0, 3.0, -4.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 4);
+        test_basic_vertex_properties(&vertex, [1.0, -2.0, 3.0, -4.0], 4);
     }
 
     #[test]
@@ -991,7 +943,11 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        assert!(valid_vertex.is_valid().is_ok());
+        // Key should be null by default, making it invalid until inserted in SlotMap
+        assert!(matches!(
+            valid_vertex.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         // Test valid vertex with negative coordinates
         let valid_negative: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
@@ -1050,7 +1006,11 @@ mod tests {
             .point(Point::new([1.5f32, 2.5f32]))
             .build()
             .unwrap();
-        assert!(valid_vertex.is_valid().is_ok());
+        // Key should be null by default, making it invalid until inserted in SlotMap
+        assert!(matches!(
+            valid_vertex.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         // Test invalid f32 vertex with NaN
         let invalid_nan: Vertex<f32, Option<()>, 2> = VertexBuilder::default()
@@ -1074,7 +1034,11 @@ mod tests {
             .point(Point::new([1, 2, 3]))
             .build()
             .unwrap();
-        assert!(valid_i32.is_valid().is_ok());
+        // Key should be null by default, making it invalid until inserted in SlotMap
+        assert!(matches!(
+            valid_i32.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         let valid_negative_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([-1, -2, -3]))
@@ -1102,7 +1066,11 @@ mod tests {
             .point(Point::new([42.0]))
             .build()
             .unwrap();
-        assert!(valid_1d.is_valid().is_ok());
+        // Key should be null by default, making it invalid until inserted in SlotMap
+        assert!(matches!(
+            valid_1d.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         let invalid_1d: Vertex<f64, Option<()>, 1> = VertexBuilder::default()
             .point(Point::new([f64::NAN]))
@@ -1115,7 +1083,11 @@ mod tests {
             .point(Point::new([1.0, 2.0, 3.0, 4.0, 5.0]))
             .build()
             .unwrap();
-        assert!(valid_5d.is_valid().is_ok());
+        // Key should be null by default, making it invalid until inserted in SlotMap
+        assert!(matches!(
+            valid_5d.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         let invalid_5d: Vertex<f64, Option<()>, 5> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, f64::NAN, 4.0, 5.0]))
@@ -1126,13 +1098,16 @@ mod tests {
 
     #[test]
     fn vertex_is_valid_key_check() {
-        // Test that vertex with valid point and key is valid
+        // Test that newly created vertex has valid point but null key
         let valid_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
-        assert!(valid_vertex.is_valid().is_ok());
-        assert!(!valid_vertex.key().is_null());
+        assert!(matches!(
+            valid_vertex.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
+        assert!(valid_vertex.key().is_null());
 
         // Test that default vertex (which has null key) is invalid
         let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
