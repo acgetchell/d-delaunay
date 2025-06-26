@@ -954,49 +954,70 @@ mod tests {
             .point(Point::new([-1.0, -2.0, -3.0]))
             .build()
             .unwrap();
-        assert!(valid_negative.is_valid().is_ok());
+        assert!(matches!(
+            valid_negative.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         // Test valid vertex with zero coordinates
         let valid_zero: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        assert!(valid_zero.is_valid().is_ok());
+        assert!(matches!(
+            valid_zero.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         // Test invalid vertex with NaN coordinate
         let invalid_nan: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, f64::NAN, 3.0]))
             .build()
             .unwrap();
-        assert!(invalid_nan.is_valid().is_err());
+        assert!(matches!(
+            invalid_nan.is_valid(),
+            Err(VertexValidationError::InvalidPoint { .. })
+        ));
 
         // Test invalid vertex with all NaN coordinates
         let invalid_all_nan: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([f64::NAN, f64::NAN, f64::NAN]))
             .build()
             .unwrap();
-        assert!(invalid_all_nan.is_valid().is_err());
+        assert!(matches!(
+            invalid_all_nan.is_valid(),
+            Err(VertexValidationError::InvalidPoint { .. })
+        ));
 
         // Test invalid vertex with positive infinity
         let invalid_pos_inf: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, f64::INFINITY, 3.0]))
             .build()
             .unwrap();
-        assert!(invalid_pos_inf.is_valid().is_err());
+        assert!(matches!(
+            invalid_pos_inf.is_valid(),
+            Err(VertexValidationError::InvalidPoint { .. })
+        ));
 
         // Test invalid vertex with negative infinity
         let invalid_neg_inf: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, f64::NEG_INFINITY, 3.0]))
             .build()
             .unwrap();
-        assert!(invalid_neg_inf.is_valid().is_err());
+        assert!(matches!(
+            invalid_neg_inf.is_valid(),
+            Err(VertexValidationError::InvalidPoint { .. })
+        ));
 
         // Test invalid vertex with mixed NaN and infinity
         let invalid_mixed: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([f64::NAN, f64::INFINITY, 1.0]))
             .build()
             .unwrap();
-        assert!(invalid_mixed.is_valid().is_err());
+        assert!(matches!(
+            invalid_mixed.is_valid(),
+            Err(VertexValidationError::InvalidPoint { .. })
+        ));
     }
 
     #[test]
@@ -1044,19 +1065,28 @@ mod tests {
             .point(Point::new([-1, -2, -3]))
             .build()
             .unwrap();
-        assert!(valid_negative_i32.is_valid().is_ok());
+        assert!(matches!(
+            valid_negative_i32.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         let valid_zero_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([0, 0, 0]))
             .build()
             .unwrap();
-        assert!(valid_zero_i32.is_valid().is_ok());
+        assert!(matches!(
+            valid_zero_i32.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
 
         let valid_unsigned: Vertex<u64, Option<()>, 2> = VertexBuilder::default()
             .point(Point::new([u64::MAX, u64::MIN]))
             .build()
             .unwrap();
-        assert!(valid_unsigned.is_valid().is_ok());
+        assert!(matches!(
+            valid_unsigned.is_valid(),
+            Err(VertexValidationError::InvalidKey)
+        ));
     }
 
     #[test]

@@ -39,6 +39,7 @@ use super::{
 };
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
+use peroxide::util::print;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 use std::cmp::{min, Ordering};
@@ -238,8 +239,8 @@ where
         + SubAssign<f64>
         + Sum
         + OrderedEq,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug,
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -342,7 +343,7 @@ where
             cells: SlotMap::with_key(),
         };
 
-        // Add vertices to SlotMap
+        // // Add vertices to SlotMap
         for vertex in vertices {
             tds.vertices.insert(*vertex);
         }
@@ -351,6 +352,14 @@ where
         let cells_vector = tds.bowyer_watson_logic(vertices)?;
         for cell in cells_vector {
             tds.cells.insert(cell);
+        }
+
+        for (key, value) in &tds.vertices {
+            println!("Vertex Key: {key:?}, Value: {value:?}");
+        }
+
+        for (key, value) in &tds.cells {
+            println!("Cell Key: {key:?}, Value: {value:?}");
         }
 
         Ok(tds)

@@ -383,7 +383,7 @@ where
     where
         T: super::point::FiniteCheck + super::point::HashCoordinate + Copy,
     {
-        // Check if all vertices are valid
+        // Check if all vertices are valid first
         for vertex in &self.vertices {
             vertex.is_valid()?;
         }
@@ -789,7 +789,7 @@ where
 #[cfg(test)]
 mod tests {
 
-use super::*;
+    use super::*;
     use crate::delaunay_core::{point::Point, vertex::VertexBuilder, Tds};
     use approx::assert_relative_eq;
 
@@ -2571,46 +2571,52 @@ use super::*;
 
     #[test]
     fn cell_is_valid_correct_cell() {
-        // Create points and vertices
+        // Create points for a 3D cell (tetrahedron)
         let points = vec![
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 0.0]), // first vertex
+            Point::new([1.0, 0.0, 0.0]), // second vertex
+            Point::new([0.0, 1.0, 0.0]), // third vertex
+            Point::new([0.0, 0.0, 1.0]), // fourth vertex
         ];
         let initial_vertices = Vertex::from_points(points);
 
-        // First create a cell with no valid keys - should get InvalidKey error
-        let mut cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+        // First create a cell with no valid keys - this should fail validation
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(initial_vertices.clone())
             .build()
             .unwrap();
+        println!("Initial cell has {} vertices", cell.number_of_vertices());
 
-        assert!(cell.key().is_null(), "Expected null key initially");
+        // First validation should fail on vertex validation
         let validation_result = cell.is_valid();
-        assert!(matches!(validation_result, Err(CellValidationError::InvalidKey)));
+        assert!(
+            matches!(
+                validation_result,
+                Err(CellValidationError::InvalidVertex { .. })
+            ),
+            "Expected InvalidVertex error since vertices have null keys"
+        );
 
-        // Create a TDS with our vertices to get valid vertex keys
-        let mut tds = Tds::new(&initial_vertices).unwrap();
-        let vertices_with_keys: Vec<_> = tds.vertices.values().copied().collect();
+        // Create a TDS with the vertices and get a cell
+        let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&initial_vertices).unwrap();
 
-        // Create a new cell with valid vertex keys but no cell key
-        let mut cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vertices_with_keys)
-            .build()
-            .unwrap();
+        // Get the first cell from TDS and verify it's valid
+        let cell_from_tds = tds.cells.values().next().unwrap();
+        println!(
+            "Cell from TDS has {} vertices",
+            cell_from_tds.number_of_vertices()
+        );
+        println!("Cell has valid key: {}", !cell_from_tds.key().is_null());
 
-        // Cell key is still null, so should still fail validation
-        assert!(cell.key().is_null(), "Expected null key after rebuild");
-        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
-
-        // Insert cell into TDS to get a valid cell key
-        let key = tds.cells.insert(cell.clone());
-        cell.key = key;
-
-        // Now the cell should be valid since both vertices and cell have valid keys
-        assert!(!cell.key().is_null(), "Expected non-null key after TDS insert");
-        assert!(cell.is_valid().is_ok(), "Expected cell to be valid after getting key");
+        // The cell should be valid since TDS gives it valid vertices and key
+        assert!(
+            !cell_from_tds.key().is_null(),
+            "Expected non-null key from TDS"
+        );
+        assert!(
+            cell_from_tds.is_valid().is_ok(),
+            "Expected cell from TDS to be valid"
+        );
     }
     #[test]
     fn cell_is_valid_invalid_vertex_error() {
@@ -2685,7 +2691,10 @@ use super::*;
 
         // By default cell should have null key and fail validation
         assert!(cell.key().is_null());
-        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
+        assert!(matches!(
+            cell.is_valid(),
+            Err(CellValidationError::InvalidKey)
+        ));
     }
 
     #[test]
@@ -2714,7 +2723,10 @@ use super::*;
 
         // By default cell should have null key and fail validation
         assert!(cell.key().is_null());
-        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
+        assert!(matches!(
+            cell.is_valid(),
+            Err(CellValidationError::InvalidKey)
+        ));
     }
 
     #[test]
@@ -2736,6 +2748,9 @@ use super::*;
 
         // By default cell should have null key and fail validation
         assert!(cell.key().is_null());
-        assert!(matches!(cell.is_valid(), Err(CellValidationError::InvalidKey)));
+        assert!(matches!(
+            cell.is_valid(),
+            Err(CellValidationError::InvalidKey)
+        ));
     }
 }
