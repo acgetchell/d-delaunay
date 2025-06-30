@@ -2029,13 +2029,13 @@ mod tests {
         use rand::Rng;
 
         // Create a large number of random points in 3D
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let points: Vec<Point<f64, 3>> = (0..100)
             .map(|_| {
                 Point::new([
-                    rng.gen::<f64>() * 100.0,
-                    rng.gen::<f64>() * 100.0,
-                    rng.gen::<f64>() * 100.0,
+                    rng.random::<f64>() * 100.0,
+                    rng.random::<f64>() * 100.0,
+                    rng.random::<f64>() * 100.0,
                 ])
             })
             .collect();
