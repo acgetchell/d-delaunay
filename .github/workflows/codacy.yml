@@ -16,6 +16,8 @@ name: Codacy Security Scan
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   pull_request_target:
     # The branches below must be a subset of the branches above
     branches: [ "main" ]
@@ -26,7 +28,31 @@ permissions:
   contents: read
 
 jobs:
+  generate-sarif:
+    name: Generate SARIF
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read           # for checkout
+      security-events: write   # to upload SARIF
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Generate SARIF report
+        uses: codacy/codacy-analysis-cli-action@97bf5df3c09e75f5bcd72695998f96ebd701846e
+        with:
+          verbose: true
+          output: results.sarif
+          format: sarif
+          gh-code-scanning-compat: true
+          max-allowed-issues: 0
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+
   codacy-security-scan:
+    if: github.event_name == 'pull_request_target'
     permissions:
       contents: read # for actions/checkout to fetch code
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
@@ -95,12 +121,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           labels: bug
 
-      # Upload the SARIF file generated in the previous step
-      - name: Upload SARIF results file
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: results.sarif
-
       - name: Fail if Codacy found issues
-        if: github.event_name == 'pull_request' && (steps.parse_sarif.outputs.has_major == 'true' || steps.parse_sarif.outputs.has_critical == 'true')
+        if: steps.parse_sarif.outputs.has_major == 'true' || steps.parse_sarif.outputs.has_critical == 'true'
         run: exit 1
