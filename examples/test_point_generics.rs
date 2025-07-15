@@ -9,20 +9,20 @@ use nalgebra::SVector;
 fn main() {
     // Test f64 support (default)
     let point_f64: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
-    println!("f64 point: {:?}", point_f64);
+    println!("f64 point: {point_f64:?}");
     println!("f64 coordinates: {:?}", point_f64.coordinates());
 
     // Test f32 support
     let point_f32: PointF32<3> = PointF32::new([1.0f32, 2.0f32, 3.0f32]);
-    println!("f32 point: {:?}", point_f32);
+    println!("f32 point: {point_f32:?}");
     println!("f32 coordinates: {:?}", point_f32.coordinates());
 
     // Test using the generic Point directly
     let point_generic_f64: Point<f64, SVector<f64, 2>, 2> = Point::new([4.0, 5.0]);
-    println!("Generic f64 point: {:?}", point_generic_f64);
+    println!("Generic f64 point: {point_generic_f64:?}");
 
     let point_generic_f32: Point<f32, SVector<f32, 2>, 2> = Point::new([4.0f32, 5.0f32]);
-    println!("Generic f32 point: {:?}", point_generic_f32);
+    println!("Generic f32 point: {point_generic_f32:?}");
 
     // Test validation
     println!("f64 point validation: {:?}", point_f64.is_valid());
@@ -37,7 +37,7 @@ fn main() {
 
     // Test type aliases
     let point_f64_alias: PointF64<3> = PointF64::new([1.0, 2.0, 3.0]);
-    println!("f64 alias point: {:?}", point_f64_alias);
+    println!("f64 alias point: {point_f64_alias:?}");
 
     println!("All tests completed successfully!");
 }

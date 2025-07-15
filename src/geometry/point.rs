@@ -417,19 +417,6 @@ macro_rules! impl_hash_coordinate {
 
 impl_hash_coordinate!(f32, f64);
 
-// impl<T, const D: usize> Hash for Point<T, D>
-// where
-//     T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-//     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-// {
-//     #[inline]
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         for &coord in &self.coords {
-//             coord.hash_coord(state);
-//         }
-//     }
-// }
-
 /// Helper trait for OrderedFloat-based equality comparison that handles NaN properly
 pub trait OrderedEq {
     /// Compares two values for equality using ordered comparison semantics.
@@ -449,9 +436,9 @@ pub trait OrderedEq {
     fn ordered_eq(&self, other: &Self) -> bool;
 }
 
-// Unified macro for implementing OrderedEq
+// Macro for implementing OrderedEq for floating-point types
 macro_rules! impl_ordered_eq {
-    (float: $($t:ty),*) => {
+    ($($t:ty),*) => {
         $(
             impl OrderedEq for $t {
                 #[inline(always)]
@@ -461,20 +448,9 @@ macro_rules! impl_ordered_eq {
             }
         )*
     };
-    (int: $($t:ty),*) => {
-        $(
-            impl OrderedEq for $t {
-                #[inline(always)]
-                fn ordered_eq(&self, other: &Self) -> bool {
-                    self == other
-                }
-            }
-        )*
-    };
 }
 
-impl_ordered_eq!(float: f32, f64);
-impl_ordered_eq!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+impl_ordered_eq!(f32, f64);
 
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 // impl<T, const D: usize> PartialEq for Point<T, D>
