@@ -36,7 +36,11 @@ jobs:
     steps:
       # Checkout the repository to the GitHub Actions runner
       - name: Checkout code
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
+        with:
+          # Fetch the PR's head commit so the scan analyzes the submitted changes
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
       # Execute Codacy Analysis CLI and generate a SARIF output with the security issues identified during the analysis
       - name: Run Codacy Analysis CLI
@@ -68,7 +72,7 @@ jobs:
           echo "has_minor=$has_minor" >> $GITHUB_OUTPUT
 
       - name: Comment on PR with Codacy issues
-        if: github.event_name == 'pull_request' && (steps.parse_sarif.outputs.has_major == 'true' || steps.parse_sarif.outputs.has_critical == 'true')
+        if: github.event_name == 'pull_request_target' && (steps.parse_sarif.outputs.has_major == 'true' || steps.parse_sarif.outputs.has_critical == 'true')
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -78,14 +82,14 @@ jobs:
             Please review the [Code Scanning Alerts](${{ github.server_url }}/${{ github.repository }}/security/code-scanning) for more details.
 
       - name: Add 'bug' label to PR
-        if: github.event_name == 'pull_request' && (steps.parse_sarif.outputs.has_major == 'true' || steps.parse_sarif.outputs.has_critical == 'true')
+        if: github.event_name == 'pull_request_target' && (steps.parse_sarif.outputs.has_major == 'true' || steps.parse_sarif.outputs.has_critical == 'true')
         uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           labels: bug
 
       - name: Remove 'bug' label from PR
-        if: github.event_name == 'pull_request' && steps.parse_sarif.outputs.has_major == 'false' && steps.parse_sarif.outputs.has_critical == 'false'
+        if: github.event_name == 'pull_request_target' && steps.parse_sarif.outputs.has_major == 'false' && steps.parse_sarif.outputs.has_critical == 'false'
         uses: actions-ecosystem/action-remove-labels@2ce5d41b4b6aa8503e285553f75ed56e0a40bae0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

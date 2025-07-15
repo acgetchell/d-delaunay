@@ -21,6 +21,7 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use thiserror::Error;
 
 /// A trait representing an abstract vector in D-dimensional space.
@@ -31,33 +32,37 @@ use thiserror::Error;
 ///
 /// # Type Parameters
 ///
+/// * `T`: The scalar type for coordinates (f32 or f64).
 /// * `D`: The dimensionality of the vector.
-///
-/// # Associated Types
-///
-/// * `Scalar`: The type of the scalar values used for the vector coordinates.
 ///
 /// # Required Methods
 ///
 /// * `from_array`: Constructs a vector from an array of scalar values.
 /// * `as_slice`: Provides a slice view of the vector's coordinates.
-pub trait VectorN<const D: usize> {
-    /// Scalar type for coordinates.
-    type Scalar: Copy + PartialEq + PartialOrd + Debug;
+pub trait VectorN<T, const D: usize> {
     /// Construct vector from array of scalars.
-    fn from_array(arr: [Self::Scalar; D]) -> Self;
+    fn from_array(arr: [T; D]) -> Self;
     /// Borrow coordinates as slice.
-    fn as_slice(&self) -> &[Self::Scalar];
+    fn as_slice(&self) -> &[T];
 }
 
-// Default implementation using nalgebra SVector
+// Default implementation using nalgebra SVector for f64
 use nalgebra::SVector;
-impl<const D: usize> VectorN<D> for SVector<f64, D> {
-    type Scalar = f64;
+impl<const D: usize> VectorN<f64, D> for SVector<f64, D> {
     fn from_array(arr: [f64; D]) -> Self {
         SVector::<f64, D>::from(arr)
     }
     fn as_slice(&self) -> &[f64] {
+        self.as_slice()
+    }
+}
+
+// Default implementation using nalgebra SVector for f32
+impl<const D: usize> VectorN<f32, D> for SVector<f32, D> {
+    fn from_array(arr: [f32; D]) -> Self {
+        SVector::<f32, D>::from(arr)
+    }
+    fn as_slice(&self) -> &[f32] {
         self.as_slice()
     }
 }
@@ -79,18 +84,20 @@ pub enum PointValidationError {
 
 /// A point in D-dimensional space, backed by an abstract vector storage.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct Point<V, const D: usize>
+pub struct Point<T, V, const D: usize>
 where
-    V: VectorN<D, Scalar = f64>,
+    T: Copy + PartialEq + PartialOrd + Debug,
+    V: VectorN<T, D>,
 {
     storage: V,
+    _phantom: PhantomData<T>,
 }
 
-/// Type alias for the default Point using nalgebra `SVector`
-pub type Point2D = Point<SVector<f64, 2>, 2>;
-/// Type alias for a 3-dimensional point using `SVector` as the storage.
-pub type Point3D = Point<SVector<f64, 3>, 3>;
-/// Type alias for a D-dimensional point using `SVector` as the storage.
+/// Type alias for 2D point using f64 coordinates
+pub type Point2D = Point<f64, SVector<f64, 2>, 2>;
+/// Type alias for 3D point using f64 coordinates
+pub type Point3D = Point<f64, SVector<f64, 3>, 3>;
+/// Type alias for a D-dimensional point using f64 coordinates
 ///
 /// This alias simplifies the creation of points with arbitrary dimensions
 /// backed by `nalgebra::SVector` for storage.
@@ -102,21 +109,26 @@ pub type Point3D = Point<SVector<f64, 3>, 3>;
 /// let point: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
 /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
 /// ```
-pub type PointND<const D: usize> = Point<SVector<f64, D>, D>;
+pub type PointND<const D: usize> = Point<f64, SVector<f64, D>, D>;
+
+/// Type alias for a D-dimensional point using f32 coordinates
+pub type PointF32<const D: usize> = Point<f32, SVector<f32, D>, D>;
 
 /// For backward compatibility, create a default Point type that uses f64 coordinates
-pub type PointF64<const D: usize> = Point<SVector<f64, D>, D>;
+pub type PointF64<const D: usize> = Point<f64, SVector<f64, D>, D>;
 
-impl<V, const D: usize> Point<V, D>
+impl<T, V, const D: usize> Point<T, V, D>
 where
-    V: VectorN<D, Scalar = f64>,
+    T: Copy + PartialEq + PartialOrd + Debug + Default,
+    V: VectorN<T, D>,
 {
-    /// Construct a new point from an array of f64 coordinates.
+    /// Construct a new point from an array of coordinates.
     #[inline]
     #[must_use]
-    pub fn new(coords: [f64; D]) -> Self {
+    pub fn new(coords: [T; D]) -> Self {
         Self {
             storage: V::from_array(coords),
+            _phantom: PhantomData,
         }
     }
 
@@ -128,108 +140,29 @@ where
 
     /// Returns the coordinates of the point as an array.
     ///
-    /// This method provides access to the underlying coordinate values of the point,
-    /// returning them as an array of `f64` values with a length equal to the
-    /// dimensionality of the point.
+    /// This method provides access to the coordinates of the point, returning an array of
+    /// scalar type `T` with a length equal to the point's dimensionality. It creates a copy of the
+    /// coordinates, so modifications to the returned array won't affect the original point.
     ///
-    /// # Returns
+    /// # Usage
     ///
-    /// An array `[f64; D]` containing the coordinates of the point, where `D` is the
-    /// dimensionality of the point. The coordinates are returned in the same order
-    /// they were provided when the point was created.
+    /// Use this method for geometric calculations, interfacing with libraries, or debugging.
     ///
-    /// # Performance
+    /// # Panics
     ///
-    /// This method has O(D) time complexity where D is the dimensionality of the point,
-    /// as it must copy each coordinate from the internal storage to the returned array.
-    /// The method is marked as `#[inline]` to encourage compiler optimization.
-    ///
-    /// # Memory Layout
-    ///
-    /// The returned array is a stack-allocated, owned copy of the coordinates.
-    /// This means modifying the returned array will not affect the original point.
+    /// Panics if there's a mismatch between the storage's length and `D`, indicating a serious
+    /// internal error.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use d_delaunay::geometry::point::PointND;
     ///
-    /// // Create a 2D point
-    /// let point_2d: PointND<2> = PointND::new([1.0, 2.0]);
-    /// let coords = point_2d.coordinates();
-    /// assert_eq!(coords, [1.0, 2.0]);
-    ///
-    /// // Create a 3D point
-    /// let point_3d: PointND<3> = PointND::new([1.5, -2.5, 3.0]);
-    /// let coords = point_3d.coordinates();
-    /// assert_eq!(coords, [1.5, -2.5, 3.0]);
-    ///
-    /// // Higher dimensional point
-    /// let point_5d: PointND<5> = PointND::new([1.0, 2.0, 3.0, 4.0, 5.0]);
-    /// let coords = point_5d.coordinates();
-    /// assert_eq!(coords, [1.0, 2.0, 3.0, 4.0, 5.0]);
-    ///
-    /// // Modifying the returned array doesn't affect the original point
-    /// let mut coords = point_2d.coordinates();
-    /// coords[0] = 999.0;
-    /// assert_eq!(point_2d.coordinates(), [1.0, 2.0]); // Original unchanged
-    /// ```
-    ///
-    /// # Use Cases
-    ///
-    /// This method is commonly used for:
-    /// - Accessing individual coordinate values for geometric calculations
-    /// - Interfacing with external libraries that expect coordinate arrays
-    /// - Serialization and debugging purposes
-    /// - Converting points to other geometric representations
-    ///
-    /// # Coordinate Access Patterns
-    ///
-    /// ```rust
-    /// use d_delaunay::geometry::point::PointND;
-    ///
     /// let point: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
-    /// let coords = point.coordinates();
-    ///
-    /// // Access individual coordinates
-    /// let x = coords[0];
-    /// let y = coords[1];
-    /// let z = coords[2];
-    ///
-    /// // Iterate over coordinates
-    /// for (i, &coord) in coords.iter().enumerate() {
-    ///     println!("Coordinate {}: {}", i, coord);
-    /// }
-    ///
-    /// // Use with pattern matching
-    /// match coords {
-    ///     [x, y, z] => println!("3D point: ({}, {}, {})", x, y, z),
-    ///     _ => unreachable!()
-    /// }
+    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// This method panics if there is an internal inconsistency between the storage
-    /// vector's length and the compile-time dimension `D`. This should never happen
-    /// in normal usage, as the type system ensures that the storage vector always
-    /// has exactly `D` elements.
-    ///
-    /// The panic occurs with the message "Vector slice length mismatch" and indicates
-    /// a serious internal error in the Point implementation. If this panic occurs,
-    /// it suggests either:
-    /// - A bug in the Point implementation
-    /// - Memory corruption
-    /// - Unsafe code violating the Point's invariants
-    ///
-    /// # Relationship to Other Methods
-    ///
-    /// This method is the primary way to extract coordinate data from a point:
-    /// - Use [`dim()`](Self::dim) to get the number of coordinates
-    /// - Use [`is_valid()`](Self::is_valid) to check if coordinates are finite
-    /// - Use [`origin()`](Self::origin) to create a point with zero coordinates
     #[inline]
-    pub fn coordinates(&self) -> [f64; D] {
+    pub fn coordinates(&self) -> [T; D] {
         self.storage
             .as_slice()
             .try_into()
@@ -240,9 +173,15 @@ where
     #[inline]
     #[must_use]
     pub fn origin() -> Self {
-        Self::new([0.0; D])
+        Self::new([T::default(); D])
     }
+}
 
+// Implement is_valid for floating-point coordinates only
+impl<V, const D: usize> Point<f64, V, D>
+where
+    V: VectorN<f64, D>,
+{
     /// Validates that all coordinates of the point are finite.
     ///
     /// This method checks each coordinate to ensure it is a finite floating-point value.
@@ -313,9 +252,33 @@ where
     }
 }
 
-impl<V, const D: usize> PartialEq for Point<V, D>
+// Implement is_valid for f32 coordinates
+impl<V, const D: usize> Point<f32, V, D>
 where
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f32, D>,
+{
+    /// Validates that all coordinates of the point are finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PointValidationError::InvalidCoordinate`] if any coordinate is NaN or infinite.
+    pub fn is_valid(&self) -> Result<(), PointValidationError> {
+        for (index, &coord) in self.storage.as_slice().iter().enumerate() {
+            if !coord.is_finite() {
+                return Err(PointValidationError::InvalidCoordinate {
+                    coordinate_index: index,
+                    coordinate_value: format!("{coord:?}"),
+                    dimension: D,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<V, const D: usize> PartialEq for Point<f64, V, D>
+where
+    V: VectorN<f64, D>,
 {
     fn eq(&self, other: &Self) -> bool {
         let self_coords = self.storage.as_slice();
@@ -346,20 +309,20 @@ where
     }
 }
 
-impl<V, const D: usize> Eq for Point<V, D> where V: VectorN<D, Scalar = f64> {}
+impl<V, const D: usize> Eq for Point<f64, V, D> where V: VectorN<f64, D> {}
 
-impl<V, const D: usize> PartialOrd for Point<V, D>
+impl<V, const D: usize> PartialOrd for Point<f64, V, D>
 where
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f64, D>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<V, const D: usize> Ord for Point<V, D>
+impl<V, const D: usize> Ord for Point<f64, V, D>
 where
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f64, D>,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Compare coordinates using OrderedFloat for proper handling of NaN
@@ -376,9 +339,9 @@ where
     }
 }
 
-impl<V, const D: usize> Hash for Point<V, D>
+impl<V, const D: usize> Hash for Point<f64, V, D>
 where
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f64, D>,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for &coord in self.storage.as_slice() {
@@ -536,10 +499,10 @@ impl_ordered_eq!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, u
 // }
 
 /// From trait implementations for Point conversions
-impl<T, V, const D: usize> From<[T; D]> for Point<V, D>
+impl<T, V, const D: usize> From<[T; D]> for Point<f64, V, D>
 where
     T: Clone + Copy + Default + Into<f64> + PartialEq + PartialOrd,
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f64, D>,
 {
     /// Create a new [Point] from an array of coordinates of type `T`.
     ///
@@ -558,7 +521,7 @@ where
     /// ```rust
     /// use d_delaunay::geometry::point::Point;
     /// let coords = [1, 2, 3];
-    /// let point: Point<nalgebra::SVector<f64, 3>, 3> = Point::from(coords);
+    /// let point: Point<f64, nalgebra::SVector<f64, 3>, 3> = Point::from(coords);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
@@ -567,28 +530,29 @@ where
         let coords_f64: [f64; D] = coords.map(std::convert::Into::into);
         Self {
             storage: V::from_array(coords_f64),
+            _phantom: PhantomData,
         }
     }
 }
 
 /// Implement Into trait for converting Point back to coordinate arrays
-impl<V, const D: usize> From<Point<V, D>> for [f64; D]
+impl<V, const D: usize> From<Point<f64, V, D>> for [f64; D]
 where
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f64, D>,
 {
     #[inline]
-    fn from(point: Point<V, D>) -> Self {
+    fn from(point: Point<f64, V, D>) -> Self {
         point.coordinates()
     }
 }
 
 /// Implement Into trait for converting Point reference to coordinate arrays
-impl<V, const D: usize> From<&Point<V, D>> for [f64; D]
+impl<V, const D: usize> From<&Point<f64, V, D>> for [f64; D]
 where
-    V: VectorN<D, Scalar = f64>,
+    V: VectorN<f64, D>,
 {
     #[inline]
-    fn from(point: &Point<V, D>) -> Self {
+    fn from(point: &Point<f64, V, D>) -> Self {
         point.coordinates()
     }
 }

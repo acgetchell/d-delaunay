@@ -26,8 +26,34 @@ with special emphasis on handling of NaN (Not a Number) and infinity values.
 
 ### 2. Implicit Conversion Example (`implicit_conversion.rs`)
 
-This example summarizes the refactoring performed to enable implicit conversion
-of `vertex.point.coordinates()` to coordinate arrays using Rust's `From` trait.
+Demonstrates the implicit conversion functionality that allows `vertex.point.coordinates()` 
+and `point.coordinates()` to be automatically converted to coordinate arrays using Rust's `From` trait.
+
+**Key Features:**
+
+- Converting owned vertices to coordinate arrays
+- Converting vertex references to coordinate arrays (preserving the original)
+- Converting owned points to coordinate arrays
+- Converting point references to coordinate arrays (preserving the original)
+- Comprehensive tests covering all conversion scenarios
+
+**Run with:** `cargo run --example implicit_conversion`
+
+### 3. Test Point Generics (`test_point_generics.rs`)
+
+Illustrates the flexibility of the Point struct across different scalar types and dimensions, 
+emphasizing usage with f32 and f64.
+
+**Key Features:**
+
+- Generic scalar type support (f32 and f64)
+- Multiple type aliases (PointND, PointF32, PointF64)
+- Validation for special floating-point values (NaN, infinity)
+- Testing across different dimensions (1D to 10D)
+- Precision differences between f32 and f64
+- Comprehensive tests covering all edge cases
+
+**Run with:** `cargo run --example test_point_generics`
 
 ## Overview
 
