@@ -18,8 +18,8 @@
 //! you can now use implicit conversion via `.into()` or let type inference
 //! handle the conversion automatically in many contexts.
 
-use d_delaunay::delaunay_core::point::PointND;
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+use d_delaunay::geometry::point::PointND;
 
 /// Demonstrates implicit conversion from vertices and points to coordinate arrays.
 ///

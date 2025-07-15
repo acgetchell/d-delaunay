@@ -98,7 +98,7 @@ pub type Point3D = Point<SVector<f64, 3>, 3>;
 /// # Example
 ///
 /// ```rust
-/// use d_delaunay::delaunay_core::point::PointND;
+/// use d_delaunay::geometry::point::PointND;
 /// let point: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
 /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
 /// ```
@@ -126,7 +126,108 @@ where
         D
     }
 
-    /// Returns the coordinates as an array.
+    /// Returns the coordinates of the point as an array.
+    ///
+    /// This method provides access to the underlying coordinate values of the point,
+    /// returning them as an array of `f64` values with a length equal to the
+    /// dimensionality of the point.
+    ///
+    /// # Returns
+    ///
+    /// An array `[f64; D]` containing the coordinates of the point, where `D` is the
+    /// dimensionality of the point. The coordinates are returned in the same order
+    /// they were provided when the point was created.
+    ///
+    /// # Performance
+    ///
+    /// This method has O(D) time complexity where D is the dimensionality of the point,
+    /// as it must copy each coordinate from the internal storage to the returned array.
+    /// The method is marked as `#[inline]` to encourage compiler optimization.
+    ///
+    /// # Memory Layout
+    ///
+    /// The returned array is a stack-allocated, owned copy of the coordinates.
+    /// This means modifying the returned array will not affect the original point.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use d_delaunay::geometry::point::PointND;
+    ///
+    /// // Create a 2D point
+    /// let point_2d: PointND<2> = PointND::new([1.0, 2.0]);
+    /// let coords = point_2d.coordinates();
+    /// assert_eq!(coords, [1.0, 2.0]);
+    ///
+    /// // Create a 3D point
+    /// let point_3d: PointND<3> = PointND::new([1.5, -2.5, 3.0]);
+    /// let coords = point_3d.coordinates();
+    /// assert_eq!(coords, [1.5, -2.5, 3.0]);
+    ///
+    /// // Higher dimensional point
+    /// let point_5d: PointND<5> = PointND::new([1.0, 2.0, 3.0, 4.0, 5.0]);
+    /// let coords = point_5d.coordinates();
+    /// assert_eq!(coords, [1.0, 2.0, 3.0, 4.0, 5.0]);
+    ///
+    /// // Modifying the returned array doesn't affect the original point
+    /// let mut coords = point_2d.coordinates();
+    /// coords[0] = 999.0;
+    /// assert_eq!(point_2d.coordinates(), [1.0, 2.0]); // Original unchanged
+    /// ```
+    ///
+    /// # Use Cases
+    ///
+    /// This method is commonly used for:
+    /// - Accessing individual coordinate values for geometric calculations
+    /// - Interfacing with external libraries that expect coordinate arrays
+    /// - Serialization and debugging purposes
+    /// - Converting points to other geometric representations
+    ///
+    /// # Coordinate Access Patterns
+    ///
+    /// ```rust
+    /// use d_delaunay::geometry::point::PointND;
+    ///
+    /// let point: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
+    /// let coords = point.coordinates();
+    ///
+    /// // Access individual coordinates
+    /// let x = coords[0];
+    /// let y = coords[1];
+    /// let z = coords[2];
+    ///
+    /// // Iterate over coordinates
+    /// for (i, &coord) in coords.iter().enumerate() {
+    ///     println!("Coordinate {}: {}", i, coord);
+    /// }
+    ///
+    /// // Use with pattern matching
+    /// match coords {
+    ///     [x, y, z] => println!("3D point: ({}, {}, {})", x, y, z),
+    ///     _ => unreachable!()
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This method panics if there is an internal inconsistency between the storage
+    /// vector's length and the compile-time dimension `D`. This should never happen
+    /// in normal usage, as the type system ensures that the storage vector always
+    /// has exactly `D` elements.
+    ///
+    /// The panic occurs with the message "Vector slice length mismatch" and indicates
+    /// a serious internal error in the Point implementation. If this panic occurs,
+    /// it suggests either:
+    /// - A bug in the Point implementation
+    /// - Memory corruption
+    /// - Unsafe code violating the Point's invariants
+    ///
+    /// # Relationship to Other Methods
+    ///
+    /// This method is the primary way to extract coordinate data from a point:
+    /// - Use [`dim()`](Self::dim) to get the number of coordinates
+    /// - Use [`is_valid()`](Self::is_valid) to check if coordinates are finite
+    /// - Use [`origin()`](Self::origin) to create a point with zero coordinates
     #[inline]
     pub fn coordinates(&self) -> [f64; D] {
         self.storage
@@ -137,11 +238,67 @@ where
 
     /// Origin point with all zeros.
     #[inline]
+    #[must_use]
     pub fn origin() -> Self {
         Self::new([0.0; D])
     }
 
-    /// Validate all coordinates are finite.
+    /// Validates that all coordinates of the point are finite.
+    ///
+    /// This method checks each coordinate to ensure it is a finite floating-point value.
+    /// A coordinate is considered valid if it is not NaN (Not a Number) and not infinite
+    /// (positive or negative infinity).
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` if all coordinates are finite
+    /// * `Err(PointValidationError::InvalidCoordinate)` if any coordinate is NaN or infinite
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PointValidationError::InvalidCoordinate`] containing:
+    /// - The index of the first invalid coordinate found
+    /// - The string representation of the invalid coordinate value
+    /// - The dimensionality of the point
+    ///
+    /// # Performance
+    ///
+    /// This method has O(D) time complexity where D is the dimensionality of the point,
+    /// as it must check each coordinate individually.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use d_delaunay::geometry::point::PointND;
+    ///
+    /// // Valid point with finite coordinates
+    /// let valid_point: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
+    /// assert!(valid_point.is_valid().is_ok());
+    ///
+    /// // Invalid point with NaN coordinate
+    /// let invalid_point: PointND<3> = PointND::new([1.0, f64::NAN, 3.0]);
+    /// assert!(invalid_point.is_valid().is_err());
+    ///
+    /// // Invalid point with infinite coordinate
+    /// let infinite_point: PointND<3> = PointND::new([1.0, f64::INFINITY, 3.0]);
+    /// assert!(infinite_point.is_valid().is_err());
+    ///
+    /// // Check specific error details
+    /// match invalid_point.is_valid() {
+    ///     Err(error) => {
+    ///         // Error contains the index and value of the invalid coordinate
+    ///         println!("Invalid coordinate found: {}", error);
+    ///     }
+    ///     Ok(_) => unreachable!()
+    /// }
+    /// ```
+    ///
+    /// # Use in Delaunay Triangulation
+    ///
+    /// This validation is particularly important for Delaunay triangulation algorithms,
+    /// as NaN or infinite coordinates can cause numerical instability and incorrect
+    /// geometric computations. It's recommended to validate points before adding them
+    /// to a triangulation.
     pub fn is_valid(&self) -> Result<(), PointValidationError> {
         for (index, &coord) in self.storage.as_slice().iter().enumerate() {
             if !coord.is_finite() {
@@ -172,7 +329,7 @@ where
     V: VectorN<D, Scalar = f64>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.coordinates().partial_cmp(&other.coordinates())
+        Some(self.cmp(other))
     }
 }
 
@@ -187,7 +344,7 @@ where
 
         for i in 0..D {
             match OrderedFloat(self_coords[i]).cmp(&OrderedFloat(other_coords[i])) {
-                std::cmp::Ordering::Equal => continue,
+                std::cmp::Ordering::Equal => {}
                 other_ordering => return other_ordering,
             }
         }
@@ -245,7 +402,7 @@ pub trait HashCoordinate {
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::point::HashCoordinate;
+    /// use d_delaunay::geometry::point::HashCoordinate;
     /// use std::collections::hash_map::DefaultHasher;
     /// use std::hash::Hasher;
     ///
@@ -375,7 +532,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let coords = [1, 2, 3];
     /// let point: Point<nalgebra::SVector<f64, 3>, 3> = Point::from(coords);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);

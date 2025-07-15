@@ -66,7 +66,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -99,7 +99,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
@@ -139,7 +139,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
@@ -187,7 +187,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// // Create a 3D tetrahedron with 4 vertices

@@ -53,7 +53,7 @@ pub fn make_uuid() -> Uuid {
 /// ```
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::delaunay_core::point::Point;
+/// use d_delaunay::geometry::point::Point;
 /// use std::collections::HashMap;
 /// use std::cmp::Ordering;
 /// let points = vec![

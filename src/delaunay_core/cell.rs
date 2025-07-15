@@ -5,10 +5,10 @@
 use super::{
     facet::Facet,
     matrix::invert,
-    point::PointND,
     utilities::{make_uuid, vec_to_array},
     vertex::{Vertex, VertexValidationError},
 };
+use crate::geometry::point::PointND;
 use nalgebra as na;
 use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
 use serde::{Deserialize, Serialize};
@@ -122,7 +122,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -145,7 +145,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -168,7 +168,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use uuid::Uuid;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let cell: Cell<Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1]).build().unwrap();
@@ -191,7 +191,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -220,8 +220,8 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::point::PointND;
     ///
     /// let vertex1: Vertex<usize, 3> = VertexBuilder::default()
     ///     .point(PointND::new([0.0, 0.0, 1.0]))
@@ -269,7 +269,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
     /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
     /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
@@ -304,7 +304,7 @@ where
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// let vertex1 = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -373,7 +373,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// let vertex1 = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -472,7 +472,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(1_usize).build().unwrap();
     /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
     /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
@@ -557,7 +557,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
     /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
     /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
@@ -603,7 +603,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
     /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
     /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
@@ -657,7 +657,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::PointND;
+    /// use d_delaunay::geometry::point::PointND;
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
     /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
