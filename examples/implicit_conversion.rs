@@ -4,19 +4,14 @@
 //! `vertex.point.coordinates()` and `point.coordinates()` to be automatically
 //! converted to coordinate arrays using Rust's `From` trait.
 //!
-//! ## Features Demonstrated
+//! ## Key Features Demonstrated
 //!
 //! - Converting owned vertices to coordinate arrays
 //! - Converting vertex references to coordinate arrays (preserving the original)
 //! - Converting owned points to coordinate arrays
 //! - Converting point references to coordinate arrays (preserving the original)
 //!
-//! ## Benefits
-//!
-//! This refactoring provides more ergonomic code while maintaining backward
-//! compatibility. Instead of always having to call `.coordinates()` explicitly,
-//! you can now use implicit conversion via `.into()` or let type inference
-//! handle the conversion automatically in many contexts.
+//! Run this example with: `cargo run --example implicit_conversion`
 
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 use d_delaunay::geometry::point::PointND;

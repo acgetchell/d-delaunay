@@ -61,6 +61,20 @@ where
     pub data: Option<U>,
 }
 
+impl<U, const D: usize> Default for Vertex<U, D>
+where
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+{
+    fn default() -> Self {
+        Self {
+            point: PointND::origin(),
+            uuid: Uuid::nil(),
+            incident_cell: None,
+            data: None,
+        }
+    }
+}
+
 impl<U, const D: usize> Vertex<U, D>
 where
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,

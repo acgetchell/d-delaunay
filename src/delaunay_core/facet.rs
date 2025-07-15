@@ -12,7 +12,7 @@ use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 /// The [Facet] struct represents a facet of a d-dimensional simplex.
 /// Passing in a [Vertex] and a [Cell] containing that vertex to the
 /// constructor will create a [Facet] struct.

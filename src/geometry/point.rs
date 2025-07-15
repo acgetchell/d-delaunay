@@ -318,7 +318,31 @@ where
     V: VectorN<D, Scalar = f64>,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.storage.as_slice() == other.storage.as_slice()
+        let self_coords = self.storage.as_slice();
+        let other_coords = other.storage.as_slice();
+
+        // Compare coordinates one by one, treating NaN as equal to itself
+        for i in 0..D {
+            let a = self_coords[i];
+            let b = other_coords[i];
+
+            // If both are NaN, they are considered equal
+            if a.is_nan() && b.is_nan() {
+                continue;
+            }
+
+            // If one is NaN and the other is not, they are not equal
+            if a.is_nan() || b.is_nan() {
+                return false;
+            }
+
+            // Use normal f64 equality for non-NaN values
+            if a != b {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
