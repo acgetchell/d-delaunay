@@ -18,7 +18,7 @@
 //! you can now use implicit conversion via `.into()` or let type inference
 //! handle the conversion automatically in many contexts.
 
-use d_delaunay::delaunay_core::point::Point;
+use d_delaunay::delaunay_core::point::PointND;
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 
 /// Demonstrates implicit conversion from vertices and points to coordinate arrays.
@@ -28,8 +28,10 @@ use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// alternatives to explicitly calling `.coordinates()`.
 fn main() {
     // Create a vertex with 3D coordinates
-    let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
-        .point(Point::new([1.0, 2.0, 3.0]))
+    // Note: Using usize for vertex data type since f64 doesn't implement Hash/Ord
+    let vertex: Vertex<usize, 3> = VertexBuilder::default()
+        .point(PointND::new([1.0, 2.0, 3.0]))
+        .data(42_usize) // Add some vertex data
         .build()
         .unwrap();
 
@@ -42,8 +44,9 @@ fn main() {
     println!("Implicit conversion from vertex: {coords_from_vertex:?}");
 
     // Create another vertex for reference conversion
-    let another_vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
-        .point(Point::new([4.0, 5.0, 6.0]))
+    let another_vertex: Vertex<usize, 3> = VertexBuilder::default()
+        .point(PointND::new([4.0, 5.0, 6.0]))
+        .data(100_usize)
         .build()
         .unwrap();
 
@@ -56,12 +59,12 @@ fn main() {
     );
 
     // Point implicit conversion also works
-    let point = Point::new([7.0, 8.0, 9.0]);
+    let point = PointND::new([7.0, 8.0, 9.0]);
     let coords_from_point: [f64; 3] = point.into();
     println!("Implicit conversion from point: {coords_from_point:?}");
 
     // And from point reference
-    let another_point = Point::new([10.0, 11.0, 12.0]);
+    let another_point = PointND::new([10.0, 11.0, 12.0]);
     let coords_from_point_ref: [f64; 3] = (&another_point).into();
     println!("Implicit conversion from point reference: {coords_from_point_ref:?}");
     println!(
