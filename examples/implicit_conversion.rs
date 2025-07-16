@@ -13,7 +13,7 @@
 //!
 //! Run this example with: `cargo run --example implicit_conversion`
 
-use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
 use d_delaunay::geometry::point::PointND;
 
 /// Demonstrates implicit conversion from vertices and points to coordinate arrays.
@@ -24,7 +24,7 @@ use d_delaunay::geometry::point::PointND;
 fn main() {
     // Create a vertex with 3D coordinates
     // Note: Using usize for vertex data type since f64 doesn't implement Hash/Ord
-    let vertex: Vertex<usize, 3> = VertexBuilder::default()
+    let vertex: VertexND<usize, 3> = VertexBuilder::default()
         .point(PointND::new([1.0, 2.0, 3.0]))
         .data(42_usize) // Add some vertex data
         .build()
@@ -39,7 +39,7 @@ fn main() {
     println!("Implicit conversion from vertex: {coords_from_vertex:?}");
 
     // Create another vertex for reference conversion
-    let another_vertex: Vertex<usize, 3> = VertexBuilder::default()
+    let another_vertex: VertexND<usize, 3> = VertexBuilder::default()
         .point(PointND::new([4.0, 5.0, 6.0]))
         .data(100_usize)
         .build()
@@ -70,13 +70,13 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
     use d_delaunay::geometry::point::PointND;
 
     #[test]
     fn test_vertex_implicit_conversion() {
         // Test owned vertex conversion
-        let vertex: Vertex<usize, 3> = VertexBuilder::default()
+        let vertex: VertexND<usize, 3> = VertexBuilder::default()
             .point(PointND::new([1.0, 2.0, 3.0]))
             .data(42_usize)
             .build()
@@ -86,7 +86,7 @@ mod tests {
         assert_eq!(coords, [1.0, 2.0, 3.0]);
 
         // Test vertex reference conversion
-        let vertex_ref: Vertex<usize, 3> = VertexBuilder::default()
+        let vertex_ref: VertexND<usize, 3> = VertexBuilder::default()
             .point(PointND::new([4.0, 5.0, 6.0]))
             .data(100_usize)
             .build()
@@ -128,7 +128,7 @@ mod tests {
         assert_eq!(coords_4d, [1.0, 2.0, 3.0, 4.0]);
 
         // Test vertices with different dimensions
-        let vertex_2d: Vertex<usize, 2> = VertexBuilder::default()
+        let vertex_2d: VertexND<usize, 2> = VertexBuilder::default()
             .point(PointND::new([5.0, 6.0]))
             .data(123_usize)
             .build()
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_vertex_conversion_consistency() {
-        let vertex: Vertex<usize, 3> = VertexBuilder::default()
+        let vertex: VertexND<usize, 3> = VertexBuilder::default()
             .point(PointND::new([1.1, 2.2, 3.3]))
             .data(999_usize)
             .build()
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_functional_usage() {
         // Test that implicit conversion works in functional contexts
-        let vertices: Vec<Vertex<usize, 3>> = vec![
+        let vertices: Vec<VertexND<usize, 3>> = vec![
             VertexBuilder::default()
                 .point(PointND::new([1.0, 2.0, 3.0]))
                 .data(1_usize)

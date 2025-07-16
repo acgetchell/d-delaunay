@@ -7,7 +7,7 @@ use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
     utilities::find_extreme_coordinates,
-    vertex::Vertex,
+    vertex::VertexND,
 };
 use crate::geometry::point::PointND;
 use approx::abs_diff_eq;
@@ -69,7 +69,7 @@ fn facets_are_adjacent<U, V, const D: usize>(
     facet2: &Facet<U, V, D>,
 ) -> bool
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     // Two facets are adjacent if they have the same vertices
@@ -87,11 +87,11 @@ where
 
 /// Generate all combinations of `k` vertices from the given vertex list
 fn generate_combinations<U, const D: usize>(
-    vertices: &[Vertex<U, D>],
+    vertices: &[VertexND<U, D>],
     k: usize,
-) -> Vec<Vec<Vertex<U, D>>>
+) -> Vec<Vec<VertexND<U, D>>>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
 {
     let mut combinations = Vec::new();
 
@@ -168,14 +168,14 @@ where
 pub struct Tds<T, U, V, const D: usize>
 where
     T: Clone + Copy + Default + PartialEq + PartialOrd,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + Serialize + Sized,
 {
     /// A [`HashMap`] that stores [Vertex] objects with their corresponding [Uuid]s as
     /// keys. Each [Vertex] has a [Point] of type T, vertex data of type U,
     /// and a constant D representing the dimension.
-    pub vertices: HashMap<Uuid, Vertex<U, D>>,
+    pub vertices: HashMap<Uuid, VertexND<U, D>>,
 
     /// A marker to use the type parameter T without direct field usage.
     marker: PhantomData<T>,
@@ -201,7 +201,7 @@ where
         + PartialOrd
         + SubAssign<f64>
         + Sum,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
@@ -272,9 +272,9 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexND};
     ///
-    /// let vertices: Vec<Vertex<usize, 3>> = Vec::new();
+    /// let vertices: Vec<VertexND<usize, 3>> = Vec::new();
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 0);
     /// assert_eq!(tds.dim(), -1);
@@ -297,13 +297,13 @@ where
     /// assert_eq!(tds.number_of_vertices(), 3);
     /// assert_eq!(tds.dim(), 2);
     /// ```
-    pub fn new(vertices: &[Vertex<U, D>]) -> Result<Self, TriangulationValidationError>
+    pub fn new(vertices: &[VertexND<U, D>]) -> Result<Self, TriangulationValidationError>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + Serialize + Sized,
     {
         let mut tds = Self {
-            vertices: Vertex::into_hashmap(vertices.to_owned()),
+            vertices: VertexND::into_hashmap(vertices.to_owned()),
             marker: PhantomData,
             cells: HashMap::new(),
         };
@@ -394,7 +394,7 @@ where
     /// assert_eq!(tds.number_of_vertices(), 3);
     /// assert_eq!(tds.dim(), 2);
     /// ```
-    pub fn add(&mut self, vertex: Vertex<U, D>) -> Result<(), &'static str> {
+    pub fn add(&mut self, vertex: VertexND<U, D>) -> Result<(), &'static str> {
         // Don't add if vertex with that point already exists
         for val in self.vertices.values() {
             let existing_coords: [f64; D] = val.into();
@@ -677,7 +677,7 @@ where
         let points = Self::create_supercell_simplex(&center, radius);
 
         let supercell = CellBuilder::default()
-            .vertices(Vertex::from_points(points))
+            .vertices(VertexND::from_points(points))
             .build()
             .unwrap();
 
@@ -691,7 +691,7 @@ where
         let points = Self::create_supercell_simplex(&center, radius);
 
         let supercell = CellBuilder::default()
-            .vertices(Vertex::from_points(points))
+            .vertices(VertexND::from_points(points))
             .build()
             .unwrap();
 
@@ -867,7 +867,7 @@ where
     /// and returns a vector of cells
     fn bowyer_watson_logic(
         &mut self,
-        vertices: &[Vertex<U, D>],
+        vertices: &[VertexND<U, D>],
     ) -> Result<Vec<Cell<U, V, D>>, TriangulationValidationError>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
@@ -878,7 +878,7 @@ where
         }
 
         // Store original vertices in self for use by helper methods
-        self.vertices = Vertex::into_hashmap(vertices.to_owned());
+        self.vertices = VertexND::into_hashmap(vertices.to_owned());
 
         // For cases with a small number of vertices, use direct combinatorial approach
         if vertices.len() > D && vertices.len() <= D + 5 {
@@ -984,7 +984,7 @@ where
     #[allow(clippy::type_complexity)]
     fn find_bad_cells_and_boundary_facets(
         &mut self,
-        vertex: &Vertex<U, D>,
+        vertex: &VertexND<U, D>,
     ) -> Result<(Vec<Uuid>, Vec<Facet<U, V, D>>), anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,

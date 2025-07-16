@@ -6,7 +6,7 @@
 //! Facets are not stored in the `Triangulation Data Structure` (TDS)
 //! directly, but created on the fly when needed.
 
-use super::{cell::Cell, vertex::Vertex};
+use super::{cell::Cell, vertex::VertexND};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -26,19 +26,19 @@ use thiserror::Error;
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
 pub struct Facet<U, V, const D: usize>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     /// The [Cell] that contains this facet.
     cell: Cell<U, V, D>,
 
     /// The [Vertex] opposite to this facet.
-    vertex: Vertex<U, D>,
+    vertex: VertexND<U, D>,
 }
 
 impl<U, V, const D: usize> Facet<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     /// The `new` function is a constructor for the [Facet]. It takes
@@ -76,7 +76,7 @@ where
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
     /// assert_eq!(facet.cell(), &cell);
     /// ```
-    pub fn new(cell: Cell<U, V, D>, vertex: Vertex<U, D>) -> Result<Self, anyhow::Error> {
+    pub fn new(cell: Cell<U, V, D>, vertex: VertexND<U, D>) -> Result<Self, anyhow::Error> {
         if !cell.vertices().contains(&vertex) {
             return Err(FacetError::CellDoesNotContainVertex.into());
         }
@@ -167,7 +167,7 @@ where
     /// assert!(facet_vertices.contains(&vertex4));
     /// ```
     #[inline]
-    pub fn vertex(&self) -> &Vertex<U, D> {
+    pub fn vertex(&self) -> &VertexND<U, D> {
         &self.vertex
     }
 
@@ -179,7 +179,7 @@ where
     ///
     /// # Returns
     ///
-    /// A `Vec<Vertex<U, D>>` containing all vertices that form this facet,
+    /// A `Vec<VertexND<U, D>>` containing all vertices that form this facet,
     /// which are all the cell's vertices excluding the opposite vertex.
     ///
     /// # Example
@@ -236,7 +236,7 @@ where
     /// assert!(facet2_vertices.contains(&vertex3));
     /// assert!(facet2_vertices.contains(&vertex4));
     /// ```
-    pub fn vertices(&self) -> Vec<Vertex<U, D>> {
+    pub fn vertices(&self) -> Vec<VertexND<U, D>> {
         self.cell
             .vertices()
             .iter()
@@ -249,18 +249,18 @@ where
 // Consolidated trait implementations for Facet
 impl<U, V, const D: usize> Eq for Facet<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    Vertex<U, D>: Hash,
+    VertexND<U, D>: Hash,
     Cell<U, V, D>: Hash,
 {
 }
 
 impl<U, V, const D: usize> Hash for Facet<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    Vertex<U, D>: Hash,
+    VertexND<U, D>: Hash,
     Cell<U, V, D>: Hash,
 {
     #[inline]

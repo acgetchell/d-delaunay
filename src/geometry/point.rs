@@ -350,6 +350,81 @@ where
     }
 }
 
+// Implement PartialEq for f32 coordinates
+impl<V, const D: usize> PartialEq for Point<f32, V, D>
+where
+    V: VectorN<f32, D>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let self_coords = self.storage.as_slice();
+        let other_coords = other.storage.as_slice();
+
+        // Compare coordinates one by one, treating NaN as equal to itself
+        for i in 0..D {
+            let a = self_coords[i];
+            let b = other_coords[i];
+
+            // If both are NaN, they are considered equal
+            if a.is_nan() && b.is_nan() {
+                continue;
+            }
+
+            // If one is NaN and the other is not, they are not equal
+            if a.is_nan() || b.is_nan() {
+                return false;
+            }
+
+            // Use normal f32 equality for non-NaN values
+            if a != b {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl<V, const D: usize> Eq for Point<f32, V, D> where V: VectorN<f32, D> {}
+
+impl<V, const D: usize> PartialOrd for Point<f32, V, D>
+where
+    V: VectorN<f32, D>,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<V, const D: usize> Ord for Point<f32, V, D>
+where
+    V: VectorN<f32, D>,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Compare coordinates using OrderedFloat for proper handling of NaN
+        let self_coords = self.coordinates();
+        let other_coords = other.coordinates();
+
+        for i in 0..D {
+            match OrderedFloat(self_coords[i]).cmp(&OrderedFloat(other_coords[i])) {
+                std::cmp::Ordering::Equal => {}
+                other_ordering => return other_ordering,
+            }
+        }
+        std::cmp::Ordering::Equal
+    }
+}
+
+impl<V, const D: usize> Hash for Point<f32, V, D>
+where
+    V: VectorN<f32, D>,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for &coord in self.storage.as_slice() {
+            OrderedFloat(coord).hash(state);
+        }
+    }
+}
+
 /// Helper trait for checking finiteness of coordinates.
 pub trait FiniteCheck {
     /// Returns true if the value is finite (not NaN or infinite).

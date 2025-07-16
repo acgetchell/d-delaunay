@@ -6,7 +6,7 @@ use super::{
     facet::Facet,
     matrix::invert,
     utilities::{make_uuid, vec_to_array},
-    vertex::{Vertex, VertexValidationError},
+    vertex::{VertexND, VertexValidationError},
 };
 use crate::geometry::point::PointND;
 use nalgebra as na;
@@ -66,11 +66,11 @@ pub enum CellValidationError {
 ///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<U, V, const D: usize>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     /// The vertices of the cell.
-    vertices: Vec<Vertex<U, D>>,
+    vertices: Vec<VertexND<U, D>>,
     /// The unique identifier of the cell.
     #[builder(setter(skip), default = "make_uuid()")]
     uuid: Uuid,
@@ -84,7 +84,7 @@ where
 
 impl<U, V, const D: usize> CellBuilder<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     fn validate(&self) -> Result<(), CellBuilderError> {
@@ -108,7 +108,7 @@ where
 // Basic implementation block with minimal trait bounds for common methods
 impl<U, V, const D: usize> Cell<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     /// The function returns the number of vertices in the [Cell].
@@ -138,7 +138,7 @@ where
     ///
     /// # Returns
     ///
-    /// A reference to the `Vec<Vertex<U, D>>` containing the vertices of the cell.
+    /// A reference to the `Vec<VertexND<U, D>>` containing the vertices of the cell.
     ///
     /// # Example
     ///
@@ -153,7 +153,7 @@ where
     /// assert_eq!(cell.vertices().len(), 3);
     /// ```
     #[inline]
-    pub fn vertices(&self) -> &Vec<Vertex<U, D>> {
+    pub fn vertices(&self) -> &Vec<VertexND<U, D>> {
         &self.vertices
     }
 
@@ -219,26 +219,25 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
     /// use d_delaunay::geometry::point::PointND;
     ///
-    /// let vertex1: Vertex<usize, 3> = VertexBuilder::default()
+    /// let vertex1: VertexND<usize, 3> = VertexBuilder::default()
     ///     .point(PointND::new([0.0, 0.0, 1.0]))
     ///     .data(1_usize)
     ///     .build()
     ///     .unwrap();
-    /// let vertex2: Vertex<usize, 3> = VertexBuilder::default()
+    /// let vertex2: VertexND<usize, 3> = VertexBuilder::default()
     ///     .point(PointND::new([0.0, 1.0, 0.0]))
     ///     .data(1_usize)
     ///     .build()
     ///     .unwrap();
-    /// let vertex3: Vertex<usize, 3> = VertexBuilder::default()
+    /// let vertex3: VertexND<usize, 3> = VertexBuilder::default()
     ///     .point(PointND::new([1.0, 0.0, 0.0]))
     ///     .data(1_usize)
     ///     .build()
     ///     .unwrap();
-    /// let vertex4: Vertex<usize, 3> = VertexBuilder::default()
+    /// let vertex4: VertexND<usize, 3> = VertexBuilder::default()
     ///     .point(PointND::new([1.0, 1.0, 1.0]))
     ///     .data(2_usize)
     ///     .build()
@@ -250,7 +249,7 @@ where
     ///     .unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
-    pub fn contains_vertex(&self, vertex: Vertex<U, D>) -> bool {
+    pub fn contains_vertex(&self, vertex: VertexND<U, D>) -> bool {
         self.vertices.contains(&vertex)
     }
 
@@ -268,14 +267,14 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
     /// use d_delaunay::geometry::point::PointND;
-    /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
-    /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex4: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
+    /// let vertex1: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
+    /// let vertex2: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex3: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex4: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
     /// let cell: Cell<usize, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
-    /// let vertex5: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(0_usize).build().unwrap();
+    /// let vertex5: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(0_usize).build().unwrap();
     /// let cell2: Cell<usize, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
     /// assert!(cell.contains_vertex_of(&cell2));
     /// ```
@@ -317,7 +316,7 @@ where
     /// ```
     pub fn from_facet_and_vertex(
         facet: &Facet<U, V, D>,
-        vertex: Vertex<U, D>,
+        vertex: VertexND<U, D>,
     ) -> Result<Self, anyhow::Error> {
         let mut vertices = facet.vertices();
         vertices.push(vertex);
@@ -417,7 +416,7 @@ where
 // Advanced implementation block for methods requiring ComplexField
 impl<U, V, const D: usize> Cell<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     /// The function `circumcenter` returns the circumcenter of the cell.
@@ -471,12 +470,12 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
     /// use d_delaunay::geometry::point::PointND;
-    /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex4: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(2_usize).build().unwrap();
+    /// let vertex1: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex2: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex3: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex4: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(2_usize).build().unwrap();
     /// let cell: Cell<usize, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let circumcenter = cell.circumcenter().unwrap();
     /// assert_eq!(circumcenter, PointND::new([0.5, 0.5, 0.5]));
@@ -556,17 +555,17 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
     /// use d_delaunay::geometry::point::PointND;
-    /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
-    /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex4: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
+    /// let vertex1: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
+    /// let vertex2: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex3: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex4: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
     /// let cell: Cell<usize, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
     /// ```
-    pub fn circumsphere_contains(&self, vertex: Vertex<U, D>) -> Result<bool, anyhow::Error> {
+    pub fn circumsphere_contains(&self, vertex: VertexND<U, D>) -> Result<bool, anyhow::Error> {
         let circumcenter = self.circumcenter()?;
         let circumradius = self.circumradius_with_center(&circumcenter);
         // Use implicit conversion from vertex to coordinates
@@ -602,19 +601,19 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder, VertexND};
     /// use d_delaunay::geometry::point::PointND;
-    /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
-    /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex4: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
+    /// let vertex1: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
+    /// let vertex2: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex3: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex4: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
     /// let cell: Cell<usize, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
-    /// let origin: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(0_usize).build().unwrap();
+    /// let origin: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 0.0])).data(0_usize).build().unwrap();
     /// assert!(cell.circumsphere_contains(origin).unwrap());
     /// ```
     pub fn circumsphere_contains_vertex(
         &self,
-        vertex: Vertex<U, D>,
+        vertex: VertexND<U, D>,
     ) -> Result<bool, anyhow::Error> {
         // Setup initial matrix with zeros
         let mut matrix = zeros(D + 1, D + 1);
@@ -656,13 +655,13 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{VertexBuilder, VertexND};
     /// use d_delaunay::geometry::point::PointND;
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// let vertex1: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
-    /// let vertex2: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex3: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
-    /// let vertex4: Vertex<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
+    /// let vertex1: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 0.0, 1.0])).data(1_usize).build().unwrap();
+    /// let vertex2: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([0.0, 1.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex3: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 0.0, 0.0])).data(1_usize).build().unwrap();
+    /// let vertex4: VertexND<usize, 3> = VertexBuilder::default().point(PointND::new([1.0, 1.0, 1.0])).data(2_usize).build().unwrap();
     /// let cell: Cell<usize, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
     /// let facets = cell.facets();
     /// assert_eq!(facets.len(), 4);
@@ -676,9 +675,9 @@ where
 }
 
 /// Helper function to sort vertices for comparison and hashing
-fn sorted_vertices<U, const D: usize>(vertices: &[Vertex<U, D>]) -> Vec<Vertex<U, D>>
+fn sorted_vertices<U, const D: usize>(vertices: &[VertexND<U, D>]) -> Vec<VertexND<U, D>>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
 {
     let mut sorted = vertices.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -688,7 +687,7 @@ where
 /// Equality of cells is based on equality of sorted vector of vertices.
 impl<U, V, const D: usize> PartialEq for Cell<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     #[inline]
@@ -700,7 +699,7 @@ where
 /// Eq implementation for Cell based on equality of sorted vector of vertices.
 impl<U, V, const D: usize> Eq for Cell<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
 }
@@ -708,7 +707,7 @@ where
 /// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<U, V, const D: usize> PartialOrd for Cell<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     #[inline]
@@ -721,7 +720,7 @@ where
 /// Custom Hash implementation for Cell
 impl<U, V, const D: usize> Hash for Cell<U, V, D>
 where
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

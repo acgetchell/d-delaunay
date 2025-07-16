@@ -89,7 +89,7 @@ pub fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
 mod lib_tests {
     use crate::{
         delaunay_core::{
-            cell::Cell, facet::Facet, triangulation_data_structure::Tds, vertex::Vertex,
+            cell::Cell, facet::Facet, triangulation_data_structure::Tds, vertex::VertexND,
         },
         geometry::point::PointND,
         is_normal,
@@ -99,7 +99,7 @@ mod lib_tests {
     fn normal_types() {
         assert!(is_normal::<PointND<3>>());
         assert!(is_normal::<PointND<2>>());
-        assert!(is_normal::<Vertex<usize, 3>>());
+        assert!(is_normal::<VertexND<usize, 3>>());
         assert!(is_normal::<Facet<usize, Option<()>, 3>>());
         assert!(is_normal::<Cell<usize, Option<()>, 4>>());
         assert!(is_normal::<Tds<f64, usize, Option<()>, 4>>());
