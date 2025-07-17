@@ -53,7 +53,7 @@ mod lib_tests {
         delaunay_core::{
             cell::Cell, facet::Facet, triangulation_data_structure::Tds, vertex::Vertex,
         },
-        geometry::point::Point,
+        geometry::Point,
         is_normal,
     };
 

@@ -12,7 +12,7 @@ use super::{
 use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use num_traits::Float;
+use num_traits::{Float, NumCast};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
@@ -666,9 +666,9 @@ where
         // Convert back to T
         let mut center = [T::default(); D];
         for i in 0..D {
-            center[i] = <T as From<f64>>::from(center_f64[i]);
+            center[i] = NumCast::from(center_f64[i]).unwrap();
         }
-        let radius = <T as From<f64>>::from(radius_f64);
+        let radius = NumCast::from(radius_f64).unwrap();
 
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
         let points = Self::create_supercell_simplex(&center, radius);

@@ -1822,6 +1822,102 @@ mod tests {
     }
 
     #[test]
+    fn point_hash_special_values() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        // Test for NaN
+        let point_nan1 = Point::new([f64::NAN, 2.0]);
+        let point_nan2 = Point::new([f64::NAN, 2.0]);
+
+        let mut hasher_nan1 = DefaultHasher::new();
+        let mut hasher_nan2 = DefaultHasher::new();
+
+        point_nan1.hash(&mut hasher_nan1);
+        point_nan2.hash(&mut hasher_nan2);
+
+        assert_eq!(hasher_nan1.finish(), hasher_nan2.finish());
+
+        // Test for positive infinity
+        let point_inf1 = Point::new([f64::INFINITY, 2.0]);
+        let point_inf2 = Point::new([f64::INFINITY, 2.0]);
+
+        let mut hasher_inf1 = DefaultHasher::new();
+        let mut hasher_inf2 = DefaultHasher::new();
+
+        point_inf1.hash(&mut hasher_inf1);
+        point_inf2.hash(&mut hasher_inf2);
+
+        assert_eq!(hasher_inf1.finish(), hasher_inf2.finish());
+
+        // Test for negative infinity
+        let point_neg_inf1 = Point::new([f64::NEG_INFINITY, 2.0]);
+        let point_neg_inf2 = Point::new([f64::NEG_INFINITY, 2.0]);
+
+        let mut hasher_neg_inf1 = DefaultHasher::new();
+        let mut hasher_neg_inf2 = DefaultHasher::new();
+
+        point_neg_inf1.hash(&mut hasher_neg_inf1);
+        point_neg_inf2.hash(&mut hasher_neg_inf2);
+
+        assert_eq!(hasher_neg_inf1.finish(), hasher_neg_inf2.finish());
+
+        // Test for +0.0 and -0.0
+        let point_pos_zero = Point::new([0.0, 2.0]);
+        let point_neg_zero = Point::new([-0.0, 2.0]);
+
+        let mut hasher_pos_zero = DefaultHasher::new();
+        let mut hasher_neg_zero = DefaultHasher::new();
+
+        point_pos_zero.hash(&mut hasher_pos_zero);
+        point_neg_zero.hash(&mut hasher_neg_zero);
+
+        assert_eq!(hasher_pos_zero.finish(), hasher_neg_zero.finish());
+    }
+
+    #[test]
+    fn point_hashmap_special_values() {
+        use std::collections::HashMap;
+
+        let mut map: HashMap<Point<f64, 2>, &str> = HashMap::new();
+
+        let point_nan = Point::new([f64::NAN, 2.0]);
+        let point_inf = Point::new([f64::INFINITY, 2.0]);
+        let point_neg_inf = Point::new([f64::NEG_INFINITY, 2.0]);
+        let point_zero = Point::new([0.0, 2.0]);
+
+        map.insert(point_nan, "NaN Point");
+        map.insert(point_inf, "Infinity Point");
+        map.insert(point_neg_inf, "Negative Infinity Point");
+        map.insert(point_zero, "Zero Point");
+
+        assert_eq!(map[&Point::new([f64::NAN, 2.0])], "NaN Point");
+        assert_eq!(map[&Point::new([f64::INFINITY, 2.0])], "Infinity Point");
+        assert_eq!(map[&Point::new([f64::NEG_INFINITY, 2.0])], "Negative Infinity Point");
+        assert_eq!(map[&Point::new([-0.0, 2.0])], "Zero Point");
+    }
+
+    #[test]
+    fn point_hashset_special_values() {
+        use std::collections::HashSet;
+
+        let mut set: HashSet<Point<f64, 2>> = HashSet::new();
+
+        set.insert(Point::new([f64::NAN, 2.0]));
+        set.insert(Point::new([f64::INFINITY, 2.0]));
+        set.insert(Point::new([f64::NEG_INFINITY, 2.0]));
+        set.insert(Point::new([0.0, 2.0]));
+        set.insert(Point::new([-0.0, 2.0]));
+
+        assert_eq!(set.len(), 4); // 0.0 and -0.0 should be considered equal here
+
+        assert!(set.contains(&Point::new([f64::NAN, 2.0])));
+        assert!(set.contains(&Point::new([f64::INFINITY, 2.0])));
+        assert!(set.contains(&Point::new([f64::NEG_INFINITY, 2.0])));
+        assert!(set.contains(&Point::new([-0.0, 2.0])));
+    }
+
+    #[test]
     fn point_hash_distribution_basic() {
         use std::collections::HashSet;
 
