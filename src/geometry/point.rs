@@ -17,7 +17,7 @@
 
 #![allow(clippy::similar_names)]
 
-use num_traits::Float;
+use num_traits::{Float, Zero};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
@@ -56,7 +56,7 @@ pub enum PointValidationError {
 /// private to prevent modification after instantiation.
 pub struct Point<T, const D: usize>
 where
-    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
@@ -65,7 +65,7 @@ where
 
 impl<T, const D: usize> Point<T, D>
 where
-    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new instance of a [Point] with the given
@@ -147,7 +147,7 @@ where
     #[must_use]
     pub fn origin() -> Self
     where
-        T: num_traits::Zero + Copy,
+        T: Zero + Copy,
     {
         Self::new([T::zero(); D])
     }
@@ -268,7 +268,7 @@ impl_hash_coordinate!(float: f32, f64);
 
 impl<T, const D: usize> Hash for Point<T, D>
 where
-    T: HashCoordinate + Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: HashCoordinate + Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -317,7 +317,7 @@ impl_ordered_eq!(float: f32, f64);
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 impl<T, const D: usize> PartialEq for Point<T, D>
 where
-    T: Clone + Copy + Default + Float + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -331,7 +331,7 @@ where
 // Manual implementation of Eq for Point using OrderedFloat for proper NaN handling
 impl<T, const D: usize> Eq for Point<T, D>
 where
-    T: Clone + Copy + Default + Float + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
 }
@@ -339,8 +339,8 @@ where
 /// From trait implementations for Point conversions
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
-    T: Clone + Copy + Default + Float + Into<U> + PartialEq + PartialOrd,
-    U: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + Into<U>,
+    U: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -376,7 +376,7 @@ where
 /// This allows `point` and `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
-    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// # Example
@@ -395,7 +395,7 @@ where
 
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
-    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// # Example
@@ -433,7 +433,7 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq + Float,
+        T: Debug + Default + OrderedEq + Float,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         assert_eq!(point.coordinates(), expected_coords);
@@ -446,15 +446,7 @@ mod tests {
         point2: Point<T, D>,
         should_be_equal: bool,
     ) where
-        T: HashCoordinate
-            + Clone
-            + Copy
-            + Default
-            + PartialEq
-            + PartialOrd
-            + OrderedEq
-            + Debug
-            + Float,
+        T: HashCoordinate + Default + OrderedEq + Debug + Float,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         if should_be_equal {
@@ -1893,7 +1885,10 @@ mod tests {
 
         assert_eq!(map[&Point::new([f64::NAN, 2.0])], "NaN Point");
         assert_eq!(map[&Point::new([f64::INFINITY, 2.0])], "Infinity Point");
-        assert_eq!(map[&Point::new([f64::NEG_INFINITY, 2.0])], "Negative Infinity Point");
+        assert_eq!(
+            map[&Point::new([f64::NEG_INFINITY, 2.0])],
+            "Negative Infinity Point"
+        );
         assert_eq!(map[&Point::new([-0.0, 2.0])], "Zero Point");
     }
 
