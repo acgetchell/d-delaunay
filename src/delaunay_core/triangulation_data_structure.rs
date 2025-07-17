@@ -192,13 +192,8 @@ where
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
     T: AddAssign<f64>
-        + Clone
-        + Copy
         + ComplexField<RealField = T>
         + Default
-        + From<f64>
-        + PartialEq
-        + PartialOrd
         + SubAssign<f64>
         + Sum
         + OrderedEq
@@ -666,9 +661,9 @@ where
         // Convert back to T
         let mut center = [T::default(); D];
         for i in 0..D {
-            center[i] = NumCast::from(center_f64[i]).unwrap();
+            center[i] = NumCast::from(center_f64[i]).expect("Failed to convert center coordinate");
         }
-        let radius = NumCast::from(radius_f64).unwrap();
+        let radius = NumCast::from(radius_f64).expect("Failed to convert radius");
 
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
         let points = Self::create_supercell_simplex(&center, radius);
@@ -684,7 +679,7 @@ where
     /// Creates a default supercell for empty input
     fn create_default_supercell() -> Cell<T, U, V, D> {
         let center = [T::default(); D];
-        let radius = <T as From<f64>>::from(20.0f64);
+        let radius = NumCast::from(20.0f64).expect("Failed to convert radius"); // Default radius of 20.0
         let points = Self::create_supercell_simplex(&center, radius);
 
         CellBuilder::default()
@@ -715,7 +710,7 @@ where
                     let center_f64: f64 = center[i].into();
                     let radius_f64: f64 = radius.into();
                     let coord_f64 = center_f64 + radius_f64 * vertex_coords[i];
-                    coords[i] = <T as From<f64>>::from(coord_f64);
+                    coords[i] = NumCast::from(coord_f64).expect("Failed to convert coordinate");
                 }
                 points.push(Point::new(coords));
             }
@@ -731,7 +726,8 @@ where
             let mut coords = [T::default(); D];
             for i in 0..D {
                 let center_f64: f64 = center[i].into();
-                coords[i] = <T as From<f64>>::from(center_f64 + radius_f64);
+                coords[i] = NumCast::from(center_f64 + radius_f64)
+                    .expect("Failed to convert center + radius");
             }
             points.push(Point::new(coords));
 
@@ -742,10 +738,12 @@ where
                     let center_f64: f64 = center[i].into();
                     if i == dim {
                         // This dimension gets negative offset
-                        coords[i] = <T as From<f64>>::from(center_f64 - radius_f64);
+                        coords[i] = NumCast::from(center_f64 - radius_f64)
+                            .expect("Failed to convert center - radius");
                     } else {
                         // Other dimensions get positive offset
-                        coords[i] = <T as From<f64>>::from(center_f64 + radius_f64);
+                        coords[i] = NumCast::from(center_f64 + radius_f64)
+                            .expect("Failed to convert center + radius");
                     }
                 }
                 points.push(Point::new(coords));
