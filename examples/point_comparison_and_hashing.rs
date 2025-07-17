@@ -16,7 +16,7 @@
 
 #![allow(clippy::similar_names)]
 
-use d_delaunay::delaunay_core::point::Point;
+use d_delaunay::geometry::point::Point;
 use std::collections::{HashMap, HashSet};
 
 fn main() {

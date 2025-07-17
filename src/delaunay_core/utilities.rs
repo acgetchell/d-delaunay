@@ -1,6 +1,7 @@
 //! Utility functions
 
-use super::{point::OrderedEq, vertex::Vertex};
+use super::vertex::Vertex;
+use crate::geometry::point::OrderedEq;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
@@ -54,7 +55,7 @@ pub fn make_uuid() -> Uuid {
 /// ```
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::delaunay_core::point::Point;
+/// use d_delaunay::geometry::point::Point;
 /// use std::collections::HashMap;
 /// use std::cmp::Ordering;
 /// let points = vec![
@@ -140,7 +141,7 @@ pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], anyhow::Err
 #[cfg(test)]
 mod tests {
 
-    use crate::delaunay_core::point::Point;
+    use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
     use super::*;

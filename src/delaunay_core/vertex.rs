@@ -1,9 +1,7 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
-use super::{
-    point::{OrderedEq, Point, PointValidationError},
-    utilities::make_uuid,
-};
+use super::utilities::make_uuid;
+use crate::geometry::point::{OrderedEq, Point, PointValidationError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
@@ -95,7 +93,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let points = vec![Point::new([1.0, 2.0, 3.0])];
     /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points.clone());
     /// assert_eq!(vertices.len(), 1);
@@ -127,7 +125,7 @@ where
     /// ```
     /// use std::collections::HashMap;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
     /// let vertices = Vertex::<f64, Option<()>, 2>::from_points(points.clone());
     /// let map: HashMap<_, _> = Vertex::into_hashmap(vertices);
@@ -150,7 +148,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
     /// let retrieved_point = vertex.point();
@@ -171,7 +169,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use uuid::Uuid;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
@@ -198,7 +196,7 @@ where
     /// # Example
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_eq!(vertex.dim(), 4);
@@ -227,7 +225,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder, VertexValidationError};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
     ///     .point(Point::new([1.0, 2.0, 3.0]))
     ///     .build()
@@ -245,7 +243,7 @@ where
     /// ```
     pub fn is_valid(self) -> Result<(), VertexValidationError>
     where
-        T: super::point::FiniteCheck + Copy + Debug,
+        T: crate::geometry::point::FiniteCheck + Copy + Debug,
     {
         // Check if the point is valid (all coordinates are finite)
         self.point.is_valid()?;

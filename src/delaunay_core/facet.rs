@@ -6,7 +6,8 @@
 //! Facets are not stored in the `Triangulation Data Structure` (TDS)
 //! directly, but created on the fly when needed.
 
-use super::{cell::Cell, point::OrderedEq, vertex::Vertex};
+use super::{cell::Cell, vertex::Vertex};
+use crate::geometry::point::OrderedEq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -70,7 +71,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -103,7 +104,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
@@ -143,7 +144,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
@@ -191,7 +192,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// // Create a 3D tetrahedron with 4 vertices
@@ -291,7 +292,8 @@ pub enum FacetError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
+    use crate::delaunay_core::{cell::CellBuilder, vertex::VertexBuilder};
+    use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
     // Define type aliases for complex types
@@ -986,7 +988,8 @@ mod tests {
 
     #[test]
     fn facet_hash() {
-        use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
+        use crate::delaunay_core::{cell::CellBuilder, vertex::VertexBuilder};
+        use crate::geometry::point::Point;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 

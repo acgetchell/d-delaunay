@@ -80,7 +80,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
@@ -99,7 +99,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.dim(), 4);
     /// ```
@@ -118,7 +118,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
@@ -137,7 +137,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point: Point<f64, 4> = Point::origin();
     /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
     /// ```
@@ -166,7 +166,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::{Point, PointValidationError};
+    /// use d_delaunay::geometry::point::{Point, PointValidationError};
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// assert!(point.is_valid().is_ok());
     ///
@@ -246,7 +246,7 @@ pub trait HashCoordinate {
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::point::HashCoordinate;
+    /// use d_delaunay::geometry::point::HashCoordinate;
     /// use std::collections::hash_map::DefaultHasher;
     /// use std::hash::Hasher;
     ///
@@ -389,7 +389,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let coords = [1, 2, 3];
     /// let point: Point<f64, 3> = Point::from(coords);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
@@ -412,7 +412,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0]);
     /// let coords: [f64; 2] = point.into();
     /// assert_eq!(coords, [1.0, 2.0]);
@@ -431,7 +431,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([3, 4]);
     /// let coords: [i32; 2] = (&point).into();
     /// assert_eq!(coords, [3, 4]);
