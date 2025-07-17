@@ -177,104 +177,63 @@ where
     }
 }
 
-// Implement is_valid for floating-point coordinates only
-impl<V, const D: usize> Point<f64, V, D>
-where
-    V: VectorN<f64, D>,
-{
-    /// Validates that all coordinates of the point are finite.
-    ///
-    /// This method checks each coordinate to ensure it is a finite floating-point value.
-    /// A coordinate is considered valid if it is not NaN (Not a Number) and not infinite
-    /// (positive or negative infinity).
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` if all coordinates are finite
-    /// * `Err(PointValidationError::InvalidCoordinate)` if any coordinate is NaN or infinite
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`PointValidationError::InvalidCoordinate`] containing:
-    /// - The index of the first invalid coordinate found
-    /// - The string representation of the invalid coordinate value
-    /// - The dimensionality of the point
-    ///
-    /// # Performance
-    ///
-    /// This method has O(D) time complexity where D is the dimensionality of the point,
-    /// as it must check each coordinate individually.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use d_delaunay::geometry::point::PointND;
-    ///
-    /// // Valid point with finite coordinates
-    /// let valid_point: PointND<3> = PointND::new([1.0, 2.0, 3.0]);
-    /// assert!(valid_point.is_valid().is_ok());
-    ///
-    /// // Invalid point with NaN coordinate
-    /// let invalid_point: PointND<3> = PointND::new([1.0, f64::NAN, 3.0]);
-    /// assert!(invalid_point.is_valid().is_err());
-    ///
-    /// // Invalid point with infinite coordinate
-    /// let infinite_point: PointND<3> = PointND::new([1.0, f64::INFINITY, 3.0]);
-    /// assert!(infinite_point.is_valid().is_err());
-    ///
-    /// // Check specific error details
-    /// match invalid_point.is_valid() {
-    ///     Err(error) => {
-    ///         // Error contains the index and value of the invalid coordinate
-    ///         println!("Invalid coordinate found: {}", error);
-    ///     }
-    ///     Ok(_) => unreachable!()
-    /// }
-    /// ```
-    ///
-    /// # Use in Delaunay Triangulation
-    ///
-    /// This validation is particularly important for Delaunay triangulation algorithms,
-    /// as NaN or infinite coordinates can cause numerical instability and incorrect
-    /// geometric computations. It's recommended to validate points before adding them
-    /// to a triangulation.
-    pub fn is_valid(&self) -> Result<(), PointValidationError> {
-        for (index, &coord) in self.storage.as_slice().iter().enumerate() {
-            if !coord.is_finite() {
-                return Err(PointValidationError::InvalidCoordinate {
-                    coordinate_index: index,
-                    coordinate_value: format!("{coord:?}"),
-                    dimension: D,
-                });
+/// Macro to implement is_valid for floating-point coordinates
+macro_rules! impl_is_valid {
+    ($scalar_type:ty) => {
+        impl<V, const D: usize> Point<$scalar_type, V, D>
+        where
+            V: VectorN<$scalar_type, D>,
+        {
+            /// Validates that all coordinates of the point are finite.
+            ///
+            /// This method checks each coordinate to ensure it is a finite floating-point value.
+            /// A coordinate is considered valid if it is not NaN (Not a Number) and not infinite
+            /// (positive or negative infinity).
+            ///
+            /// # Returns
+            ///
+            /// * `Ok(())` if all coordinates are finite
+            /// * `Err(PointValidationError::InvalidCoordinate)` if any coordinate is NaN or infinite
+            ///
+            /// # Errors
+            ///
+            /// Returns a [`PointValidationError::InvalidCoordinate`] containing:
+            /// - The index of the first invalid coordinate found
+            /// - The string representation of the invalid coordinate value
+            /// - The dimensionality of the point
+            ///
+            /// # Performance
+            ///
+            /// This method has O(D) time complexity where D is the dimensionality of the point,
+            /// as it must check each coordinate individually.
+            ///
+            /// # Use in Delaunay Triangulation
+            ///
+            /// This validation is particularly important for Delaunay triangulation algorithms,
+            /// as NaN or infinite coordinates can cause numerical instability and incorrect
+            /// geometric computations. It's recommended to validate points before adding them
+            /// to a triangulation.
+            pub fn is_valid(&self) -> Result<(), PointValidationError> {
+                for (index, &coord) in self.storage.as_slice().iter().enumerate() {
+                    if !coord.is_finite() {
+                        return Err(PointValidationError::InvalidCoordinate {
+                            coordinate_index: index,
+                            coordinate_value: format!("{coord:?}"),
+                            dimension: D,
+                        });
+                    }
+                }
+                Ok(())
             }
         }
-        Ok(())
-    }
+    };
 }
 
-// Implement is_valid for f32 coordinates
-impl<V, const D: usize> Point<f32, V, D>
-where
-    V: VectorN<f32, D>,
-{
-    /// Validates that all coordinates of the point are finite.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`PointValidationError::InvalidCoordinate`] if any coordinate is NaN or infinite.
-    pub fn is_valid(&self) -> Result<(), PointValidationError> {
-        for (index, &coord) in self.storage.as_slice().iter().enumerate() {
-            if !coord.is_finite() {
-                return Err(PointValidationError::InvalidCoordinate {
-                    coordinate_index: index,
-                    coordinate_value: format!("{coord:?}"),
-                    dimension: D,
-                });
-            }
-        }
-        Ok(())
-    }
-}
+// Generate implementation for f32 coordinates
+impl_is_valid!(f32);
+
+// Generate implementation for f64 coordinates
+impl_is_valid!(f64);
 
 impl<V, const D: usize> PartialEq for Point<f64, V, D>
 where
@@ -527,28 +486,6 @@ macro_rules! impl_ordered_eq {
 
 impl_ordered_eq!(f32, f64);
 
-// Custom PartialEq implementation using OrderedFloat for consistent NaN handling
-// impl<T, const D: usize> PartialEq for Point<T, D>
-// where
-//     T: Clone + Copy + Default + PartialOrd + OrderedEq,
-//     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-// {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.coords
-//             .iter()
-//             .zip(other.coords.iter())
-//             .all(|(a, b)| a.ordered_eq(b))
-//     }
-// }
-
-// Manual implementation of Eq for Point using OrderedFloat for proper NaN handling
-// impl<T, const D: usize> Eq for Point<T, D>
-// where
-//     T: Clone + Copy + Default + PartialOrd + OrderedEq,
-//     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-// {
-// }
-
 /// From trait implementations for Point conversions
 impl<T, V, const D: usize> From<[T; D]> for Point<T, V, D>
 where
@@ -729,12 +666,32 @@ mod tests {
         let valid_point = PointF32::new([1.0, 2.0]);
         assert!(valid_point.is_valid().is_ok());
 
-        // Invalid points
+        let valid_negative = PointF32::new([-1.0, -2.0, -3.0]);
+        assert!(valid_negative.is_valid().is_ok());
+
+        let valid_zero = PointF32::new([0.0, 0.0]);
+        assert!(valid_zero.is_valid().is_ok());
+
+        // Test with extreme but valid values
+        let valid_extreme = PointF32::new([f32::MAX, f32::MIN]);
+        assert!(valid_extreme.is_valid().is_ok());
+
+        let valid_min_positive = PointF32::new([f32::MIN_POSITIVE, -f32::MIN_POSITIVE]);
+        assert!(valid_min_positive.is_valid().is_ok());
+
+        // Invalid points with NaN
         let invalid_nan = PointF32::new([f32::NAN, 2.0]);
         assert!(invalid_nan.is_valid().is_err());
 
+        let invalid_all_nan = PointF32::new([f32::NAN, f32::NAN]);
+        assert!(invalid_all_nan.is_valid().is_err());
+
+        // Invalid points with infinity
         let invalid_inf = PointF32::new([f32::INFINITY, 2.0]);
         assert!(invalid_inf.is_valid().is_err());
+
+        let invalid_neg_inf = PointF32::new([1.0, f32::NEG_INFINITY]);
+        assert!(invalid_neg_inf.is_valid().is_err());
     }
 
     #[test]
@@ -751,6 +708,25 @@ mod tests {
                 assert_eq!(coordinate_index, 1);
                 assert_eq!(dimension, 3);
                 assert!(coordinate_value.contains("NaN"));
+            }
+            _ => panic!("Expected InvalidCoordinate error"),
+        }
+    }
+
+    #[test]
+    fn test_point_validation_error_details_f32() {
+        let invalid_point = PointF32::new([1.0, f32::INFINITY, 3.0]);
+        let result = invalid_point.is_valid();
+
+        match result {
+            Err(PointValidationError::InvalidCoordinate {
+                coordinate_index,
+                coordinate_value,
+                dimension,
+            }) => {
+                assert_eq!(coordinate_index, 1);
+                assert_eq!(dimension, 3);
+                assert!(coordinate_value.contains("inf"));
             }
             _ => panic!("Expected InvalidCoordinate error"),
         }

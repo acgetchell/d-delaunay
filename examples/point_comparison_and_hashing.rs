@@ -69,20 +69,16 @@ fn basic_comparison_demo() {
 }
 
 /// Demonstrates NaN comparison behavior - the key innovation
+#[allow(clippy::float_cmp)]
 fn nan_comparison_demo() {
     println!("🔥 NaN Comparison Behavior");
     println!("--------------------------");
 
     // Standard IEEE 754 behavior for comparison
     let nan_val = f64::NAN;
-    println!(
-        "Standard IEEE 754: NaN == NaN is {}",
-        nan_val.is_nan() && nan_val.is_nan()
-    );
-    println!(
-        "Standard IEEE 754: NaN != NaN is {}",
-        !nan_val.is_nan() || !nan_val.is_nan()
-    );
+    let nan_val2 = f64::NAN; // Use f64::NAN instead of division or subtraction
+    println!("Standard IEEE 754: NaN == NaN is {}", nan_val == nan_val2);
+    println!("Standard IEEE 754: NaN != NaN is {}", nan_val != nan_val2);
 
     println!("\nOur Point implementation:");
 
