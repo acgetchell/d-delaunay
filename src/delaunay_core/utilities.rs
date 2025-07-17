@@ -76,7 +76,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHashe
     ordering: Ordering,
 ) -> [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {

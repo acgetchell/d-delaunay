@@ -68,7 +68,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug + Float,
+    T: Default + OrderedEq + Debug + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -92,7 +92,7 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -170,7 +170,7 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,

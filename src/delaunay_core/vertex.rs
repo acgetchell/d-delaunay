@@ -51,7 +51,7 @@ pub enum VertexValidationError {
 /// implements Eq, Hash, Ord, `PartialEq`, and `PartialOrd`.
 pub struct Vertex<T, U, const D: usize>
 where
-    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -70,7 +70,7 @@ where
 
 impl<T, U, const D: usize> Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -268,7 +268,7 @@ where
 // Group 1: PartialEq, PartialOrd, and From trait implementations
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -284,7 +284,7 @@ where
 
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -299,7 +299,7 @@ where
 /// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
 impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -313,7 +313,7 @@ where
 /// This allows `&vertex` to be implicitly converted to `[T; D]` for coordinate access
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -326,7 +326,7 @@ where
 // Group 2: Eq implementation with additional Hash requirement
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Vertex<T, U, D>: Hash,
@@ -336,7 +336,7 @@ where
 
 impl<T, U, const D: usize> Hash for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
@@ -358,7 +358,7 @@ mod tests {
     // Helper function to create a basic vertex with given coordinates
     fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
     where
-        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+        T: Default + OrderedEq + Float,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -371,7 +371,7 @@ mod tests {
     // Helper function to create a vertex with data
     fn create_vertex_with_data<T, U, const D: usize>(coords: [T; D], data: U) -> Vertex<T, U, D>
     where
-        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
+        T: Default + OrderedEq + Float,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -388,7 +388,7 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq + Float,
+        T: Default + OrderedEq + Debug + Float,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
