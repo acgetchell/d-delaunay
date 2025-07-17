@@ -17,6 +17,7 @@
 
 #![allow(clippy::similar_names)]
 
+use num_traits::Float;
 use ordered_float::OrderedFloat;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
@@ -53,7 +54,7 @@ pub enum PointValidationError {
 /// private to prevent modification after instantiation.
 pub struct Point<T, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
@@ -62,7 +63,7 @@ where
 
 impl<T, const D: usize> Point<T, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `new` creates a new instance of a [Point] with the given
@@ -287,7 +288,7 @@ impl_hash_coordinate!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u1
 
 impl<T, const D: usize> Hash for Point<T, D>
 where
-    T: HashCoordinate + Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: HashCoordinate + Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -347,7 +348,7 @@ impl_ordered_eq!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, u
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 impl<T, const D: usize> PartialEq for Point<T, D>
 where
-    T: Clone + Copy + Default + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -361,7 +362,7 @@ where
 // Manual implementation of Eq for Point using OrderedFloat for proper NaN handling
 impl<T, const D: usize> Eq for Point<T, D>
 where
-    T: Clone + Copy + Default + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
 }
@@ -369,8 +370,8 @@ where
 /// From trait implementations for Point conversions
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
-    T: Clone + Copy + Default + Into<U> + PartialEq + PartialOrd,
-    U: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + Into<U> + PartialEq + PartialOrd,
+    U: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -390,7 +391,7 @@ where
     ///
     /// ```rust
     /// use d_delaunay::geometry::point::Point;
-    /// let coords = [1, 2, 3];
+    /// let coords = [1.0, 2.0, 3.0];
     /// let point: Point<f64, 3> = Point::from(coords);
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
@@ -406,7 +407,7 @@ where
 /// This allows `point` and `&point` to be implicitly converted to `[T; D]`
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// # Example
@@ -425,16 +426,16 @@ where
 
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + Float + PartialEq + PartialOrd + OrderedEq,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// # Example
     ///
     /// ```rust
     /// use d_delaunay::geometry::point::Point;
-    /// let point = Point::new([3, 4]);
-    /// let coords: [i32; 2] = (&point).into();
-    /// assert_eq!(coords, [3, 4]);
+    /// let point = Point::new([3.0, 4.0]);
+    /// let coords: [f64; 2] = (&point).into();
+    /// assert_eq!(coords, [3.0, 4.0]);
     /// ```
     #[inline]
     fn from(point: &Point<T, D>) -> [T; D] {
@@ -457,7 +458,7 @@ mod tests {
     }
 
     // Helper function to test basic point properties
-    fn test_basic_point_properties<T, const D: usize>(
+    fn test_basic_point_properties<T: Float, const D: usize>(
         point: &Point<T, D>,
         expected_coords: [T; D],
         expected_dim: usize,
@@ -470,7 +471,7 @@ mod tests {
     }
 
     // Helper function to test point equality and hash consistency
-    fn test_point_equality_and_hash<T, const D: usize>(
+    fn test_point_equality_and_hash<T: Float, const D: usize>(
         point1: Point<T, D>,
         point2: Point<T, D>,
         should_be_equal: bool,
@@ -600,20 +601,6 @@ mod tests {
     }
 
     #[test]
-    fn point_from_array() {
-        let coords = [1i32, 2i32, 3i32];
-        let point: Point<f64, 3> = Point::from(coords);
-
-        let result_coords = point.coordinates();
-        assert_relative_eq!(
-            result_coords.as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(point.dim(), 3);
-    }
-
-    #[test]
     fn point_from_array_f32_to_f64() {
         let coords = [1.5f32, 2.5f32, 3.5f32, 4.5f32];
         let point: Point<f64, 4> = Point::from(coords);
@@ -638,28 +625,6 @@ mod tests {
             [1.0f32, 2.0f32, 3.0f32].as_slice(),
             epsilon = 1e-9
         );
-
-        let coords_i32 = [1i32, 2i32, 3i32];
-        let point_i32: Point<i32, 3> = Point::from(coords_i32);
-        assert_eq!(point_i32.coordinates(), [1i32, 2i32, 3i32]);
-    }
-
-    #[test]
-    fn point_from_array_integer_to_integer() {
-        // Test conversion from i32 to i64
-        let coords_i32 = [1i32, 2i32, 3i32];
-        let point_i64: Point<i64, 3> = Point::from(coords_i32);
-        assert_eq!(point_i64.coordinates(), [1i64, 2i64, 3i64]);
-
-        // Test conversion from u8 to i32
-        let coords_u8 = [10u8, 20u8, 30u8];
-        let point_i32: Point<i32, 3> = Point::from(coords_u8);
-        assert_eq!(point_i32.coordinates(), [10i32, 20i32, 30i32]);
-
-        // Test conversion from i16 to isize
-        let coords_i16 = [100i16, 200i16];
-        let point_isize: Point<isize, 2> = Point::from(coords_i16);
-        assert_eq!(point_isize.coordinates(), [100isize, 200isize]);
     }
 
     #[test]
@@ -681,29 +646,6 @@ mod tests {
         assert_relative_eq!(
             result_f64.as_slice(),
             [1.5f64, 2.5f64].as_slice(),
-            epsilon = 1e-9
-        );
-    }
-
-    #[test]
-    fn point_from_array_integer_to_float() {
-        // Test conversion from i32 to f64
-        let coords_i32 = [1i32, 2i32, 3i32];
-        let point_f64: Point<f64, 3> = Point::from(coords_i32);
-        let result_i32_f64 = point_f64.coordinates();
-        assert_relative_eq!(
-            result_i32_f64.as_slice(),
-            [1.0f64, 2.0f64, 3.0f64].as_slice(),
-            epsilon = 1e-9
-        );
-
-        // Test conversion from u8 to f64
-        let coords_u8 = [10u8, 20u8];
-        let point_f64: Point<f64, 2> = Point::from(coords_u8);
-        let result_u8_f64 = point_f64.coordinates();
-        assert_relative_eq!(
-            result_u8_f64.as_slice(),
-            [10.0f64, 20.0f64].as_slice(),
             epsilon = 1e-9
         );
     }
@@ -774,46 +716,6 @@ mod tests {
     }
 
     #[test]
-    fn point_from_complex_conversions() {
-        // Test conversion with mixed type arrays
-        let coords_mixed_i32 = [-100i32, 200i32, 300i32];
-        let point_f64: Point<f64, 3> = Point::from(coords_mixed_i32);
-        let mixed_coords = point_f64.coordinates();
-        assert_relative_eq!(
-            mixed_coords.as_slice(),
-            [-100.0f64, 200.0f64, 300.0f64].as_slice(),
-            epsilon = 1e-9
-        );
-
-        // Test with larger values
-        let coords_large = [10000i32, 20000i32];
-        let point_f64: Point<f64, 2> = Point::from(coords_large);
-        let large_coords = point_f64.coordinates();
-        assert_relative_eq!(
-            large_coords.as_slice(),
-            [10000.0f64, 20000.0f64].as_slice(),
-            epsilon = 1e-9
-        );
-
-        // Test with very small values
-        // When converting from f32 to f64, there can be small precision
-        // differences due to how floating point numbers are represented in
-        // memory. Use approximate comparison for these small values.
-        let coords_small_f32 = [0.000_001_f32, 0.000_002_f32];
-        let point_f64: Point<f64, 2> = Point::from(coords_small_f32);
-
-        // Use relative comparison with appropriate epsilon for small floating
-        // point values
-        let expected = [0.000_001_f64, 0.000_002_f64];
-        assert_relative_eq!(
-            point_f64.coordinates().as_slice(),
-            expected.as_slice(),
-            epsilon = 1e-9,
-            max_relative = 1e-7
-        );
-    }
-
-    #[test]
     fn point_1d() {
         let point: Point<f64, 1> = Point::new([42.0]);
         test_basic_point_properties(&point, [42.0], 1);
@@ -847,17 +749,6 @@ mod tests {
 
         let origin: Point<f64, 5> = Point::origin();
         test_basic_point_properties(&origin, [0.0, 0.0, 0.0, 0.0, 0.0], 5);
-    }
-
-    #[test]
-    fn point_with_integers() {
-        let point: Point<i32, 3> = Point::new([1, 2, 3]);
-
-        assert_eq!(point.coordinates(), [1, 2, 3]);
-        assert_eq!(point.dim(), 3);
-
-        let origin: Point<i32, 3> = Point::origin();
-        assert_eq!(origin.coordinates(), [0, 0, 0]);
     }
 
     #[test]
@@ -998,25 +889,6 @@ mod tests {
     }
 
     #[test]
-    fn point_from_different_integer_types() {
-        // Test conversion from different integer types
-        let u8_coords: [u8; 3] = [1, 2, 3];
-        let point_from_u8: Point<f64, 3> = Point::from(u8_coords);
-        assert_relative_eq!(
-            point_from_u8.coordinates().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-
-        let i16_coords: [i16; 2] = [-1, 32767];
-        let point_from_i16: Point<f64, 2> = Point::from(i16_coords);
-        assert_relative_eq!(
-            point_from_i16.coordinates().as_slice(),
-            [-1.0, 32767.0].as_slice()
-        );
-    }
-
-    #[test]
     fn point_hash_f32() {
         use std::collections::HashMap;
 
@@ -1031,35 +903,6 @@ mod tests {
 
         assert_eq!(map.get(&point3), Some(&10)); // Should find point1's value
         assert_eq!(map.len(), 2);
-    }
-
-    #[test]
-    fn point_hash_integers() {
-        use std::collections::HashMap;
-
-        // Test with i32
-        let mut map_i32: HashMap<Point<i32, 3>, &str> = HashMap::new();
-        let point_i32_1 = Point::new([1, 2, 3]);
-        let point_i32_2 = Point::new([4, 5, 6]);
-        let point_i32_3 = Point::new([1, 2, 3]); // Same as point_i32_1
-
-        map_i32.insert(point_i32_1, "first");
-        map_i32.insert(point_i32_2, "second");
-
-        assert_eq!(map_i32.get(&point_i32_3), Some(&"first"));
-        assert_eq!(map_i32.len(), 2);
-
-        // Test with u64
-        let mut map_u64: HashMap<Point<u64, 2>, bool> = HashMap::new();
-        let point_u64_1 = Point::new([100u64, 200u64]);
-        let point_u64_2 = Point::new([300u64, 400u64]);
-        let point_u64_3 = Point::new([100u64, 200u64]); // Same as point_u64_1
-
-        map_u64.insert(point_u64_1, true);
-        map_u64.insert(point_u64_2, false);
-
-        assert_eq!(map_u64.get(&point_u64_3), Some(&true));
-        assert_eq!(map_u64.len(), 2);
     }
 
     #[test]
@@ -1079,14 +922,6 @@ mod tests {
 
         assert_eq!(point_f32_1, point_f32_2);
         assert_ne!(point_f32_1, point_f32_3);
-
-        // Test Eq for i32
-        let point_i32_1 = Point::new([10, 20]);
-        let point_i32_2 = Point::new([10, 20]);
-        let point_i32_3 = Point::new([10, 21]);
-
-        assert_eq!(point_i32_1, point_i32_2);
-        assert_ne!(point_i32_1, point_i32_3);
     }
 
     #[test]
@@ -1100,65 +935,6 @@ mod tests {
         let point_f32_1 = Point::new([1.5f32, 2.5f32]);
         let point_f32_2 = Point::new([1.5f32, 2.5f32]);
         test_point_equality_and_hash(point_f32_1, point_f32_2, true);
-    }
-
-    #[test]
-    fn point_hash_consistency_integers() {
-        // Test integer hashing consistency
-        let point_i32_1 = Point::new([42, -17, 100]);
-        let point_i32_2 = Point::new([42, -17, 100]);
-        test_point_equality_and_hash(point_i32_1, point_i32_2, true);
-
-        // Test with u64
-        let point_u64_1 = Point::new([1000u64, 2000u64]);
-        let point_u64_2 = Point::new([1000u64, 2000u64]);
-        test_point_equality_and_hash(point_u64_1, point_u64_2, true);
-    }
-
-    #[test]
-    fn point_hash_all_primitives() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        // Function to get hash value for any hashable type
-        fn get_hash<T: Hash>(value: &T) -> u64 {
-            let mut hasher = DefaultHasher::new();
-            value.hash(&mut hasher);
-            hasher.finish()
-        }
-
-        // Test all primitive integer types
-        let point_i8: Point<i8, 2> = Point::new([1, 2]);
-        let point_i16: Point<i16, 2> = Point::new([1, 2]);
-        let point_i32: Point<i32, 2> = Point::new([1, 2]);
-        let point_i64: Point<i64, 2> = Point::new([1, 2]);
-        let point_u8: Point<u8, 2> = Point::new([1, 2]);
-        let point_u16: Point<u16, 2> = Point::new([1, 2]);
-        let point_u32: Point<u32, 2> = Point::new([1, 2]);
-        let point_u64: Point<u64, 2> = Point::new([1, 2]);
-        let point_usize: Point<usize, 2> = Point::new([1, 2]);
-        let point_isize: Point<isize, 2> = Point::new([1, 2]);
-
-        // Get hash for each type
-        let _hash_i8 = get_hash(&point_i8);
-        let _hash_i16 = get_hash(&point_i16);
-        let _hash_i32 = get_hash(&point_i32);
-        let _hash_i64 = get_hash(&point_i64);
-        let _hash_u8 = get_hash(&point_u8);
-        let _hash_u16 = get_hash(&point_u16);
-        let _hash_u32 = get_hash(&point_u32);
-        let _hash_u64 = get_hash(&point_u64);
-        let _hash_usize = get_hash(&point_usize);
-        let _hash_isize = get_hash(&point_isize);
-
-        // Verify that equal points of the same type hash to the same value
-        let point_i32_a: Point<i32, 2> = Point::new([1, 2]);
-        let point_i32_b: Point<i32, 2> = Point::new([1, 2]);
-        assert_eq!(get_hash(&point_i32_a), get_hash(&point_i32_b));
-
-        // Test points with different values hash differently
-        let point_i32_c: Point<i32, 2> = Point::new([2, 3]);
-        assert_ne!(get_hash(&point_i32_a), get_hash(&point_i32_c));
     }
 
     #[test]
@@ -1261,38 +1037,6 @@ mod tests {
     }
 
     #[test]
-    fn point_is_valid_integers() {
-        // All integer types should always be valid (no NaN or infinity)
-        let valid_i32 = Point::new([1i32, 2i32, 3i32]);
-        assert!(valid_i32.is_valid().is_ok());
-
-        let valid_negative_i32 = Point::new([-1i32, -2i32, -3i32]);
-        assert!(valid_negative_i32.is_valid().is_ok());
-
-        let valid_zero_i32 = Point::new([0i32, 0i32]);
-        assert!(valid_zero_i32.is_valid().is_ok());
-
-        let valid_u64 = Point::new([u64::MAX, u64::MIN, 42u64]);
-        assert!(valid_u64.is_valid().is_ok());
-
-        let valid_i8 = Point::new([i8::MAX, i8::MIN, 0i8, -1i8]);
-        assert!(valid_i8.is_valid().is_ok());
-
-        let valid_isize = Point::new([isize::MAX, isize::MIN]);
-        assert!(valid_isize.is_valid().is_ok());
-
-        // Test with various integer types
-        let valid_u8 = Point::new([255u8, 0u8, 128u8]);
-        assert!(valid_u8.is_valid().is_ok());
-
-        let valid_i16 = Point::new([32767i16, -32768i16, 0i16]);
-        assert!(valid_i16.is_valid().is_ok());
-
-        let valid_u32 = Point::new([u32::MAX, 0u32, 42u32]);
-        assert!(valid_u32.is_valid().is_ok());
-    }
-
-    #[test]
     fn point_is_valid_different_dimensions() {
         // Test 1D points
         let valid_1d_f64 = Point::new([42.0]);
@@ -1300,9 +1044,6 @@ mod tests {
 
         let invalid_1d_nan = Point::new([f64::NAN]);
         assert!(invalid_1d_nan.is_valid().is_err());
-
-        let valid_1d_int = Point::new([42i32]);
-        assert!(valid_1d_int.is_valid().is_ok());
 
         // Test 2D points
         let valid_2d = Point::new([1.0, 2.0]);
@@ -1978,32 +1719,19 @@ mod tests {
         let subnormal_point = Point::new([subnormal, -subnormal, 0.0]);
         assert!(subnormal_point.is_valid().is_ok());
 
-        // Test with integer extremes
-        let extreme_int_point = Point::new([i64::MAX, i64::MIN, 0i64]);
-        assert!(extreme_int_point.is_valid().is_ok());
-        assert_eq!(extreme_int_point.coordinates(), [i64::MAX, i64::MIN, 0i64]);
-
-        // Test with unsigned integer extremes
-        let extreme_uint_point = Point::new([u64::MAX, u64::MIN, 42u64]);
-        assert!(extreme_uint_point.is_valid().is_ok());
-        assert_eq!(
-            extreme_uint_point.coordinates(),
-            [u64::MAX, u64::MIN, 42u64]
-        );
-
         // Test f32 extremes
         let extreme_f32_point = Point::new([f32::MAX, f32::MIN, f32::MIN_POSITIVE]);
         assert!(extreme_f32_point.is_valid().is_ok());
     }
 
     #[test]
-    #[allow(clippy::redundant_clone)]
     fn point_clone_and_copy_semantics() {
         // Test that Point correctly implements Clone and Copy
 
         let original = Point::new([1.0, 2.0, 3.0]);
 
         // Test explicit cloning
+        #[allow(clippy::clone_on_copy)]
         let cloned = original.clone();
         assert_relative_eq!(
             original.coordinates().as_slice(),
@@ -2017,11 +1745,6 @@ mod tests {
         // Original should still be accessible after copy
         assert_eq!(original.dim(), 3);
         assert_eq!(copied.dim(), 3);
-
-        // Test with different types
-        let int_point = Point::new([1i32, 2i32]);
-        let int_copied = int_point;
-        assert_eq!(int_point, int_copied);
 
         // Test with f32
         let f32_point = Point::new([1.5f32, 2.5f32, 3.5f32, 4.5f32]);
@@ -2085,17 +1808,11 @@ mod tests {
 
         assert_eq!(mem::size_of::<Point<f64, 3>>(), mem::size_of::<[f64; 3]>());
         assert_eq!(mem::size_of::<Point<f32, 4>>(), mem::size_of::<[f32; 4]>());
-        assert_eq!(mem::size_of::<Point<i32, 2>>(), mem::size_of::<[i32; 2]>());
-        assert_eq!(mem::size_of::<Point<u64, 5>>(), mem::size_of::<[u64; 5]>());
 
         // Test alignment
         assert_eq!(
             mem::align_of::<Point<f64, 3>>(),
             mem::align_of::<[f64; 3]>()
-        );
-        assert_eq!(
-            mem::align_of::<Point<i32, 4>>(),
-            mem::align_of::<[i32; 4]>()
         );
 
         // Test with different dimensions
@@ -2105,9 +1822,6 @@ mod tests {
 
         assert_eq!(mem::size_of::<Point<f32, 1>>(), 4); // 1 * 4 bytes
         assert_eq!(mem::size_of::<Point<f32, 2>>(), 8); // 2 * 4 bytes
-
-        assert_eq!(mem::size_of::<Point<i32, 1>>(), 4); // 1 * 4 bytes
-        assert_eq!(mem::size_of::<Point<i32, 3>>(), 12); // 3 * 4 bytes
     }
 
     #[test]
@@ -2129,11 +1843,6 @@ mod tests {
         let hash_0d = get_hash(&point_0d);
         let hash_0d_2 = get_hash(&point_0d_2);
         assert_eq!(hash_0d, hash_0d_2);
-
-        // Test with different types
-        let point_0d_int: Point<i32, 0> = Point::new([]);
-        assert_eq!(point_0d_int.dim(), 0);
-        assert!(point_0d_int.is_valid().is_ok());
 
         // Test origin for 0D
         let origin_0d: Point<f64, 0> = Point::origin();
@@ -2373,26 +2082,6 @@ mod tests {
     fn point_validation_all_coordinate_types() {
         // Test validation with different coordinate types
 
-        // All integer types should always be valid
-        let int_types_valid = [
-            Point::new([1i8, 2i8]).is_valid().is_ok(),
-            Point::new([1i16, 2i16]).is_valid().is_ok(),
-            Point::new([1i32, 2i32]).is_valid().is_ok(),
-            Point::new([1i64, 2i64]).is_valid().is_ok(),
-            Point::new([1i128, 2i128]).is_valid().is_ok(),
-            Point::new([1isize, 2isize]).is_valid().is_ok(),
-            Point::new([1u8, 2u8]).is_valid().is_ok(),
-            Point::new([1u16, 2u16]).is_valid().is_ok(),
-            Point::new([1u32, 2u32]).is_valid().is_ok(),
-            Point::new([1u64, 2u64]).is_valid().is_ok(),
-            Point::new([1u128, 2u128]).is_valid().is_ok(),
-            Point::new([1usize, 2usize]).is_valid().is_ok(),
-        ];
-
-        for valid in int_types_valid {
-            assert!(valid, "Integer type should always be valid");
-        }
-
         // Floating point types can be invalid
         assert!(Point::new([1.0f32, 2.0f32]).is_valid().is_ok());
         assert!(Point::new([1.0f64, 2.0f64]).is_valid().is_ok());
@@ -2429,7 +2118,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::redundant_clone)]
     fn point_trait_completeness() {
         // Helper functions for compile-time trait checks
         fn assert_send<T: Send>(_: T) {}
@@ -2460,7 +2148,7 @@ mod tests {
         assert_sync(point);
 
         // Test Clone and Copy
-        #[allow(clippy::redundant_clone)]
+        #[allow(clippy::clone_on_copy)]
         let cloned = point.clone();
         let copied = point;
 

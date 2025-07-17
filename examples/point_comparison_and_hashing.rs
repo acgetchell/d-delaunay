@@ -324,21 +324,24 @@ fn numeric_types_demo() {
     println!("f32 points equal: {}", point_f32_1 == point_f32_2);
     println!("f32 NaN points equal: {}", point_f32_nan == point_f32_nan2);
 
-    // Integer points
-    let point_i32_1 = Point::new([10i32, 20i32, 30i32]);
-    let point_i32_2 = Point::new([10i32, 20i32, 30i32]);
-    let point_i32_3 = Point::new([10i32, 20i32, 31i32]);
+    // Integer-like values using f64
+    let point_int_1 = Point::new([10.0, 20.0, 30.0]);
+    let point_int_2 = Point::new([10.0, 20.0, 30.0]);
+    let point_int_3 = Point::new([10.0, 20.0, 31.0]);
 
-    println!("i32 points equal: {}", point_i32_1 == point_i32_2);
-    println!("i32 points different: {}", point_i32_1 != point_i32_3);
-
-    // Demonstrate HashMap with integer points
-    let mut int_map: HashMap<Point<i32, 2>, String> = HashMap::new();
-    int_map.insert(Point::new([1, 2]), "integer point".to_string());
-
-    let lookup_key = Point::new([1, 2]);
+    println!("Integer-like points equal: {}", point_int_1 == point_int_2);
     println!(
-        "Can retrieve integer point: {}",
+        "Integer-like points different: {}",
+        point_int_1 != point_int_3
+    );
+
+    // Demonstrate HashMap with integer-like points
+    let mut int_map: HashMap<Point<f64, 2>, String> = HashMap::new();
+    int_map.insert(Point::new([1.0, 2.0]), "integer-like point".to_string());
+
+    let lookup_key = Point::new([1.0, 2.0]);
+    println!(
+        "Can retrieve integer-like point: {}",
         int_map.contains_key(&lookup_key)
     );
 

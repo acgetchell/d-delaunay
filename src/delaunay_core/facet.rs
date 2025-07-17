@@ -8,6 +8,7 @@
 
 use super::{cell::Cell, vertex::Vertex};
 use crate::geometry::point::OrderedEq;
+use num_traits::Float;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -27,7 +28,7 @@ use thiserror::Error;
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
 pub struct Facet<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -41,7 +42,7 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -254,7 +255,7 @@ where
 // Consolidated trait implementations for Facet
 impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -265,7 +266,7 @@ where
 
 impl<T, U, V, const D: usize> Hash for Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,

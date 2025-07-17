@@ -12,6 +12,7 @@ use super::{
 use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
+use num_traits::Float;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
@@ -67,7 +68,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -91,7 +92,7 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -169,7 +170,7 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -200,7 +201,8 @@ where
         + PartialOrd
         + SubAssign<f64>
         + Sum
-        + OrderedEq,
+        + OrderedEq
+        + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -664,9 +666,9 @@ where
         // Convert back to T
         let mut center = [T::default(); D];
         for i in 0..D {
-            center[i] = T::from(center_f64[i]);
+            center[i] = <T as From<f64>>::from(center_f64[i]);
         }
-        let radius = T::from(radius_f64);
+        let radius = <T as From<f64>>::from(radius_f64);
 
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
         let points = Self::create_supercell_simplex(&center, radius);
@@ -682,7 +684,7 @@ where
     /// Creates a default supercell for empty input
     fn create_default_supercell() -> Cell<T, U, V, D> {
         let center = [T::default(); D];
-        let radius = T::from(20.0f64);
+        let radius = <T as From<f64>>::from(20.0f64);
         let points = Self::create_supercell_simplex(&center, radius);
 
         let supercell = CellBuilder::default()
@@ -715,7 +717,7 @@ where
                     let center_f64: f64 = center[i].into();
                     let radius_f64: f64 = radius.into();
                     let coord_f64 = center_f64 + radius_f64 * vertex_coords[i];
-                    coords[i] = T::from(coord_f64);
+                    coords[i] = <T as From<f64>>::from(coord_f64);
                 }
                 points.push(Point::new(coords));
             }
@@ -731,7 +733,7 @@ where
             let mut coords = [T::default(); D];
             for i in 0..D {
                 let center_f64: f64 = center[i].into();
-                coords[i] = T::from(center_f64 + radius_f64);
+                coords[i] = <T as From<f64>>::from(center_f64 + radius_f64);
             }
             points.push(Point::new(coords));
 
@@ -742,10 +744,10 @@ where
                     let center_f64: f64 = center[i].into();
                     if i == dim {
                         // This dimension gets negative offset
-                        coords[i] = T::from(center_f64 - radius_f64);
+                        coords[i] = <T as From<f64>>::from(center_f64 - radius_f64);
                     } else {
                         // Other dimensions get positive offset
-                        coords[i] = T::from(center_f64 + radius_f64);
+                        coords[i] = <T as From<f64>>::from(center_f64 + radius_f64);
                     }
                 }
                 points.push(Point::new(coords));

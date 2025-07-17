@@ -2,6 +2,7 @@
 
 use super::vertex::Vertex;
 use crate::geometry::point::OrderedEq;
+use num_traits::Float;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
@@ -75,7 +76,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHashe
     ordering: Ordering,
 ) -> [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
