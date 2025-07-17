@@ -6,14 +6,15 @@
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
-    point::{OrderedEq, Point},
     utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
+use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::cmp::{min, Ordering};
+use num_traits::{Float, NumCast};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -67,7 +68,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
+    T: Default + OrderedEq + Debug + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -91,7 +92,7 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -169,7 +170,7 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -191,16 +192,12 @@ where
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
     T: AddAssign<f64>
-        + Clone
-        + Copy
         + ComplexField<RealField = T>
         + Default
-        + From<f64>
-        + PartialEq
-        + PartialOrd
         + SubAssign<f64>
         + Sum
-        + OrderedEq,
+        + OrderedEq
+        + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -235,7 +232,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let vertices = vec![
     ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
@@ -285,7 +282,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let vertices = vec![
     ///     VertexBuilder::default().point(Point::new([0.0, 0.0])).build().unwrap(),
@@ -343,7 +340,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let point = Point::new([1.0, 2.0, 3.0]);
@@ -359,7 +356,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let point = Point::new([1.0, 2.0, 3.0]);
@@ -376,7 +373,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
@@ -427,7 +424,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 0);
@@ -438,7 +435,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let vertex1 = VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap();
@@ -455,7 +452,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -487,7 +484,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.dim(), -1); // Empty triangulation
@@ -498,7 +495,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
@@ -530,7 +527,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// // 2D triangulation
@@ -578,7 +575,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -597,7 +594,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -616,7 +613,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.number_of_cells(), 0); // No cells for empty input
@@ -664,9 +661,9 @@ where
         // Convert back to T
         let mut center = [T::default(); D];
         for i in 0..D {
-            center[i] = T::from(center_f64[i]);
+            center[i] = NumCast::from(center_f64[i]).expect("Failed to convert center coordinate");
         }
-        let radius = T::from(radius_f64);
+        let radius = NumCast::from(radius_f64).expect("Failed to convert radius");
 
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
         let points = Self::create_supercell_simplex(&center, radius);
@@ -682,15 +679,13 @@ where
     /// Creates a default supercell for empty input
     fn create_default_supercell() -> Cell<T, U, V, D> {
         let center = [T::default(); D];
-        let radius = T::from(20.0f64);
+        let radius = NumCast::from(20.0f64).expect("Failed to convert radius"); // Default radius of 20.0
         let points = Self::create_supercell_simplex(&center, radius);
 
-        let supercell = CellBuilder::default()
+        CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap();
-
-        supercell
+            .unwrap()
     }
 
     /// Creates a well-formed simplex centered at the given point with the given radius
@@ -715,7 +710,7 @@ where
                     let center_f64: f64 = center[i].into();
                     let radius_f64: f64 = radius.into();
                     let coord_f64 = center_f64 + radius_f64 * vertex_coords[i];
-                    coords[i] = T::from(coord_f64);
+                    coords[i] = NumCast::from(coord_f64).expect("Failed to convert coordinate");
                 }
                 points.push(Point::new(coords));
             }
@@ -731,7 +726,8 @@ where
             let mut coords = [T::default(); D];
             for i in 0..D {
                 let center_f64: f64 = center[i].into();
-                coords[i] = T::from(center_f64 + radius_f64);
+                coords[i] = NumCast::from(center_f64 + radius_f64)
+                    .expect("Failed to convert center + radius");
             }
             points.push(Point::new(coords));
 
@@ -742,10 +738,12 @@ where
                     let center_f64: f64 = center[i].into();
                     if i == dim {
                         // This dimension gets negative offset
-                        coords[i] = T::from(center_f64 - radius_f64);
+                        coords[i] = NumCast::from(center_f64 - radius_f64)
+                            .expect("Failed to convert center - radius");
                     } else {
                         // Other dimensions get positive offset
-                        coords[i] = T::from(center_f64 + radius_f64);
+                        coords[i] = NumCast::from(center_f64 + radius_f64)
+                            .expect("Failed to convert center + radius");
                     }
                 }
                 points.push(Point::new(coords));
@@ -782,7 +780,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -804,7 +802,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points: Vec<Point<f64, 3>> = Vec::new();
@@ -819,7 +817,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -839,7 +837,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -1298,7 +1296,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -1319,7 +1317,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
@@ -1331,7 +1329,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// // 2D triangulation
@@ -1363,7 +1361,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::{Tds, TriangulationValidationError};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
     /// use d_delaunay::delaunay_core::cell::CellBuilder;
     ///
@@ -1390,7 +1388,10 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), TriangulationValidationError>
     where
-        T: super::point::FiniteCheck + super::point::HashCoordinate + Copy + Debug,
+        T: crate::geometry::point::FiniteCheck
+            + crate::geometry::point::HashCoordinate
+            + Copy
+            + Debug,
         [T; D]: serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         // First, validate cell uniqueness (quick check for duplicate cells)
@@ -1971,8 +1972,8 @@ mod tests {
     #[test]
     fn test_triangulation_validation_errors() {
         use crate::delaunay_core::cell::CellBuilder;
-        use crate::delaunay_core::point::Point;
         use crate::delaunay_core::vertex::VertexBuilder;
+        use crate::geometry::point::Point;
 
         // Test validation with an invalid cell
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
@@ -2024,7 +2025,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // This test can be slow due to the large number of points
+    #[ignore = "This test can be slow due to the large number of points"]
     fn tds_large_triangulation() {
         use rand::Rng;
 

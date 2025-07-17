@@ -1,10 +1,9 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
-use super::{
-    point::{OrderedEq, Point, PointValidationError},
-    utilities::make_uuid,
-};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use super::utilities::make_uuid;
+use crate::geometry::point::{OrderedEq, Point, PointValidationError};
+use num_traits::Float;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use thiserror::Error;
@@ -43,13 +42,16 @@ pub enum VertexValidationError {
 /// - `data`: The `data` property is an optional field that can hold any
 ///   type `U`. It is used to store additional data associated with the vertex.
 ///
-/// Data type T is in practice f64 which does not implement Eq, Hash, or Ord.
+/// The Point<T, D> encapsulates the coordinate type T and provides necessary
+/// trait bounds, so the Vertex struct is generic over the coordinate type T,
+/// data type U, and dimension D.
 ///
+/// T is intended to be a Float type (f32, f64, etc.) for coordinates.
 /// U is intended to be data associated with the vertex, e.g. a string, which
 /// implements Eq, Hash, Ord, `PartialEq`, and `PartialOrd`.
 pub struct Vertex<T, U, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -68,7 +70,7 @@ where
 
 impl<T, U, const D: usize> Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + Float + OrderedEq,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -95,7 +97,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let points = vec![Point::new([1.0, 2.0, 3.0])];
     /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points.clone());
     /// assert_eq!(vertices.len(), 1);
@@ -127,7 +129,7 @@ where
     /// ```
     /// use std::collections::HashMap;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
     /// let vertices = Vertex::<f64, Option<()>, 2>::from_points(points.clone());
     /// let map: HashMap<_, _> = Vertex::into_hashmap(vertices);
@@ -150,7 +152,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
     /// let retrieved_point = vertex.point();
@@ -171,7 +173,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use uuid::Uuid;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
@@ -198,7 +200,7 @@ where
     /// # Example
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_eq!(vertex.dim(), 4);
@@ -227,7 +229,7 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder, VertexValidationError};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
     ///     .point(Point::new([1.0, 2.0, 3.0]))
     ///     .build()
@@ -245,7 +247,7 @@ where
     /// ```
     pub fn is_valid(self) -> Result<(), VertexValidationError>
     where
-        T: super::point::FiniteCheck + Copy + Debug,
+        T: crate::geometry::point::FiniteCheck + Copy + Debug,
     {
         // Check if the point is valid (all coordinates are finite)
         self.point.is_valid()?;
@@ -266,7 +268,7 @@ where
 // Group 1: PartialEq, PartialOrd, and From trait implementations
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -282,7 +284,7 @@ where
 
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -297,7 +299,7 @@ where
 /// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
 impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -311,7 +313,7 @@ where
 /// This allows `&vertex` to be implicitly converted to `[T; D]` for coordinate access
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -324,7 +326,7 @@ where
 // Group 2: Eq implementation with additional Hash requirement
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Vertex<T, U, D>: Hash,
@@ -334,7 +336,7 @@ where
 
 impl<T, U, const D: usize> Hash for Vertex<T, U, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
@@ -356,7 +358,7 @@ mod tests {
     // Helper function to create a basic vertex with given coordinates
     fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
     where
-        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+        T: Default + OrderedEq + Float,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -369,7 +371,7 @@ mod tests {
     // Helper function to create a vertex with data
     fn create_vertex_with_data<T, U, const D: usize>(coords: [T; D], data: U) -> Vertex<T, U, D>
     where
-        T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+        T: Default + OrderedEq + Float,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -386,7 +388,7 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq,
+        T: Default + OrderedEq + Debug + Float,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -718,18 +720,6 @@ mod tests {
             epsilon = 1e-9
         );
         assert_eq!(vertex.dim(), 2);
-        assert!(!vertex.uuid().is_nil());
-    }
-
-    #[test]
-    fn vertex_with_integers() {
-        let vertex: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
-            .point(Point::new([1, 2, 3]))
-            .build()
-            .unwrap();
-
-        assert_eq!(vertex.point().coordinates(), [1, 2, 3]);
-        assert_eq!(vertex.dim(), 3);
         assert!(!vertex.uuid().is_nil());
     }
 
@@ -1148,34 +1138,6 @@ mod tests {
             .build()
             .unwrap();
         assert!(invalid_inf.is_valid().is_err());
-    }
-
-    #[test]
-    fn vertex_is_valid_integers() {
-        // Integer vertices should always be valid
-        let valid_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
-            .point(Point::new([1, 2, 3]))
-            .build()
-            .unwrap();
-        assert!(valid_i32.is_valid().is_ok());
-
-        let valid_negative_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
-            .point(Point::new([-1, -2, -3]))
-            .build()
-            .unwrap();
-        assert!(valid_negative_i32.is_valid().is_ok());
-
-        let valid_zero_i32: Vertex<i32, Option<()>, 3> = VertexBuilder::default()
-            .point(Point::new([0, 0, 0]))
-            .build()
-            .unwrap();
-        assert!(valid_zero_i32.is_valid().is_ok());
-
-        let valid_unsigned: Vertex<u64, Option<()>, 2> = VertexBuilder::default()
-            .point(Point::new([u64::MAX, u64::MIN]))
-            .build()
-            .unwrap();
-        assert!(valid_unsigned.is_valid().is_ok());
     }
 
     #[test]

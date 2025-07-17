@@ -141,10 +141,12 @@ mod tests {
         let inverted_matrix = invert(&matrix);
 
         assert!(inverted_matrix.is_err());
-        assert!(inverted_matrix
-            .unwrap_err()
-            .to_string()
-            .contains("Matrix is singular"));
+        assert!(
+            inverted_matrix
+                .unwrap_err()
+                .to_string()
+                .contains("Matrix is singular")
+        );
     }
 
     // #[test]

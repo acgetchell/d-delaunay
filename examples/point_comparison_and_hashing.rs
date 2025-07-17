@@ -16,7 +16,7 @@
 
 #![allow(clippy::similar_names)]
 
-use d_delaunay::delaunay_core::point::Point;
+use d_delaunay::geometry::point::Point;
 use std::collections::{HashMap, HashSet};
 
 fn main() {
@@ -324,21 +324,24 @@ fn numeric_types_demo() {
     println!("f32 points equal: {}", point_f32_1 == point_f32_2);
     println!("f32 NaN points equal: {}", point_f32_nan == point_f32_nan2);
 
-    // Integer points
-    let point_i32_1 = Point::new([10i32, 20i32, 30i32]);
-    let point_i32_2 = Point::new([10i32, 20i32, 30i32]);
-    let point_i32_3 = Point::new([10i32, 20i32, 31i32]);
+    // Integer-like values using f64
+    let point_int_1 = Point::new([10.0, 20.0, 30.0]);
+    let point_int_2 = Point::new([10.0, 20.0, 30.0]);
+    let point_int_3 = Point::new([10.0, 20.0, 31.0]);
 
-    println!("i32 points equal: {}", point_i32_1 == point_i32_2);
-    println!("i32 points different: {}", point_i32_1 != point_i32_3);
-
-    // Demonstrate HashMap with integer points
-    let mut int_map: HashMap<Point<i32, 2>, String> = HashMap::new();
-    int_map.insert(Point::new([1, 2]), "integer point".to_string());
-
-    let lookup_key = Point::new([1, 2]);
+    println!("Integer-like points equal: {}", point_int_1 == point_int_2);
     println!(
-        "Can retrieve integer point: {}",
+        "Integer-like points different: {}",
+        point_int_1 != point_int_3
+    );
+
+    // Demonstrate HashMap with integer-like points
+    let mut int_map: HashMap<Point<f64, 2>, String> = HashMap::new();
+    int_map.insert(Point::new([1.0, 2.0]), "integer-like point".to_string());
+
+    let lookup_key = Point::new([1.0, 2.0]);
+    println!(
+        "Can retrieve integer-like point: {}",
         int_map.contains_key(&lookup_key)
     );
 
@@ -352,42 +355,4 @@ fn numeric_types_demo() {
     );
 
     println!();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_nan_equality() {
-        let point1 = Point::new([f64::NAN, 1.0]);
-        let point2 = Point::new([f64::NAN, 1.0]);
-        assert_eq!(point1, point2);
-    }
-
-    #[test]
-    fn test_hashmap_with_nan() {
-        let mut map = HashMap::new();
-        let nan_point = Point::new([f64::NAN, 1.0]);
-        map.insert(nan_point, "test");
-
-        let lookup_point = Point::new([f64::NAN, 1.0]);
-        assert!(map.contains_key(&lookup_point));
-    }
-
-    #[test]
-    fn test_mathematical_properties() {
-        let a = Point::new([f64::NAN, f64::INFINITY]);
-        let b = Point::new([f64::NAN, f64::INFINITY]);
-        let c = Point::new([f64::NAN, f64::INFINITY]);
-
-        // Reflexivity
-        assert_eq!(a, a);
-
-        // Symmetry
-        assert_eq!(a == b, b == a);
-
-        // Transitivity
-        assert!(a == b && b == c && a == c);
-    }
 }

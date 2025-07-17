@@ -20,7 +20,6 @@ pub mod delaunay_core {
     pub mod cell;
     pub mod facet;
     pub mod matrix;
-    pub mod point;
     pub mod triangulation_data_structure;
     pub mod utilities;
     pub mod vertex;
@@ -28,10 +27,15 @@ pub mod delaunay_core {
     pub use cell::*;
     pub use facet::*;
     pub use matrix::*;
-    pub use point::*;
     pub use triangulation_data_structure::*;
     pub use utilities::*;
     pub use vertex::*;
+}
+
+/// Contains the `Point` struct and geometry predicates.
+pub mod geometry {
+    pub mod point;
+    pub use point::*;
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
@@ -47,9 +51,9 @@ pub fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
 mod lib_tests {
     use crate::{
         delaunay_core::{
-            cell::Cell, facet::Facet, point::Point, triangulation_data_structure::Tds,
-            vertex::Vertex,
+            cell::Cell, facet::Facet, triangulation_data_structure::Tds, vertex::Vertex,
         },
+        geometry::Point,
         is_normal,
     };
 

@@ -6,8 +6,10 @@
 //! Facets are not stored in the `Triangulation Data Structure` (TDS)
 //! directly, but created on the fly when needed.
 
-use super::{cell::Cell, point::OrderedEq, vertex::Vertex};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use super::{cell::Cell, vertex::Vertex};
+use crate::geometry::point::OrderedEq;
+use num_traits::Float;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
@@ -26,7 +28,7 @@ use thiserror::Error;
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
 pub struct Facet<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -40,7 +42,7 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
+    T: Default + OrderedEq + Debug + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -70,7 +72,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -103,7 +105,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
@@ -143,7 +145,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
@@ -191,7 +193,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// // Create a 3D tetrahedron with 4 vertices
@@ -253,7 +255,7 @@ where
 // Consolidated trait implementations for Facet
 impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -264,7 +266,7 @@ where
 
 impl<T, U, V, const D: usize> Hash for Facet<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -291,7 +293,8 @@ pub enum FacetError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
+    use crate::delaunay_core::{cell::CellBuilder, vertex::VertexBuilder};
+    use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
     // Define type aliases for complex types
@@ -717,9 +720,11 @@ mod tests {
         assert!(result.is_err());
 
         let error = result.unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("The cell does not contain the vertex!"));
+        assert!(
+            error
+                .to_string()
+                .contains("The cell does not contain the vertex!")
+        );
     }
 
     #[test]
@@ -737,9 +742,11 @@ mod tests {
         assert!(result.is_err());
 
         let error = result.unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("The cell is a 0-simplex with no facet!"));
+        assert!(
+            error
+                .to_string()
+                .contains("The cell is a 0-simplex with no facet!")
+        );
     }
 
     #[test]
@@ -986,7 +993,8 @@ mod tests {
 
     #[test]
     fn facet_hash() {
-        use crate::delaunay_core::{cell::CellBuilder, point::Point, vertex::VertexBuilder};
+        use crate::delaunay_core::{cell::CellBuilder, vertex::VertexBuilder};
+        use crate::geometry::point::Point;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 

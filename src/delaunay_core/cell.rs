@@ -5,14 +5,15 @@
 use super::{
     facet::Facet,
     matrix::invert,
-    point::{OrderedEq, Point},
     utilities::{make_uuid, vec_to_array},
     vertex::{Vertex, VertexValidationError},
 };
+use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use num_traits::Float;
+use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use thiserror::Error;
 use uuid::Uuid;
@@ -34,7 +35,9 @@ pub enum CellValidationError {
     #[error("Duplicate vertices: cell contains non-unique vertices which is not allowed")]
     DuplicateVertices,
     /// The cell has insufficient vertices to form a proper D-simplex.
-    #[error("Insufficient vertices: cell has {actual} vertices; expected exactly {expected} for a {dimension}D simplex")]
+    #[error(
+        "Insufficient vertices: cell has {actual} vertices; expected exactly {expected} for a {dimension}D simplex"
+    )]
     InsufficientVertices {
         /// The actual number of vertices in the cell.
         actual: usize,
@@ -67,7 +70,7 @@ pub enum CellValidationError {
 ///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<T, U, V, const D: usize>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -87,7 +90,7 @@ where
 
 impl<T, U, V, const D: usize> CellBuilder<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -113,7 +116,7 @@ where
 // Basic implementation block with minimal trait bounds for common methods
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq + Debug,
+    T: Default + OrderedEq + Debug + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -129,7 +132,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -152,7 +155,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -175,7 +178,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use uuid::Uuid;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1]).build().unwrap();
@@ -198,7 +201,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -227,7 +230,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
     ///     .point(Point::new([0.0, 0.0, 1.0]))
     ///     .data(1)
@@ -274,7 +277,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
@@ -309,7 +312,7 @@ where
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -378,7 +381,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
     /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
     /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
@@ -388,7 +391,7 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), CellValidationError>
     where
-        T: super::point::FiniteCheck + super::point::HashCoordinate + Copy,
+        T: crate::geometry::point::FiniteCheck + crate::geometry::point::HashCoordinate + Copy,
     {
         // Check if all vertices are valid
         for vertex in &self.vertices {
@@ -432,7 +435,8 @@ where
         + PartialEq
         + PartialOrd
         + OrderedEq
-        + Sum,
+        + Sum
+        + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
@@ -490,7 +494,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
@@ -591,7 +595,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
@@ -642,7 +646,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
     /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
@@ -700,7 +704,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::delaunay_core::point::Point;
+    /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
     /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
@@ -721,7 +725,7 @@ where
 /// Helper function to sort vertices for comparison and hashing
 fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -733,7 +737,7 @@ where
 /// Equality of cells is based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -747,7 +751,7 @@ where
 /// Eq implementation for Cell based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -757,7 +761,7 @@ where
 /// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -772,7 +776,7 @@ where
 /// Custom Hash implementation for Cell
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
+    T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -797,7 +801,8 @@ where
 mod tests {
 
     use super::*;
-    use crate::delaunay_core::{point::Point, vertex::VertexBuilder};
+    use crate::delaunay_core::vertex::VertexBuilder;
+    use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
     #[test]
@@ -1524,42 +1529,6 @@ mod tests {
     }
 
     #[test]
-    fn cell_hash_in_hashmap() {
-        use std::collections::HashMap;
-
-        let mut map: HashMap<Cell<i32, Option<()>, Option<()>, 2>, i32> = HashMap::new();
-
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0, 0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1, 0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0, 1]))
-            .build()
-            .unwrap();
-
-        let cell1: Cell<i32, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let cell2: Cell<i32, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-
-        map.insert(cell1.clone(), 10);
-        map.insert(cell2.clone(), 20);
-
-        assert_eq!(map.get(&cell1), Some(&10));
-        assert_eq!(map.get(&cell2), Some(&20));
-        assert_eq!(map.len(), 2);
-    }
-
-    #[test]
     fn cell_default() {
         let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::default();
 
@@ -1670,34 +1639,6 @@ mod tests {
 
         assert_eq!(cell.number_of_vertices(), 3);
         assert_eq!(cell.dim(), 2);
-    }
-
-    #[test]
-    fn cell_with_integers() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0i32, 0i32, 0i32]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1i32, 0i32, 0i32]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0i32, 1i32, 0i32]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0i32, 0i32, 1i32]))
-            .build()
-            .unwrap();
-
-        let cell: Cell<i32, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-
-        assert_eq!(cell.number_of_vertices(), 4);
-        assert_eq!(cell.dim(), 3);
     }
 
     #[test]
@@ -2496,23 +2437,6 @@ mod tests {
     #[test]
     fn cell_different_numeric_types() {
         // Test with different numeric types to ensure type flexibility
-        // Test with i64
-        let vertex1_i64 = VertexBuilder::default()
-            .point(Point::new([0i64, 0i64, 0i64]))
-            .build()
-            .unwrap();
-        let vertex2_i64 = VertexBuilder::default()
-            .point(Point::new([1i64, 0i64, 0i64]))
-            .build()
-            .unwrap();
-
-        let cell_i64: Cell<i64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1_i64, vertex2_i64])
-            .build()
-            .unwrap();
-        assert_eq!(cell_i64.number_of_vertices(), 2);
-        assert_eq!(cell_i64.dim(), 1);
-
         // Test with f32
         let vertex1_f32 = VertexBuilder::default()
             .point(Point::new([0.0f32, 0.0f32]))
