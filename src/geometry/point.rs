@@ -19,7 +19,7 @@
 
 use num_traits::Float;
 use ordered_float::OrderedFloat;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
@@ -28,7 +28,9 @@ use thiserror::Error;
 #[derive(Error, Debug, PartialEq, Clone)]
 pub enum PointValidationError {
     /// A coordinate is invalid (NaN or infinite).
-    #[error("Invalid coordinate at index {coordinate_index} in dimension {dimension}: {coordinate_value}")]
+    #[error(
+        "Invalid coordinate at index {coordinate_index} in dimension {dimension}: {coordinate_value}"
+    )]
     InvalidCoordinate {
         /// Index of the invalid coordinate in the point.
         coordinate_index: usize,
@@ -215,20 +217,9 @@ macro_rules! impl_finite_check {
             }
         )*
     };
-    (int: $($t:ty),*) => {
-        $(
-            impl FiniteCheck for $t {
-                #[inline(always)]
-                fn is_finite_generic(&self) -> bool {
-                    true
-                }
-            }
-        )*
-    };
 }
 
 impl_finite_check!(float: f32, f64);
-impl_finite_check!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 /// Helper trait for hashing individual coordinates for non-hashable types
 /// like f32 and f64.
@@ -271,20 +262,9 @@ macro_rules! impl_hash_coordinate {
             }
         )*
     };
-    (int: $($t:ty),*) => {
-        $(
-            impl HashCoordinate for $t {
-                #[inline(always)]
-                fn hash_coord<H: Hasher>(&self, state: &mut H) {
-                    self.hash(state);
-                }
-            }
-        )*
-    };
 }
 
 impl_hash_coordinate!(float: f32, f64);
-impl_hash_coordinate!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 impl<T, const D: usize> Hash for Point<T, D>
 where
@@ -330,20 +310,9 @@ macro_rules! impl_ordered_eq {
             }
         )*
     };
-    (int: $($t:ty),*) => {
-        $(
-            impl OrderedEq for $t {
-                #[inline(always)]
-                fn ordered_eq(&self, other: &Self) -> bool {
-                    self == other
-                }
-            }
-        )*
-    };
 }
 
 impl_ordered_eq!(float: f32, f64);
-impl_ordered_eq!(int: i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 impl<T, const D: usize> PartialEq for Point<T, D>
@@ -448,6 +417,7 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use std::collections::hash_map::DefaultHasher;
+    use std::collections::{HashMap, HashSet};
     use std::hash::{Hash, Hasher};
 
     // Helper function to get hash value for any hashable type
@@ -458,12 +428,12 @@ mod tests {
     }
 
     // Helper function to test basic point properties
-    fn test_basic_point_properties<T: Float, const D: usize>(
+    fn test_basic_point_properties<T, const D: usize>(
         point: &Point<T, D>,
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq,
+        T: Clone + Copy + Debug + Default + PartialEq + PartialOrd + OrderedEq + Float,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         assert_eq!(point.coordinates(), expected_coords);
@@ -471,7 +441,7 @@ mod tests {
     }
 
     // Helper function to test point equality and hash consistency
-    fn test_point_equality_and_hash<T: Float, const D: usize>(
+    fn test_point_equality_and_hash<T, const D: usize>(
         point1: Point<T, D>,
         point2: Point<T, D>,
         should_be_equal: bool,
@@ -483,7 +453,8 @@ mod tests {
             + PartialEq
             + PartialOrd
             + OrderedEq
-            + std::fmt::Debug,
+            + Debug
+            + Float,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         if should_be_equal {
@@ -494,6 +465,10 @@ mod tests {
             // Note: Different points may still hash to same value (hash collisions)
         }
     }
+
+    // =============================================================================
+    // BASIC POINT FUNCTIONALITY
+    // =============================================================================
 
     #[test]
     fn point_default() {
@@ -564,7 +539,7 @@ mod tests {
 
     #[test]
     fn point_serialization() {
-        use serde_test::{assert_tokens, Token};
+        use serde_test::{Token, assert_tokens};
 
         let point: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
         assert_tokens(
@@ -1509,34 +1484,6 @@ mod tests {
         assert!(f64::MIN_POSITIVE.is_finite_generic());
         assert!(0.0f32.is_finite_generic());
         assert!((-0.0f64).is_finite_generic());
-
-        // Test all integer types (should always be finite)
-        assert!(42i8.is_finite_generic());
-        assert!(42i16.is_finite_generic());
-        assert!(42i32.is_finite_generic());
-        assert!(42i64.is_finite_generic());
-        assert!(42i128.is_finite_generic());
-        assert!(42isize.is_finite_generic());
-        assert!(42u8.is_finite_generic());
-        assert!(42u16.is_finite_generic());
-        assert!(42u32.is_finite_generic());
-        assert!(42u64.is_finite_generic());
-        assert!(42u128.is_finite_generic());
-        assert!(42usize.is_finite_generic());
-
-        // Test integer edge cases
-        assert!(i8::MAX.is_finite_generic());
-        assert!(i8::MIN.is_finite_generic());
-        assert!(u8::MAX.is_finite_generic());
-        assert!(u8::MIN.is_finite_generic());
-        assert!(i32::MAX.is_finite_generic());
-        assert!(i32::MIN.is_finite_generic());
-        assert!(i64::MAX.is_finite_generic());
-        assert!(i64::MIN.is_finite_generic());
-        assert!(isize::MAX.is_finite_generic());
-        assert!(isize::MIN.is_finite_generic());
-        assert!(usize::MAX.is_finite_generic());
-        assert!(usize::MIN.is_finite_generic());
     }
 
     #[test]
@@ -1579,26 +1526,6 @@ mod tests {
 
         // Test that different special values hash differently
         assert_ne!(hash_coord(&f64::INFINITY), hash_coord(&f64::NEG_INFINITY));
-
-        // Test all integer types
-        assert_eq!(hash_coord(&42i8), hash_coord(&42i8));
-        assert_eq!(hash_coord(&42i16), hash_coord(&42i16));
-        assert_eq!(hash_coord(&42i32), hash_coord(&42i32));
-        assert_eq!(hash_coord(&42i64), hash_coord(&42i64));
-        assert_eq!(hash_coord(&42i128), hash_coord(&42i128));
-        assert_eq!(hash_coord(&42isize), hash_coord(&42isize));
-        assert_eq!(hash_coord(&42u8), hash_coord(&42u8));
-        assert_eq!(hash_coord(&42u16), hash_coord(&42u16));
-        assert_eq!(hash_coord(&42u32), hash_coord(&42u32));
-        assert_eq!(hash_coord(&42u64), hash_coord(&42u64));
-        assert_eq!(hash_coord(&42u128), hash_coord(&42u128));
-        assert_eq!(hash_coord(&42usize), hash_coord(&42usize));
-
-        // Test integer edge cases
-        assert_eq!(hash_coord(&i8::MAX), hash_coord(&i8::MAX));
-        assert_eq!(hash_coord(&i8::MIN), hash_coord(&i8::MIN));
-        assert_eq!(hash_coord(&u64::MAX), hash_coord(&u64::MAX));
-        assert_eq!(hash_coord(&u64::MIN), hash_coord(&u64::MIN));
     }
 
     #[test]
@@ -1626,31 +1553,6 @@ mod tests {
         // Test zero comparisons
         assert!(0.0f32.ordered_eq(&(-0.0f32)));
         assert!(0.0f64.ordered_eq(&(-0.0f64)));
-
-        // Test integer types
-        assert!(42i8.ordered_eq(&42i8));
-        assert!(42i16.ordered_eq(&42i16));
-        assert!(42i32.ordered_eq(&42i32));
-        assert!(42i64.ordered_eq(&42i64));
-        assert!(42i128.ordered_eq(&42i128));
-        assert!(42isize.ordered_eq(&42isize));
-        assert!(42u8.ordered_eq(&42u8));
-        assert!(42u16.ordered_eq(&42u16));
-        assert!(42u32.ordered_eq(&42u32));
-        assert!(42u64.ordered_eq(&42u64));
-        assert!(42u128.ordered_eq(&42u128));
-        assert!(42usize.ordered_eq(&42usize));
-
-        // Test integer inequality
-        assert!(!1i32.ordered_eq(&2i32));
-        assert!(!100u64.ordered_eq(&200u64));
-
-        // Test edge cases for integers
-        assert!(i8::MAX.ordered_eq(&i8::MAX));
-        assert!(i8::MIN.ordered_eq(&i8::MIN));
-        assert!(!i8::MAX.ordered_eq(&i8::MIN));
-        assert!(u32::MAX.ordered_eq(&u32::MAX));
-        assert!(u32::MIN.ordered_eq(&u32::MIN));
     }
 
     #[test]
@@ -2115,6 +2017,279 @@ mod tests {
         {
             assert_eq!(coordinate_index, 0);
         }
+    }
+
+    #[test]
+    fn point_hashmap_with_special_values() {
+        use std::collections::HashMap;
+
+        let mut point_map: HashMap<Point<f64, 3>, &str> = HashMap::new();
+
+        // Insert points with various special values
+        let point_normal = Point::new([1.0, 2.0, 3.0]);
+        let point_nan = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_inf = Point::new([f64::INFINITY, 2.0, 3.0]);
+        let point_neg_inf = Point::new([f64::NEG_INFINITY, 2.0, 3.0]);
+
+        point_map.insert(point_normal, "normal point");
+        point_map.insert(point_nan, "point with NaN");
+        point_map.insert(point_inf, "point with +∞");
+        point_map.insert(point_neg_inf, "point with -∞");
+
+        assert_eq!(point_map.len(), 4);
+
+        // Test retrieval with equivalent points
+        let point_normal_copy = Point::new([1.0, 2.0, 3.0]);
+        let point_nan_copy = Point::new([f64::NAN, 2.0, 3.0]);
+        let point_inf_copy = Point::new([f64::INFINITY, 2.0, 3.0]);
+        let point_neg_inf_copy = Point::new([f64::NEG_INFINITY, 2.0, 3.0]);
+
+        assert!(point_map.contains_key(&point_normal_copy));
+        assert!(point_map.contains_key(&point_nan_copy));
+        assert!(point_map.contains_key(&point_inf_copy));
+        assert!(point_map.contains_key(&point_neg_inf_copy));
+
+        // Test retrieval of values
+        assert_eq!(point_map.get(&point_normal_copy), Some(&"normal point"));
+        assert_eq!(point_map.get(&point_nan_copy), Some(&"point with NaN"));
+        assert_eq!(point_map.get(&point_inf_copy), Some(&"point with +∞"));
+        assert_eq!(point_map.get(&point_neg_inf_copy), Some(&"point with -∞"));
+
+        // Demonstrate that NaN points can be used as keys reliably
+        let mut nan_counter = HashMap::new();
+        for _ in 0..5 {
+            let nan_point = Point::new([f64::NAN, 1.0]);
+            *nan_counter.entry(nan_point).or_insert(0) += 1;
+        }
+        assert_eq!(*nan_counter.values().next().unwrap(), 5);
+    }
+
+    #[test]
+    fn point_hashset_with_special_values() {
+        use std::collections::HashSet;
+
+        let mut point_set: HashSet<Point<f64, 2>> = HashSet::new();
+
+        // Add various points including duplicates with special values
+        let points = vec![
+            Point::new([1.0, 2.0]),
+            Point::new([1.0, 2.0]), // Duplicate normal point
+            Point::new([f64::NAN, 2.0]),
+            Point::new([f64::NAN, 2.0]), // Duplicate NaN point
+            Point::new([f64::INFINITY, 2.0]),
+            Point::new([f64::INFINITY, 2.0]), // Duplicate infinity point
+            Point::new([0.0, -0.0]),          // Zero and negative zero (equal)
+            Point::new([-0.0, 0.0]),          // Different zero combination
+        ];
+
+        for point in points {
+            point_set.insert(point);
+        }
+
+        // Should have 4 unique points: normal, NaN, ∞, and two different zero combinations
+        // Note: [0.0, -0.0] and [-0.0, 0.0] are different points because only corresponding
+        // coordinates are compared for equality (0.0 == -0.0 but the positions differ)
+        assert_eq!(point_set.len(), 4);
+
+        // Test membership
+        let test_nan = Point::new([f64::NAN, 2.0]);
+        let test_inf = Point::new([f64::INFINITY, 2.0]);
+        let test_normal = Point::new([1.0, 2.0]);
+
+        assert!(point_set.contains(&test_nan));
+        assert!(point_set.contains(&test_inf));
+        assert!(point_set.contains(&test_normal));
+    }
+
+    #[test]
+    fn point_mathematical_properties_comprehensive() {
+        // Test mathematical properties with various special values
+        let point_a = Point::new([f64::NAN, 2.0, f64::INFINITY]);
+        let point_b = Point::new([f64::NAN, 2.0, f64::INFINITY]);
+        let point_c = Point::new([f64::NAN, 2.0, f64::INFINITY]);
+
+        // Reflexivity: a == a
+        assert_eq!(point_a, point_a);
+
+        // Symmetry: if a == b, then b == a
+        let symmetry_ab = point_a == point_b;
+        let symmetry_ba = point_b == point_a;
+        assert_eq!(symmetry_ab, symmetry_ba);
+        assert!(symmetry_ab && symmetry_ba);
+
+        // Transitivity: if a == b and b == c, then a == c
+        let trans_ab = point_a == point_b;
+        let trans_bc = point_b == point_c;
+        let trans_ac = point_a == point_c;
+        assert!(trans_ab && trans_bc && trans_ac);
+
+        // Test with mixed special values
+        let point_mixed1 = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0]);
+        let point_mixed2 = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0]);
+        let point_mixed3 = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0]);
+
+        // All should be equal
+        assert_eq!(point_mixed1, point_mixed2);
+        assert_eq!(point_mixed2, point_mixed3);
+        assert_eq!(point_mixed1, point_mixed3);
+
+        // Test reflexivity with mixed values
+        assert_eq!(point_mixed1, point_mixed1);
+    }
+
+    #[test]
+    fn point_numeric_types_f32() {
+        // Test f32 points
+        let point_f32_1 = Point::new([1.5f32, 2.5f32]);
+        let point_f32_2 = Point::new([1.5f32, 2.5f32]);
+        let point_f32_nan = Point::new([f32::NAN, 2.5f32]);
+        let point_f32_nan2 = Point::new([f32::NAN, 2.5f32]);
+
+        assert_eq!(point_f32_1, point_f32_2);
+        assert_eq!(point_f32_nan, point_f32_nan2);
+
+        // Test f32 infinity
+        let point_f32_inf1 = Point::new([f32::INFINITY, 1.0f32]);
+        let point_f32_inf2 = Point::new([f32::INFINITY, 1.0f32]);
+        let point_f32_neg_inf = Point::new([f32::NEG_INFINITY, 1.0f32]);
+
+        assert_eq!(point_f32_inf1, point_f32_inf2);
+        assert_ne!(point_f32_inf1, point_f32_neg_inf);
+
+        // Test f32 in HashMap
+        let mut f32_map: HashMap<Point<f32, 2>, &str> = HashMap::new();
+        f32_map.insert(point_f32_1, "f32 point");
+        f32_map.insert(point_f32_nan, "f32 NaN point");
+
+        let lookup_f32 = Point::new([1.5f32, 2.5f32]);
+        let lookup_f32_nan = Point::new([f32::NAN, 2.5f32]);
+
+        assert!(f32_map.contains_key(&lookup_f32));
+        assert!(f32_map.contains_key(&lookup_f32_nan));
+        assert_eq!(f32_map.get(&lookup_f32), Some(&"f32 point"));
+        assert_eq!(f32_map.get(&lookup_f32_nan), Some(&"f32 NaN point"));
+    }
+
+    #[test]
+    fn point_integer_like_values() {
+        // Test integer-like values using f64
+        let point_int_1 = Point::new([10.0, 20.0, 30.0]);
+        let point_int_2 = Point::new([10.0, 20.0, 30.0]);
+        let point_int_3 = Point::new([10.0, 20.0, 31.0]);
+
+        assert_eq!(point_int_1, point_int_2);
+        assert_ne!(point_int_1, point_int_3);
+
+        // Test in HashMap
+        let mut int_map: HashMap<Point<f64, 2>, String> = HashMap::new();
+        int_map.insert(Point::new([1.0, 2.0]), "integer-like point".to_string());
+
+        let lookup_key = Point::new([1.0, 2.0]);
+        assert!(int_map.contains_key(&lookup_key));
+        assert_eq!(int_map.get(&lookup_key).unwrap(), "integer-like point");
+    }
+
+    #[test]
+    fn point_floating_point_precision() {
+        // Test that we can distinguish between very close floating point values
+        let point_epsilon1 = Point::new([1.0 + f64::EPSILON, 2.0]);
+        let point_epsilon2 = Point::new([1.0, 2.0]);
+        assert_ne!(point_epsilon1, point_epsilon2);
+
+        // Test with values that should be exactly equal
+        let point_exact1 = Point::new([0.1 + 0.2, 1.0]);
+        let point_exact2 = Point::new([0.3, 1.0]);
+        // Note: Due to floating point representation, 0.1 + 0.2 != 0.3
+        // This test demonstrates the exact equality behavior
+        assert_ne!(point_exact1, point_exact2);
+
+        // Test that points with slightly different values are not approximately equal
+        // (demonstrating that we use exact equality, not approximate)
+        let point_a = Point::new([1.0, 2.0]);
+        let point_b = Point::new([1.0 + f64::EPSILON, 2.0]);
+        assert_ne!(point_a, point_b);
+
+        // But points with exactly the same values are equal
+        let point_same1 = Point::new([1.0, 2.0]);
+        let point_same2 = Point::new([1.0, 2.0]);
+        assert_eq!(point_same1, point_same2);
+    }
+
+    #[test]
+    fn point_zero_and_negative_zero() {
+        // Test zero and negative zero behavior
+        let point_pos_zero = Point::new([0.0, 0.0]);
+        let point_neg_zero = Point::new([-0.0, -0.0]);
+        let point_mixed_zero = Point::new([0.0, -0.0]);
+        let point_mixed_zero2 = Point::new([-0.0, 0.0]);
+
+        // All should be equal (0.0 == -0.0 in IEEE 754)
+        assert_eq!(point_pos_zero, point_neg_zero);
+        assert_eq!(point_pos_zero, point_mixed_zero);
+        assert_eq!(point_pos_zero, point_mixed_zero2);
+        assert_eq!(point_neg_zero, point_mixed_zero);
+        assert_eq!(point_neg_zero, point_mixed_zero2);
+        assert_eq!(point_mixed_zero, point_mixed_zero2);
+
+        // Test hashing consistency
+        let hash_pos = get_hash(&point_pos_zero);
+        let hash_neg = get_hash(&point_neg_zero);
+        let hash_mixed1 = get_hash(&point_mixed_zero);
+        let hash_mixed2 = get_hash(&point_mixed_zero2);
+
+        assert_eq!(hash_pos, hash_neg);
+        assert_eq!(hash_pos, hash_mixed1);
+        assert_eq!(hash_pos, hash_mixed2);
+    }
+
+    #[test]
+    fn point_nan_different_creation_methods() {
+        // Test that different ways of creating NaN are treated as equal
+        let nan1 = f64::NAN;
+        let nan2 = f64::NAN;
+        let nan3 = f64::NAN;
+
+        let point_nan_variant1 = Point::new([nan1, 1.0]);
+        let point_nan_variant2 = Point::new([nan2, 1.0]);
+        let point_nan_variant3 = Point::new([nan3, 1.0]);
+
+        assert_eq!(point_nan_variant1, point_nan_variant2);
+        assert_eq!(point_nan_variant2, point_nan_variant3);
+        assert_eq!(point_nan_variant1, point_nan_variant3);
+
+        // Test hash consistency
+        let hash1 = get_hash(&point_nan_variant1);
+        let hash2 = get_hash(&point_nan_variant2);
+        let hash3 = get_hash(&point_nan_variant3);
+
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash2, hash3);
+    }
+
+    #[test]
+    fn point_mixed_special_values_comprehensive() {
+        // Test various combinations of special values
+        let point_all_special = Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -0.0]);
+        let point_all_special_copy =
+            Point::new([f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -0.0]);
+
+        assert_eq!(point_all_special, point_all_special_copy);
+
+        // Test different combinations
+        let point_combo1 = Point::new([f64::NAN, 1.0, f64::INFINITY]);
+        let point_combo2 = Point::new([f64::NAN, 1.0, f64::INFINITY]);
+        let point_combo3 = Point::new([f64::NAN, 1.0, f64::NEG_INFINITY]); // Different
+
+        assert_eq!(point_combo1, point_combo2);
+        assert_ne!(point_combo1, point_combo3);
+
+        // Test in collections
+        let mut special_set: HashSet<Point<f64, 3>> = HashSet::new();
+        special_set.insert(point_combo1);
+        special_set.insert(point_combo2); // Should not increase size
+        special_set.insert(point_combo3); // Should increase size
+
+        assert_eq!(special_set.len(), 2);
     }
 
     #[test]

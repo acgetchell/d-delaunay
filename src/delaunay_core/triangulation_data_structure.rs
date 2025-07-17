@@ -13,8 +13,8 @@ use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::Float;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::cmp::{min, Ordering};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -687,12 +687,10 @@ where
         let radius = <T as From<f64>>::from(20.0f64);
         let points = Self::create_supercell_simplex(&center, radius);
 
-        let supercell = CellBuilder::default()
+        CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap();
-
-        supercell
+            .unwrap()
     }
 
     /// Creates a well-formed simplex centered at the given point with the given radius

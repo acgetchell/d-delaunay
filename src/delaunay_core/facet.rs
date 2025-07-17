@@ -9,7 +9,7 @@
 use super::{cell::Cell, vertex::Vertex};
 use crate::geometry::point::OrderedEq;
 use num_traits::Float;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
@@ -720,9 +720,11 @@ mod tests {
         assert!(result.is_err());
 
         let error = result.unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("The cell does not contain the vertex!"));
+        assert!(
+            error
+                .to_string()
+                .contains("The cell does not contain the vertex!")
+        );
     }
 
     #[test]
@@ -740,9 +742,11 @@ mod tests {
         assert!(result.is_err());
 
         let error = result.unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("The cell is a 0-simplex with no facet!"));
+        assert!(
+            error
+                .to_string()
+                .contains("The cell is a 0-simplex with no facet!")
+        );
     }
 
     #[test]

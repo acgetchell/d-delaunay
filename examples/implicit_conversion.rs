@@ -17,6 +17,8 @@
 //! compatibility. Instead of always having to call `.coordinates()` explicitly,
 //! you can now use implicit conversion via `.into()` or let type inference
 //! handle the conversion automatically in many contexts.
+//!
+//! Run this example with: `cargo run --example implicit_conversion`
 
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 use d_delaunay::geometry::point::Point;

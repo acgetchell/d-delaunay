@@ -3,7 +3,7 @@
 use super::utilities::make_uuid;
 use crate::geometry::point::{OrderedEq, Point, PointValidationError};
 use num_traits::Float;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
 use thiserror::Error;

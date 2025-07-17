@@ -12,8 +12,8 @@ use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::Float;
-use peroxide::fuga::{anyhow, zeros, LinearAlgebra, MatrixTrait};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use thiserror::Error;
 use uuid::Uuid;
@@ -35,7 +35,9 @@ pub enum CellValidationError {
     #[error("Duplicate vertices: cell contains non-unique vertices which is not allowed")]
     DuplicateVertices,
     /// The cell has insufficient vertices to form a proper D-simplex.
-    #[error("Insufficient vertices: cell has {actual} vertices; expected exactly {expected} for a {dimension}D simplex")]
+    #[error(
+        "Insufficient vertices: cell has {actual} vertices; expected exactly {expected} for a {dimension}D simplex"
+    )]
     InsufficientVertices {
         /// The actual number of vertices in the cell.
         actual: usize,

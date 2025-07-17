@@ -3,7 +3,7 @@
 use super::vertex::Vertex;
 use crate::geometry::point::OrderedEq;
 use num_traits::Float;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash};
 use uuid::Uuid;
 
