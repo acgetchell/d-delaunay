@@ -1,0 +1,42 @@
+# .codacy.yml
+
+# 1. Enable/disable engines
+engines:
+  # Static analysis & secret detection
+  semgrep:
+    enabled: true
+    # Optionally scope to Rust only
+    languages:
+      - "rust"
+
+  # Dependency vulnerability scanning
+  trivy:
+    enabled: true
+    languages:
+      - "rust"
+
+  # Duplication detection
+  jscpd:
+    enabled: true
+    languages:
+      - "rust"
+
+  # Complexity metrics
+  lizard:
+    enabled: true
+    languages:
+      - "rust"
+
+# 2. Global ignore patterns (paths or globs)
+ignore:
+  paths:
+    - "Cargo.lock"
+
+# 3. (Optional) Per-engine excludes
+# engines:
+#   rust_clippy:
+#     enabled: true
+#     exclude_paths:
+#       - "Cargo.lock"
+#
+#   # You can repeat exclude_paths under any engine if you need fine-grained control.

@@ -41,6 +41,7 @@
         "rawpointer",
         "rustversion",
         "sarif",
+        "semgrep",
         "serde",
         "simplicial",
         "spacelike",

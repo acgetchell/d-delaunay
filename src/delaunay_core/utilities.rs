@@ -1,8 +1,7 @@
 //! Utility functions
 
-use super::{point::OrderedEq, vertex::Vertex};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::Ordering, collections::HashMap, hash::Hash};
+use super::vertex::VertexND;
+use std::{cmp::Ordering, collections::HashMap, fmt::Debug, hash::Hash};
 use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
@@ -39,7 +38,7 @@ pub fn make_uuid() -> Uuid {
 ///
 /// # Returns
 ///
-/// an array of type `T` with length `D` containing the minimum or maximum
+/// an array of type `f64` with length `D` containing the minimum or maximum
 /// coordinate for each dimension.
 ///
 /// # Panics
@@ -53,41 +52,39 @@ pub fn make_uuid() -> Uuid {
 ///
 /// ```
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
-/// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::delaunay_core::point::Point;
+/// use d_delaunay::delaunay_core::vertex::VertexND;
+/// use d_delaunay::geometry::point::{Point, PointND};
 /// use std::collections::HashMap;
 /// use std::cmp::Ordering;
 /// let points = vec![
-///     Point::new([-1.0, 2.0, 3.0]),
-///     Point::new([4.0, -5.0, 6.0]),
-///     Point::new([7.0, 8.0, -9.0]),
+///     PointND::new([-1.0, 2.0, 3.0]),
+///     PointND::new([4.0, -5.0, 6.0]),
+///     PointND::new([7.0, 8.0, -9.0]),
 /// ];
-/// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-/// let hashmap = Vertex::into_hashmap(vertices);
+/// let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+/// let hashmap = VertexND::into_hashmap(vertices);
 /// let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
 /// # use approx::assert_relative_eq;
 /// assert_relative_eq!(min_coords.as_slice(), [-1.0, -5.0, -9.0].as_slice(), epsilon = 1e-9);
 /// ```
 #[must_use]
-pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHasher>(
-    vertices: &HashMap<Uuid, Vertex<T, U, D>, S>,
+pub fn find_extreme_coordinates<U, const D: usize, S: ::std::hash::BuildHasher>(
+    vertices: &HashMap<Uuid, VertexND<U, D>, S>,
     ordering: Ordering,
-) -> [T; D]
+) -> [f64; D]
 where
-    T: Clone + Copy + Default + PartialEq + PartialOrd + OrderedEq,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Debug + Default,
 {
     if vertices.is_empty() {
         return [Default::default(); D];
     }
 
     // Initialize with the first vertex's coordinates using implicit conversion
-    let mut extreme_coords: [T; D] = vertices.values().next().unwrap().into();
+    let mut extreme_coords: [f64; D] = vertices.values().next().unwrap().into();
 
     // Compare with remaining vertices
     for vertex in vertices.values().skip(1) {
-        let vertex_coords: [T; D] = vertex.into();
+        let vertex_coords: [f64; D] = vertex.into();
         for (i, coord) in vertex_coords.iter().enumerate() {
             match ordering {
                 Ordering::Less => {
@@ -140,7 +137,7 @@ pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], anyhow::Err
 #[cfg(test)]
 mod tests {
 
-    use crate::delaunay_core::point::Point;
+    use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
     use super::*;
@@ -164,8 +161,8 @@ mod tests {
             Point::new([4.0, -5.0, 6.0]),
             Point::new([7.0, 8.0, -9.0]),
         ];
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
 
         assert_relative_eq!(
@@ -185,8 +182,8 @@ mod tests {
             Point::new([4.0, -5.0, 6.0]),
             Point::new([7.0, 8.0, -9.0]),
         ];
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
         assert_relative_eq!(
@@ -298,7 +295,7 @@ mod tests {
 
     #[test]
     fn utilities_find_extreme_coordinates_empty() {
-        let empty_hashmap: HashMap<Uuid, Vertex<f64, Option<()>, 3>> = HashMap::new();
+        let empty_hashmap: HashMap<Uuid, VertexND<Option<()>, 3>> = HashMap::new();
         let min_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Greater);
 
@@ -318,8 +315,8 @@ mod tests {
     #[test]
     fn utilities_find_extreme_coordinates_single_point() {
         let points = vec![Point::new([5.0, -3.0, 7.0])];
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
@@ -340,8 +337,8 @@ mod tests {
     #[test]
     fn utilities_find_extreme_coordinates_equal_ordering() {
         let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         // Using Ordering::Equal should return the first vertex's coordinates unchanged
         let coords = find_extreme_coordinates(&hashmap, Ordering::Equal);
@@ -367,8 +364,8 @@ mod tests {
             Point::new([3.0, 2.0]),
             Point::new([2.0, 5.0]),
         ];
-        let vertices: Vec<Vertex<f64, Option<()>, 2>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 2>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
@@ -380,8 +377,8 @@ mod tests {
     #[test]
     fn utilities_find_extreme_coordinates_1d() {
         let points = vec![Point::new([10.0]), Point::new([-5.0]), Point::new([3.0])];
-        let vertices: Vec<Vertex<f64, Option<()>, 1>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 1>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
@@ -397,7 +394,7 @@ mod tests {
             Point::new([4.0, -1.0, 2.0]),
             Point::new([-2.0, 5.0, 1.0]),
         ];
-        let vertices: Vec<Vertex<f64, i32, 3>> = points
+        let vertices: Vec<VertexND<i32, 3>> = points
             .into_iter()
             .enumerate()
             .map(|(i, point)| {
@@ -409,7 +406,7 @@ mod tests {
                     .unwrap()
             })
             .collect();
-        let hashmap = Vertex::into_hashmap(vertices);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
@@ -433,8 +430,8 @@ mod tests {
             Point::new([2.0, 3.0, 4.0]),
             Point::new([2.0, 3.0, 4.0]),
         ];
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
@@ -459,8 +456,8 @@ mod tests {
             Point::new([-1e9, 1e3, -1e15]),
             Point::new([1e15, 1e9, 1e6]),
         ];
-        let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-        let hashmap = Vertex::into_hashmap(vertices);
+        let vertices: Vec<VertexND<Option<()>, 3>> = VertexND::from_points(points);
+        let hashmap = VertexND::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
