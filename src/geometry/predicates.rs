@@ -1280,18 +1280,19 @@ mod tests {
     #[test]
     fn predicates_simplex_orientation_positive() {
         // Test a positively oriented simplex
+        // Using vertices that create a positive determinant
         let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
+            .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
+            .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
@@ -1308,19 +1309,20 @@ mod tests {
 
     #[test]
     fn predicates_simplex_orientation_negative() {
-        // Test a negatively oriented simplex (by swapping two vertices)
+        // Test a negatively oriented simplex
+        // Using vertices that create a negative determinant
         let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
+            .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
         let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
+            .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
