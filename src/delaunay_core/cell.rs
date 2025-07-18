@@ -499,7 +499,7 @@ where
     }
 
     /// Alternative method that accepts precomputed circumcenter
-    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> T
+    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -545,7 +545,7 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let circumcenter = self.circumcenter()?;
-        let circumradius = self.circumradius_with_center(&circumcenter);
+        let circumradius = self.circumradius_with_center(&circumcenter)?;
         // Use implicit conversion from vertex to coordinates, then convert to f64
         let vertex_coords: [T; D] = (&vertex).into();
         let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
@@ -2001,7 +2001,7 @@ mod tests {
         let radius_with_center = cell.circumradius_with_center(&circumcenter);
         let radius_direct = cell.circumradius().unwrap();
 
-        assert_relative_eq!(radius_with_center, radius_direct, epsilon = 1e-10);
+        assert_relative_eq!(radius_with_center.unwrap(), radius_direct, epsilon = 1e-10);
     }
 
     #[test]

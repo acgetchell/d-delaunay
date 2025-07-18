@@ -109,16 +109,18 @@ where
     // Build matrix A and vector B for the linear system
     let mut matrix = zeros(dim, dim);
     let mut b = zeros(dim, 1);
-    let coords_0: [T; D] = (&vertices[0]).into();
-    let coords_0_f64: [f64; D] = coords_0.map(std::convert::Into::into);
+    let coords_0_f64: [f64; D] = {
+        let coords_0: [T; D] = (&vertices[0]).into();
+        coords_0.map(std::convert::Into::into)
+    };
 
     for i in 0..dim {
-        let coords_i: [T; D] = (&vertices[i + 1]).into();
-        let coords_vertex_f64: [f64; D] = coords_i.map(std::convert::Into::into);
+        let coords_vertex: [T; D] = (&vertices[i + 1]).into();
+        let coords_vertex_f64: [f64; D] = coords_vertex.map(std::convert::Into::into);
 
         // Fill matrix row
         for j in 0..dim {
-            matrix[(i, j)] = (coords_i[j] - coords_0[j]).into();
+            matrix[(i, j)] = coords_vertex_f64[j] - coords_0_f64[j];
         }
 
         // Fill vector element
@@ -186,7 +188,7 @@ where
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
     let circumcenter = circumcenter(vertices)?;
-    Ok(circumradius_with_center(vertices, &circumcenter))
+    circumradius_with_center(vertices, &circumcenter)
 }
 
 /// Calculate the circumradius given a precomputed circumcenter.
@@ -200,7 +202,15 @@ where
 /// * `circumcenter` - The precomputed circumcenter
 ///
 /// # Returns
-/// The circumradius as a value of type T
+/// The circumradius as a value of type T if successful, or an error if the
+/// simplex is degenerate or the distance calculation fails.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The vertices slice is empty
+/// - Coordinate conversion fails
+/// - Distance calculation fails
 ///
 /// # Example
 ///
@@ -215,14 +225,14 @@ where
 /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
 /// let vertices = vec![vertex1, vertex2, vertex3, vertex4];
 /// let center = circumcenter(&vertices).unwrap();
-/// let radius = circumradius_with_center(&vertices, &center);
+/// let radius = circumradius_with_center(&vertices, &center).unwrap();
 /// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
 /// ```
 pub fn circumradius_with_center<T, U, const D: usize>(
     vertices: &[Vertex<T, U, D>],
     circumcenter: &Point<f64, D>,
-) -> T
+) -> Result<T, anyhow::Error>
 where
     T: Clone
         + ComplexField<RealField = T>
@@ -240,15 +250,15 @@ where
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
     if vertices.is_empty() {
-        return T::zero();
+        return Err(anyhow::Error::msg("Empty vertex set"));
     }
 
     let vertex_coords: [T; D] = (&vertices[0]).into();
     let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
-    na::distance(
+    Ok(na::distance(
         &na::Point::<T, D>::from(circumcenter.coordinates()),
         &na::Point::<T, D>::from(vertex_coords_f64),
-    )
+    ))
 }
 
 /// Check if a vertex is contained within the circumsphere of a simplex.
@@ -305,7 +315,7 @@ where
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
     let circumcenter = circumcenter(simplex_vertices)?;
-    let circumradius = circumradius_with_center(simplex_vertices, &circumcenter);
+    let circumradius = circumradius_with_center(simplex_vertices, &circumcenter)?;
     // Use implicit conversion from vertex to coordinates, then convert to f64
     let vertex_coords: [T; D] = (&test_vertex).into();
     let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
@@ -1000,7 +1010,7 @@ mod tests {
         let radius_with_center = circumradius_with_center(&vertices, &center);
         let radius_direct = circumradius(&vertices).unwrap();
 
-        assert_relative_eq!(radius_with_center, radius_direct, epsilon = 1e-10);
+        assert_relative_eq!(radius_with_center.unwrap(), radius_direct, epsilon = 1e-10);
     }
 
     #[test]
