@@ -6,9 +6,9 @@
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
-    utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
+use crate::geometry::predicates::find_extreme_coordinates;
 use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
