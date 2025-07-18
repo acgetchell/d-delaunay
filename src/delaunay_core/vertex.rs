@@ -1,7 +1,7 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::utilities::make_uuid;
-use crate::geometry::point::{OrderedEq, Point, PointValidationError};
+use crate::geometry::point::{Coordinates,OrderedEq, Point, PointValidationError};
 use num_traits::Float;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;

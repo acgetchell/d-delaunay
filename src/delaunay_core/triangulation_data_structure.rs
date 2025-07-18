@@ -9,7 +9,7 @@ use super::{
     utilities::find_extreme_coordinates,
     vertex::Vertex,
 };
-use crate::geometry::point::{OrderedEq, Point};
+use crate::geometry::point::{Coordinates,OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, NumCast};

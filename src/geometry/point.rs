@@ -41,6 +41,43 @@ pub enum PointValidationError {
     },
 }
 
+/// A trait that defines operations and properties for d-dimensional coordinates.
+///
+/// # Type Parameters
+///
+/// * `T`: The type of the coordinates.
+/// * `D`: The dimensionality of the coordinates.
+///
+/// # Required Methods
+///
+/// * `coordinates`: Returns the coordinates as an array.
+/// * `dim`: Returns the dimensionality of the coordinates.
+/// * `is_valid`: Validates the coordinates and returns a result indicating validity.
+pub trait Coordinates<T, const D: usize>
+where
+    T: Default + Float + OrderedEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    /// Returns the coordinates of the point as an array.
+    fn coordinates(&self) -> [T; D];
+    /// Returns the dimensionality of the coordinates.
+    fn dim(&self) -> usize;
+    /// Validates the coordinates of the point.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if all coordinates are valid, otherwise returns a
+    /// `PointValidationError` indicating the invalid coordinate.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PointValidationError::InvalidCoordinate` if any coordinate
+    /// is NaN, infinite, or otherwise invalid.
+    fn is_valid(&self) -> Result<(), PointValidationError>
+    where
+        T: FiniteCheck + Copy + Debug;
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialOrd, Serialize)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
@@ -61,6 +98,39 @@ where
 {
     /// The coordinates of the point.
     coords: [T; D],
+}
+
+impl<T, const D: usize> Coordinates<T, D> for Point<T, D>
+where
+    T: Default + Float + OrderedEq,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn coordinates(&self) -> [T; D] {
+        self.coords
+    }
+
+    #[inline]
+    fn dim(&self) -> usize {
+        D
+    }
+
+    fn is_valid(&self) -> Result<(), PointValidationError>
+    where
+        T: FiniteCheck + Copy + Debug,
+    {
+        // Verify all coordinates are finite
+        for (index, &coord) in self.coords.iter().enumerate() {
+            if !coord.is_finite_generic() {
+                return Err(PointValidationError::InvalidCoordinate {
+                    coordinate_index: index,
+                    coordinate_value: format!("{coord:?}"),
+                    dimension: D,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<T, const D: usize> Point<T, D>

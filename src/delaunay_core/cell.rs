@@ -8,7 +8,7 @@ use super::{
     utilities::{make_uuid, vec_to_array},
     vertex::{Vertex, VertexValidationError},
 };
-use crate::geometry::point::{OrderedEq, Point};
+use crate::geometry::point::{Coordinates,OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::Float;
@@ -563,12 +563,15 @@ where
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+        Point<f64, D>: Coordinates<f64, D>,
+        T: From<f64>,
     {
         let vertex_coords: [T; D] = (&self.vertices[0]).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+        let circumcenter_coords: [f64; D] = circumcenter.coordinates();
+        let circumcenter_coords_t: [T; D] = circumcenter_coords.map(<T as From<f64>>::from);
         na::distance(
-            &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords_f64),
+            &na::Point::<T, D>::from(circumcenter_coords_t),
+            &na::Point::<T, D>::from(vertex_coords),
         )
     }
 
@@ -608,15 +611,18 @@ where
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+        Point<f64, D>: Coordinates<f64, D>,
+        T: From<f64>,
     {
         let circumcenter = self.circumcenter()?;
         let circumradius = self.circumradius_with_center(&circumcenter);
-        // Use implicit conversion from vertex to coordinates, then convert to f64
+        // Use implicit conversion from vertex to coordinates
         let vertex_coords: [T; D] = (&vertex).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+        let circumcenter_coords: [f64; D] = circumcenter.coordinates();
+        let circumcenter_coords_t: [T; D] = circumcenter_coords.map(<T as From<f64>>::from);
         let radius = na::distance(
-            &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords_f64),
+            &na::Point::<T, D>::from(circumcenter_coords_t),
+            &na::Point::<T, D>::from(vertex_coords),
         );
 
         Ok(circumradius >= radius)
