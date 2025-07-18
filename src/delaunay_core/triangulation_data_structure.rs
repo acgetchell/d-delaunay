@@ -8,8 +8,8 @@ use super::{
     facet::Facet,
     vertex::Vertex,
 };
-use crate::geometry::predicates::find_extreme_coordinates;
 use crate::geometry::point::{OrderedEq, Point};
+use crate::geometry::predicates::find_extreme_coordinates;
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, NumCast};

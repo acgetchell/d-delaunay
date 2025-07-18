@@ -24,11 +24,11 @@ with special emphasis on handling of NaN (Not a Number) and infinity values.
 
 **Run with:** `cargo run --example point_comparison_and_hashing`
 
-### 2. Circumsphere Containment Testing (`test_circumsphere.rs`)
+### 2. Circumsphere Containment and Simplex Orientation Testing (`test_circumsphere.rs`)
 
 Demonstrates and compares two methods for determining if a point lies inside
-the circumsphere of a tetrahedron, highlighting their differences in numerical
-stability and implementation approach.
+the circumsphere of a 4D simplex (5-cell/hypertetrahedron), plus comprehensive
+testing of simplex orientation across multiple dimensions.
 
 **Key Features:**
 
@@ -38,13 +38,24 @@ stability and implementation approach.
 - **Determinant-based method** (`circumsphere_contains_vertex`): Uses a matrix
   determinant approach that avoids explicit circumcenter calculation and
   provides superior numerical stability.
+- **4D simplex testing**: Uses a unit 4D simplex with vertices at:
+  - `[0,0,0,0]` (origin)
+  - `[1,0,0,0]` (unit vector along x-axis)
+  - `[0,1,0,0]` (unit vector along y-axis)
+  - `[0,0,1,0]` (unit vector along z-axis)
+  - `[0,0,0,1]` (unit vector along w-axis)
 - **Comprehensive testing**: Tests various categories of points including:
   - Inside points (well within the circumsphere)
   - Outside points (clearly beyond the circumsphere)
-  - Boundary points (on edges and faces of the tetrahedron)
-  - Vertex points (the tetrahedron vertices themselves)
-- **Unit tetrahedron setup**: Uses a well-defined unit simplex with vertices
-  at `[0,0,0]`, `[1,0,0]`, `[0,1,0]`, and `[0,0,1]` for predictable geometry.
+  - Boundary points (on edges and faces of the 4D simplex)
+  - Vertex points (the simplex vertices themselves)
+- **Simplex orientation testing**: Tests simplex orientation across dimensions:
+  - 4D simplex orientation with positive and negative variants
+  - 3D tetrahedron orientation for comparison
+  - 2D triangle orientation with normal and reversed vertex ordering
+  - Degenerate cases (collinear points)
+- **Orientation impact demonstration**: Shows how the determinant-based method
+  automatically handles orientation differences while maintaining consistent results.
 - **Method comparison**: Shows how both methods perform on the same test cases,
   demonstrating where they agree and where numerical differences may occur.
 

@@ -343,13 +343,21 @@ where
 /// - A constant 1
 ///
 /// The test point `p` is inside the circumsphere if and only if the determinant
-/// of this matrix is negative.
+/// has the correct sign relative to the simplex orientation.
 ///
 /// # Mathematical Background
 ///
 /// This determinant test is mathematically equivalent to checking if the test point
 /// lies inside the circumsphere, but avoids the numerical instability that can arise
 /// from computing circumcenter coordinates and distances explicitly.
+///
+/// The sign of the determinant depends on the orientation of the simplex:
+/// - For a **positively oriented** simplex: positive determinant means the point is inside
+/// - For a **negatively oriented** simplex: negative determinant means the point is inside
+///
+/// This function automatically determines the simplex orientation using [`simplex_orientation`]
+/// and interprets the determinant sign accordingly, ensuring correct results regardless
+/// of vertex ordering.
 ///
 /// # Arguments
 ///
@@ -455,9 +463,116 @@ where
     // Calculate the determinant of the matrix
     let det = matrix.det();
 
-    // For the in-sphere test, the point is inside if the determinant is negative
-    // The sign depends on the orientation of the simplex vertices
-    Ok(det < 0.0)
+    // The sign of the determinant depends on the orientation of the simplex.
+    // For a positively oriented simplex, the determinant is positive when the test point
+    // is inside the circumsphere. For a negatively oriented simplex, the determinant
+    // is negative when the test point is inside the circumsphere.
+    // We need to check the orientation of the simplex to interpret the determinant correctly.
+    let is_positive_orientation = simplex_orientation(simplex_vertices)?;
+
+    if is_positive_orientation {
+        // For positive orientation, positive determinant means inside circumsphere
+        Ok(det > 0.0)
+    } else {
+        // For negative orientation, negative determinant means inside circumsphere
+        Ok(det < 0.0)
+    }
+}
+
+/// Determine the orientation of a simplex using the determinant of its coordinate matrix.
+///
+/// This function computes the orientation of a d-dimensional simplex by calculating
+/// the determinant of a matrix formed by the coordinates of its vertices.
+///
+/// # Arguments
+///
+/// * `simplex_vertices` - A slice of vertices that form the simplex (must have exactly D+1 vertices)
+///
+/// # Returns
+///
+/// Returns `true` if the simplex is positively oriented (determinant > 0),
+/// `false` if negatively oriented (determinant < 0), and `false` for degenerate cases (determinant = 0).
+///
+/// # Errors
+///
+/// Returns an error if the number of simplex vertices is not exactly D+1.
+///
+/// # Algorithm
+///
+/// For a d-dimensional simplex with vertices `v₁, v₂, ..., vₐ₊₁`, the orientation
+/// is determined by the sign of the determinant of the matrix:
+///
+/// ```text
+/// |  x₁   y₁   z₁  ...  1  |
+/// |  x₂   y₂   z₂  ...  1  |
+/// |  x₃   y₃   z₃  ...  1  |
+/// |  ...  ...  ... ...  ... |
+/// |  xₐ₊₁ yₐ₊₁ zₐ₊₁ ... 1  |
+/// ```
+///
+/// Where each row contains the d coordinates of a vertex and a constant 1.
+///
+/// # Example
+///
+/// ```
+/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+/// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::predicates::simplex_orientation;
+/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
+/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
+/// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+/// let is_positive = simplex_orientation(&simplex_vertices).unwrap();
+/// ```
+pub fn simplex_orientation<T, U, const D: usize>(
+    simplex_vertices: &[Vertex<T, U, D>],
+) -> Result<bool, anyhow::Error>
+where
+    T: Clone
+        + ComplexField<RealField = T>
+        + Copy
+        + Default
+        + PartialEq
+        + PartialOrd
+        + OrderedEq
+        + Sum
+        + Float,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    f64: From<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+{
+    if simplex_vertices.len() != D + 1 {
+        return Err(anyhow::Error::msg(
+            "Invalid simplex: wrong number of vertices",
+        ));
+    }
+
+    // Create matrix for orientation test
+    // Matrix has D+1 columns: D coordinates + 1
+    let mut matrix = zeros(D + 1, D + 1);
+
+    // Populate rows with the coordinates of the vertices of the simplex
+    for (i, v) in simplex_vertices.iter().enumerate() {
+        // Use implicit conversion from vertex to coordinates
+        let vertex_coords: [T; D] = v.into();
+        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+
+        // Add coordinates
+        for j in 0..D {
+            matrix[(i, j)] = vertex_coords_f64[j];
+        }
+
+        // Add one to the last column
+        matrix[(i, D)] = 1.0;
+    }
+
+    // Calculate the determinant of the matrix
+    let det = matrix.det();
+
+    // Positive determinant means positive orientation
+    Ok(det > 0.0)
 }
 
 /// Find the extreme coordinates (minimum or maximum) across all vertices in a `HashMap`.
@@ -938,7 +1053,8 @@ mod tests {
             Point::new([4.0, -5.0, 6.0]),
             Point::new([7.0, 8.0, -9.0]),
         ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
 
@@ -959,7 +1075,8 @@ mod tests {
             Point::new([4.0, -5.0, 6.0]),
             Point::new([7.0, 8.0, -9.0]),
         ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater);
 
@@ -975,7 +1092,8 @@ mod tests {
 
     #[test]
     fn predicates_find_extreme_coordinates_empty() {
-        let empty_hashmap: HashMap<Uuid, crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = HashMap::new();
+        let empty_hashmap: HashMap<Uuid, crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            HashMap::new();
         let min_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
         let max_coords = find_extreme_coordinates(&empty_hashmap, Ordering::Greater);
 
@@ -995,7 +1113,8 @@ mod tests {
     #[test]
     fn predicates_find_extreme_coordinates_single_point() {
         let points = vec![Point::new([5.0, -3.0, 7.0])];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
@@ -1017,7 +1136,8 @@ mod tests {
     #[test]
     fn predicates_find_extreme_coordinates_equal_ordering() {
         let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
         // Using Ordering::Equal should return the first vertex's coordinates unchanged
@@ -1044,7 +1164,8 @@ mod tests {
             Point::new([3.0, 2.0]),
             Point::new([2.0, 5.0]),
         ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
@@ -1057,7 +1178,8 @@ mod tests {
     #[test]
     fn predicates_find_extreme_coordinates_1d() {
         let points = vec![Point::new([10.0]), Point::new([-5.0]), Point::new([3.0])];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
@@ -1109,7 +1231,8 @@ mod tests {
             Point::new([2.0, 3.0, 4.0]),
             Point::new([2.0, 3.0, 4.0]),
         ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
@@ -1135,7 +1258,8 @@ mod tests {
             Point::new([-1e9, 1e3, -1e15]),
             Point::new([1e15, 1e9, 1e6]),
         ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> = crate::delaunay_core::vertex::Vertex::from_points(points);
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less);
@@ -1150,6 +1274,108 @@ mod tests {
             max_coords.as_slice(),
             [1e15, 1e9, 1e12].as_slice(),
             epsilon = 1e-9
+        );
+    }
+
+    #[test]
+    fn predicates_simplex_orientation_positive() {
+        // Test a positively oriented simplex
+        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
+        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+
+        let orientation = simplex_orientation(&simplex_vertices).unwrap();
+        assert!(orientation, "This simplex should be positively oriented");
+    }
+
+    #[test]
+    fn predicates_simplex_orientation_negative() {
+        // Test a negatively oriented simplex (by swapping two vertices)
+        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex4 = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 1.0]))
+            .data(2)
+            .build()
+            .unwrap();
+        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+
+        let orientation = simplex_orientation(&simplex_vertices).unwrap();
+        assert!(!orientation, "This simplex should be negatively oriented");
+    }
+
+    #[test]
+    fn predicates_simplex_orientation_2d() {
+        // Test 2D orientation
+        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0]))
+                .build()
+                .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0]))
+            .build()
+            .unwrap();
+        let vertex3 = VertexBuilder::default()
+            .point(Point::new([0.0, 1.0]))
+            .build()
+            .unwrap();
+        let simplex_vertices = vec![vertex1, vertex2, vertex3];
+
+        let orientation = simplex_orientation(&simplex_vertices).unwrap();
+        assert!(orientation, "This 2D simplex should be positively oriented");
+    }
+
+    #[test]
+    fn predicates_simplex_orientation_error_wrong_vertex_count() {
+        // Test with wrong number of vertices
+        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
+            .point(Point::new([0.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let vertex2 = VertexBuilder::default()
+            .point(Point::new([1.0, 0.0, 0.0]))
+            .data(1)
+            .build()
+            .unwrap();
+        let simplex_vertices = vec![vertex1, vertex2]; // Only 2 vertices for 3D
+
+        let result = simplex_orientation(&simplex_vertices);
+        assert!(
+            result.is_err(),
+            "Should error with wrong number of vertices"
         );
     }
 }

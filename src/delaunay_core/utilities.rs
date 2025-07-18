@@ -21,7 +21,6 @@ pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }
 
-
 /// The function `vec_to_array` converts a [Vec] to an array of f64
 ///
 /// # Errors
@@ -66,7 +65,6 @@ mod tests {
         println!("make_uuid = {uuid:?}");
         println!("uuid version: {:?}\n", uuid.get_version_num());
     }
-
 
     #[test]
     fn utilities_vec_to_array_success() {
@@ -164,7 +162,6 @@ mod tests {
         let array = result.unwrap();
         assert_relative_eq!(array.as_slice(), [0.0, 0.0, 0.0].as_slice(), epsilon = 1e-9);
     }
-
 
     #[test]
     fn utilities_make_uuid_uniqueness() {
