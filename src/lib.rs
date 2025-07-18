@@ -35,7 +35,9 @@ pub mod delaunay_core {
 /// Contains the `Point` struct and geometry predicates.
 pub mod geometry {
     pub mod point;
+    pub mod predicates;
     pub use point::*;
+    pub use predicates::*;
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
