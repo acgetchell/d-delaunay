@@ -483,29 +483,83 @@ where
 
     /// The function `circumradius` returns the circumradius of the cell.
     ///
-    /// This method delegates to the `circumradius` function in the geometry predicates module.
+    /// The circumradius is the distance from the circumcenter to any vertex of the simplex.
+    ///
+    /// # Returns
+    /// The circumradius as a value of type T if successful, or an error if the
+    /// circumcenter calculation fails.
     ///
     /// # Errors
     ///
     /// Returns an error if the circumcenter calculation fails. See [`circumcenter`] for details.
     ///
-    /// [`circumcenter`]: Self::circumcenter
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::geometry::point::Point;
+    /// use approx::assert_relative_eq;
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
+    /// let radius = cell.circumradius().unwrap();
+    /// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
+    /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
+    /// ```
     pub fn circumradius(&self) -> Result<T, anyhow::Error>
     where
-        OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+        OPoint<T, Const<D>>: From<[f64; D]>,
     {
         crate::geometry::predicates::circumradius(&self.vertices)
     }
 
-    /// Alternative method that accepts precomputed circumcenter
-    fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
+    /// The function `circumradius_with_center` returns the circumradius of the cell
+    /// given a precomputed circumcenter.
+    ///
+    /// This is a helper function that calculates the circumradius when the circumcenter
+    /// is already known, avoiding redundant computation.
+    ///
+    /// # Arguments
+    ///
+    /// * `circumcenter` - The precomputed circumcenter
+    ///
+    /// # Returns
+    /// The circumradius as a value of type T if successful, or an error if the
+    /// distance calculation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if coordinate conversion or distance calculation fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::geometry::point::Point;
+    /// use approx::assert_relative_eq;
+    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
+    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
+    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
+    /// let cell: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data("three-one cell").build().unwrap();
+    /// let circumcenter = cell.circumcenter().unwrap();
+    /// let radius = cell.circumradius_with_center(&circumcenter).unwrap();
+    /// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
+    /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
+    /// ```
+    pub fn circumradius_with_center(&self, circumcenter: &Point<f64, D>) -> Result<T, anyhow::Error>
     where
-        OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+        OPoint<T, Const<D>>: From<[f64; D]>,
     {
         crate::geometry::predicates::circumradius_with_center(&self.vertices, circumcenter)
     }
+
 
     /// The function `circumsphere_contains` checks if a given vertex is
     /// contained in the circumsphere of the Cell.
@@ -544,17 +598,7 @@ where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let circumcenter = self.circumcenter()?;
-        let circumradius = self.circumradius_with_center(&circumcenter)?;
-        // Use implicit conversion from vertex to coordinates, then convert to f64
-        let vertex_coords: [T; D] = (&vertex).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
-        let radius = na::distance(
-            &na::Point::<T, D>::from(circumcenter.coordinates()),
-            &na::Point::<T, D>::from(vertex_coords_f64),
-        );
-
-        Ok(circumradius >= radius)
+        crate::geometry::predicates::circumsphere_contains(&self.vertices, vertex)
     }
 
     /// The function `circumsphere_contains_vertex` checks if a given vertex is

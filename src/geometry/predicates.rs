@@ -4,7 +4,8 @@
 //! that operate on points and simplices, including circumcenter and circumradius
 //! calculations.
 
-use crate::delaunay_core::{matrix::invert, utilities::vec_to_array, vertex::Vertex};
+use crate::delaunay_core::{utilities::vec_to_array, vertex::Vertex};
+use crate::geometry::matrix::invert;
 use crate::geometry::point::{OrderedEq, Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
@@ -291,7 +292,7 @@ where
 /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
 /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
 /// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
-/// let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(3).build().unwrap();
+/// let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.5, 0.5, 0.5])).data(3).build().unwrap();
 /// assert!(circumsphere_contains(&simplex_vertices, test_vertex).unwrap());
 /// ```
 pub fn circumsphere_contains<T, U, const D: usize>(
@@ -432,7 +433,9 @@ where
     }
 
     // Create matrix for in-sphere test
-    // Matrix has D+2 columns: D coordinates + squared norm + 1
+    // Matrix dimensions: (D+2) x (D+2)
+    //   rows = D+1 simplex vertices + 1 test point
+    //   cols = D coordinates + squared norm + 1
     let mut matrix = zeros(D + 2, D + 2);
 
     // Populate rows with the coordinates of the vertices of the simplex
