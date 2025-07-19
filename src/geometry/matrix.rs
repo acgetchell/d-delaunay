@@ -31,7 +31,7 @@ pub enum MatrixError {
 /// ```
 /// use peroxide::fuga::*;
 /// use peroxide::c;
-/// use d_delaunay::delaunay_core::matrix::invert;
+/// use d_delaunay::geometry::matrix::invert;
 ///
 /// let matrix = matrix(c!(1, 2, 3, 4), 2, 2, Row);
 /// let inverted_matrix = invert(&matrix);

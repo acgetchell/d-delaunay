@@ -21,6 +21,13 @@ serde_test = "1.0.177"
 thiserror = "2.0.12"
 uuid = { version = "1.10.0", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "circumsphere_containment"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 dead_code = "warn"
