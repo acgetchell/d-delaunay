@@ -1,50 +1,21 @@
-//! # Circumsphere Containment and Simplex Orientation Test Example (4D)
+//! # Circumsphere Containment Test Example
 //!
-//! This example demonstrates and compares two methods for testing whether a point
-//! lies inside the circumsphere of a 4D simplex (5-cell/hypertetrahedron):
+//! This example demonstrates and compares three methods for testing whether a point
+//! lies inside the circumsphere of a simplex in 2D, 3D, and 4D:
 //!
-//! 1. **Distance-based method** (`circumsphere_contains`): Computes the circumcenter
-//!    and circumradius explicitly, then checks if the test point is within that distance.
-//! 2. **Standard determinant-based method** (`insphere`): Uses a matrix
-//!    determinant approach that is more numerically stable.
-//! 3. **Optimized matrix method** (`circumsphere_contains_vertex_matrix`): Uses a different
-//!    matrix formulation with inverted sign convention for better numerical conditioning.
+//! 1. **`insphere`**: Standard determinant-based method using matrix determinants
+//! 2. **`insphere_distance`**: Distance-based method that computes circumcenter and circumradius
+//! 3. **`insphere_lifted`**: Lifted coordinate method using a different matrix formulation
 //!
-//! Additionally, this example demonstrates the `simplex_orientation` function which
-//! determines whether a simplex is positively or negatively oriented based on the
-//! determinant of its vertex coordinates.
-//!
-//! ## Test Setup
-//!
-//! The example uses a unit 4D simplex with vertices at:
-//! - `[0, 0, 0, 0]` (origin)
-//! - `[1, 0, 0, 0]` (unit vector along x-axis)
-//! - `[0, 1, 0, 0]` (unit vector along y-axis)
-//! - `[0, 0, 1, 0]` (unit vector along z-axis)
-//! - `[0, 0, 0, 1]` (unit vector along w-axis)
-//!
-//! This 4D simplex has a circumcenter at `[0.5, 0.5, 0.5, 0.5]` and circumradius of
-//! `√4/2 = 1.0`.
-//!
-//! ## Test Categories
-//!
-//! The example tests several categories of points:
-//! - **Inside points**: Small coordinates like `[0.25, 0.25, 0.25]` that should be
-//!   well within the circumsphere
-//! - **Outside points**: Large coordinates like `[2, 2, 2]` that are clearly outside
-//! - **Boundary points**: Points on edges and faces of the tetrahedron
-//! - **Vertex points**: The tetrahedron vertices themselves
-//!
-//! ## Expected Behavior
-//!
-//! Both methods should generally agree on clearly inside/outside points. However,
-//! the determinant method may be more accurate for boundary cases due to its
-//! superior numerical stability.
+//! The example systematically tests each dimension with:
+//! - Unit simplexes (triangle, tetrahedron, 4D simplex)
+//! - Various test points (inside, outside, boundary, vertices)
+//! - Comparison of all three methods
 //!
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --example test_circumsphere
+//! cargo run --example test_circumsphere [2d|3d|4d|all|help]
 //! ```
 
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
@@ -57,8 +28,8 @@ use nalgebra as na;
 use peroxide::fuga::{LinearAlgebra, zeros};
 use std::env;
 
-/// Create a test vertex with given coordinates and data - specialized for f64 and i32
-fn create_test_vertex(coords: [f64; 4], data: i32) -> Vertex<f64, i32, 4> {
+/// Create a 2D test vertex
+fn create_vertex_2d(coords: [f64; 2], data: i32) -> Vertex<f64, i32, 2> {
     VertexBuilder::default()
         .point(Point::new(coords))
         .data(data)
@@ -66,7 +37,25 @@ fn create_test_vertex(coords: [f64; 4], data: i32) -> Vertex<f64, i32, 4> {
         .unwrap()
 }
 
-/// Convert InSphere result to string representation
+/// Create a 3D test vertex
+fn create_vertex_3d(coords: [f64; 3], data: i32) -> Vertex<f64, i32, 3> {
+    VertexBuilder::default()
+        .point(Point::new(coords))
+        .data(data)
+        .build()
+        .unwrap()
+}
+
+/// Create a 4D test vertex
+fn create_vertex_4d(coords: [f64; 4], data: i32) -> Vertex<f64, i32, 4> {
+    VertexBuilder::default()
+        .point(Point::new(coords))
+        .data(data)
+        .build()
+        .unwrap()
+}
+
+/// Convert `InSphere` result to string representation
 fn insphere_to_string(result: &Result<InSphere, anyhow::Error>) -> String {
     match result {
         Ok(InSphere::INSIDE) => "INSIDE".to_string(),
@@ -76,19 +65,186 @@ fn insphere_to_string(result: &Result<InSphere, anyhow::Error>) -> String {
     }
 }
 
-/// Test a point against all three circumsphere methods and print results - specialized for 4D
-fn test_and_print_point(
-    simplex_vertices: &[Vertex<f64, i32, 4>],
-    test_coords: [f64; 4],
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "2d" => test_2d_circumsphere(),
+            "3d" => test_3d_circumsphere(),
+            "4d" => test_4d_circumsphere(),
+            "orientation" => test_all_orientations(),
+            "debug-3d" => test_3d_simplex_analysis(),
+            "debug-4d" => debug_4d_circumsphere_properties(),
+            "debug-3d-matrix" => test_3d_matrix_analysis(),
+            "debug-3d-properties" => debug_3d_circumsphere_properties(),
+            "debug-4d-properties" => debug_4d_circumsphere_properties(),
+            "debug-compare" => compare_circumsphere_methods(),
+            "debug-orientation" => demonstrate_orientation_impact_on_circumsphere(),
+            "debug-containment" => test_circumsphere_containment(),
+            "debug-4d-methods" => test_4d_circumsphere_methods(),
+            "debug-all" => {
+                println!("Running all debug tests...\n");
+                test_3d_simplex_analysis();
+                debug_4d_circumsphere_properties();
+                test_3d_matrix_analysis();
+                debug_3d_circumsphere_properties();
+                compare_circumsphere_methods();
+                demonstrate_orientation_impact_on_circumsphere();
+                test_circumsphere_containment();
+                test_4d_circumsphere_methods();
+            }
+            "all" => {
+                test_2d_circumsphere();
+                test_3d_circumsphere();
+                test_4d_circumsphere();
+                test_all_orientations();
+            }
+            "everything" => {
+                println!("Running all tests and debug functions...\n");
+                test_2d_circumsphere();
+                test_3d_circumsphere();
+                test_4d_circumsphere();
+                test_all_orientations();
+                test_3d_simplex_analysis();
+                debug_4d_circumsphere_properties();
+                test_3d_matrix_analysis();
+                debug_3d_circumsphere_properties();
+                compare_circumsphere_methods();
+                demonstrate_orientation_impact_on_circumsphere();
+                test_circumsphere_containment();
+                test_4d_circumsphere_methods();
+            }
+            "help" | "--help" | "-h" => print_help(),
+            _ => {
+                println!("Unknown argument: {}", args[1]);
+                print_help();
+            }
+        }
+    } else {
+        print_help();
+    }
+}
+
+fn print_help() {
+    println!("Circumsphere Containment Test Suite");
+    println!("=====================================");
+    println!();
+    println!("Usage: cargo run --example test_circumsphere [TEST]");
+    println!();
+    println!("Basic tests:");
+    println!("  2d          - Test 2D circumsphere methods (triangle)");
+    println!("  3d          - Test 3D circumsphere methods (tetrahedron)");
+    println!("  4d          - Test 4D circumsphere methods (4D simplex)");
+    println!("  orientation - Test simplex orientation in 2D, 3D, and 4D");
+    println!("  all         - Run all basic dimensional tests and orientation tests");
+    println!();
+    println!("Debug tests:");
+    println!("  debug-3d           - Detailed 3D simplex analysis and debugging");
+    println!("  debug-4d           - Detailed 4D simplex analysis and debugging");
+    println!("  debug-3d-matrix    - Step-by-step 3D matrix method analysis");
+    println!("  debug-3d-properties - 3D circumsphere properties analysis");
+    println!("  debug-4d-properties - 4D circumsphere properties analysis");
+    println!("  debug-compare      - Compare circumsphere methods across dimensions");
+    println!("  debug-orientation  - Demonstrate orientation impact on circumsphere");
+    println!("  debug-containment  - Detailed circumsphere containment testing");
+    println!("  debug-4d-methods   - Compare 4D circumsphere methods in detail");
+    println!("  debug-all          - Run all debug tests");
+    println!();
+    println!("Comprehensive:");
+    println!("  everything  - Run all tests and all debug functions");
+    println!("  help        - Show this help message");
+    println!();
+    println!("Examples:");
+    println!("  cargo run --example test_circumsphere 2d");
+    println!("  cargo run --example test_circumsphere debug-3d-matrix");
+    println!("  cargo run --example test_circumsphere debug-3d-properties");
+    println!("  cargo run --example test_circumsphere debug-all");
+    println!("  cargo run --example test_circumsphere everything");
+}
+
+/// Test 2D circumsphere methods with a triangle
+fn test_2d_circumsphere() {
+    println!("=============================================");
+    println!("Testing 2D circumsphere methods (triangle)");
+    println!("=============================================");
+
+    // Create a unit right triangle: (0,0), (1,0), (0,1)
+    let vertices = vec![
+        create_vertex_2d([0.0, 0.0], 0),
+        create_vertex_2d([1.0, 0.0], 1),
+        create_vertex_2d([0.0, 1.0], 2),
+    ];
+
+    println!("2D triangle vertices:");
+    for (i, vertex) in vertices.iter().enumerate() {
+        let coords: [f64; 2] = vertex.into();
+        println!("  v{}: [{}, {}]", i, coords[0], coords[1]);
+    }
+    println!();
+
+    // Calculate circumcenter and circumradius for reference
+    match circumcenter(&vertices) {
+        Ok(center) => {
+            println!("Circumcenter: {:?}", center.coordinates());
+            match circumradius(&vertices) {
+                Ok(radius) => {
+                    println!("Circumradius: {radius:.6}");
+                    println!();
+
+                    // Test various 2D points
+                    let test_points = vec![
+                        ([0.5, 0.5], "circumcenter_region"),
+                        ([0.1, 0.1], "clearly_inside"),
+                        ([0.9, 0.9], "possibly_outside"),
+                        ([2.0, 2.0], "far_outside"),
+                        ([0.0, 0.0], "vertex_origin"),
+                        ([0.5, 0.0], "edge_midpoint"),
+                        ([0.25, 0.25], "inside_triangle"),
+                    ];
+
+                    for (coords, description) in test_points {
+                        test_2d_point(
+                            &vertices,
+                            coords,
+                            description,
+                            &center.coordinates(),
+                            radius,
+                        );
+                    }
+                }
+                Err(e) => println!("Error calculating circumradius: {e}"),
+            }
+        }
+        Err(e) => println!("Error calculating circumcenter: {e}"),
+    }
+
+    println!("2D circumsphere testing completed.\n");
+}
+
+/// Test a single 2D point against all circumsphere methods
+fn test_2d_point(
+    vertices: &[Vertex<f64, i32, 2>],
+    coords: [f64; 2],
     description: &str,
+    center: &[f64; 2],
+    radius: f64,
 ) {
-    let test_vertex = create_test_vertex(test_coords, 99);
+    let test_vertex = create_vertex_2d(coords, 99);
 
-    let result_insphere = insphere(simplex_vertices, test_vertex);
-    let result_distance = insphere_distance(simplex_vertices, test_vertex);
-    let result_lifted = insphere_lifted(simplex_vertices, test_vertex);
+    let result_insphere = insphere(vertices, test_vertex);
+    let result_distance = insphere_distance(vertices, test_vertex);
+    let result_lifted = insphere_lifted(vertices, test_vertex);
 
-    println!("Point {description} {test_coords:?}:");
+    // Calculate actual distance to center
+    let distance_to_center = {
+        let diff = [coords[0] - center[0], coords[1] - center[1]];
+        (diff[0] * diff[0] + diff[1] * diff[1]).sqrt()
+    };
+
+    println!("Point {description} {coords:?}:");
+    println!("  Distance to center: {distance_to_center:.6}");
+    println!("  Expected inside: {}", distance_to_center <= radius);
     println!(
         "  insphere:          {}",
         insphere_to_string(&result_insphere)
@@ -118,71 +274,288 @@ fn test_and_print_point(
     println!();
 }
 
-/// Main function that demonstrates circumsphere containment testing.
-///
-/// This function sets up a unit tetrahedron and tests various points to see
-/// if they lie inside the circumsphere using both available methods.
-fn main() {
-    let args: Vec<String> = env::args().collect();
+/// Test 3D circumsphere methods with a tetrahedron
+fn test_3d_circumsphere() {
+    println!("=============================================");
+    println!("Testing 3D circumsphere methods (tetrahedron)");
+    println!("=============================================");
 
-    if args.len() > 1 {
-        match args[1].as_str() {
-            "4d" => test_4d_circumsphere_methods(),
-            "containment" => test_circumsphere_containment(),
-            "orientation" => test_simplex_orientation(),
-            "impact" => demonstrate_orientation_impact_on_circumsphere(),
-            "3d" => test_3d_simplex_analysis(),
-            "matrix" => test_3d_matrix_analysis(),
-            "debug3d" => debug_3d_circumsphere_properties(),
-            "debug4d" => debug_4d_circumsphere_properties(),
-            "compare" => compare_circumsphere_methods(),
-            "all" => {
-                test_4d_circumsphere_methods();
-                test_circumsphere_containment();
-                test_simplex_orientation();
-                demonstrate_orientation_impact_on_circumsphere();
-                test_3d_simplex_analysis();
-                test_3d_matrix_analysis();
-                debug_3d_circumsphere_properties();
-                debug_4d_circumsphere_properties();
-                compare_circumsphere_methods();
-            }
-            "help" | "--help" | "-h" => print_help(),
-            _ => {
-                println!("Unknown argument: {}", args[1]);
-                print_help();
+    // Create a unit tetrahedron: (0,0,0), (1,0,0), (0,1,0), (0,0,1)
+    let vertices = vec![
+        create_vertex_3d([0.0, 0.0, 0.0], 0),
+        create_vertex_3d([1.0, 0.0, 0.0], 1),
+        create_vertex_3d([0.0, 1.0, 0.0], 2),
+        create_vertex_3d([0.0, 0.0, 1.0], 3),
+    ];
+
+    println!("3D tetrahedron vertices:");
+    for (i, vertex) in vertices.iter().enumerate() {
+        let coords: [f64; 3] = vertex.into();
+        println!("  v{}: [{}, {}, {}]", i, coords[0], coords[1], coords[2]);
+    }
+    println!();
+
+    // Calculate circumcenter and circumradius for reference
+    match circumcenter(&vertices) {
+        Ok(center) => {
+            println!("Circumcenter: {:?}", center.coordinates());
+            match circumradius(&vertices) {
+                Ok(radius) => {
+                    println!("Circumradius: {radius:.6}");
+                    println!();
+
+                    // Test various 3D points
+                    let test_points = vec![
+                        ([0.5, 0.5, 0.5], "circumcenter_region"),
+                        ([0.1, 0.1, 0.1], "clearly_inside"),
+                        ([0.9, 0.9, 0.9], "possibly_outside"),
+                        ([2.0, 2.0, 2.0], "far_outside"),
+                        ([0.0, 0.0, 0.0], "vertex_origin"),
+                        ([0.25, 0.25, 0.0], "face_center"),
+                        ([0.2, 0.2, 0.2], "inside_tetrahedron"),
+                    ];
+
+                    for (coords, description) in test_points {
+                        test_3d_point(
+                            &vertices,
+                            coords,
+                            description,
+                            &center.coordinates(),
+                            radius,
+                        );
+                    }
+                }
+                Err(e) => println!("Error calculating circumradius: {e}"),
             }
         }
-    } else {
-        print_help();
+        Err(e) => println!("Error calculating circumcenter: {e}"),
     }
+
+    println!("3D circumsphere testing completed.\n");
 }
 
-fn print_help() {
-    println!("Circumsphere Containment Test Suite");
-    println!("====================================");
+/// Test a single 3D point against all circumsphere methods
+fn test_3d_point(
+    vertices: &[Vertex<f64, i32, 3>],
+    coords: [f64; 3],
+    description: &str,
+    center: &[f64; 3],
+    radius: f64,
+) {
+    let test_vertex = create_vertex_3d(coords, 99);
+
+    let result_insphere = insphere(vertices, test_vertex);
+    let result_distance = insphere_distance(vertices, test_vertex);
+    let result_lifted = insphere_lifted(vertices, test_vertex);
+
+    // Calculate actual distance to center
+    let distance_to_center = {
+        let diff = [
+            coords[0] - center[0],
+            coords[1] - center[1],
+            coords[2] - center[2],
+        ];
+        (diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]).sqrt()
+    };
+
+    println!("Point {description} {coords:?}:");
+    println!("  Distance to center: {distance_to_center:.6}");
+    println!("  Expected inside: {}", distance_to_center <= radius);
+    println!(
+        "  insphere:          {}",
+        insphere_to_string(&result_insphere)
+    );
+    println!(
+        "  insphere_distance: {}",
+        insphere_to_string(&result_distance)
+    );
+    println!(
+        "  insphere_lifted:   {}",
+        insphere_to_string(&result_lifted)
+    );
+
+    // Check agreement between methods
+    let methods_agree =
+        if let (Ok(r1), Ok(r2), Ok(r3)) = (&result_insphere, &result_distance, &result_lifted) {
+            r1 == r2 && r2 == r3
+        } else {
+            false
+        };
+
+    if methods_agree {
+        println!("  ✓ All methods agree");
+    } else {
+        println!("  ⚠ Methods disagree");
+    }
     println!();
-    println!("Usage: cargo run --example test_circumsphere [TEST]");
+}
+
+/// Test 4D circumsphere methods with a 4-simplex
+fn test_4d_circumsphere() {
+    println!("=============================================");
+    println!("Testing 4D circumsphere methods (4-simplex)");
+    println!("=============================================");
+
+    // Create a unit 4-simplex: vertices at origin and unit vectors along each axis
+    let vertices = vec![
+        create_vertex_4d([0.0, 0.0, 0.0, 0.0], 0),
+        create_vertex_4d([1.0, 0.0, 0.0, 0.0], 1),
+        create_vertex_4d([0.0, 1.0, 0.0, 0.0], 2),
+        create_vertex_4d([0.0, 0.0, 1.0, 0.0], 3),
+        create_vertex_4d([0.0, 0.0, 0.0, 1.0], 4),
+    ];
+
+    println!("4D simplex vertices:");
+    for (i, vertex) in vertices.iter().enumerate() {
+        let coords: [f64; 4] = vertex.into();
+        println!(
+            "  v{}: [{}, {}, {}, {}]",
+            i, coords[0], coords[1], coords[2], coords[3]
+        );
+    }
     println!();
-    println!("Available tests:");
-    println!("  4d          - Test 4D circumsphere methods comparison");
-    println!("  containment - Test circumsphere containment with various points");
-    println!("  orientation - Test simplex orientation detection");
-    println!("  impact      - Demonstrate orientation impact on circumsphere testing");
-    println!("  3d          - Test 3D simplex analysis for debugging");
-    println!("  matrix      - Detailed matrix method analysis for 3D case");
-    println!("  debug3d     - Debug 3D circumsphere properties");
-    println!("  debug4d     - Debug 4D circumsphere properties");
-    println!("  compare     - Compare circumsphere methods across different points");
-    println!("  all         - Run all tests");
-    println!("  help        - Show this help message");
+
+    // Calculate circumcenter and circumradius for reference
+    match circumcenter(&vertices) {
+        Ok(center) => {
+            println!("Circumcenter: {:?}", center.coordinates());
+            match circumradius(&vertices) {
+                Ok(radius) => {
+                    println!("Circumradius: {radius:.6}");
+                    println!();
+
+                    // Test various 4D points
+                    let test_points = vec![
+                        ([0.5, 0.5, 0.5, 0.5], "circumcenter"),
+                        ([0.1, 0.1, 0.1, 0.1], "clearly_inside"),
+                        ([0.9, 0.9, 0.9, 0.9], "possibly_outside"),
+                        ([2.0, 2.0, 2.0, 2.0], "far_outside"),
+                        ([0.0, 0.0, 0.0, 0.0], "vertex_origin"),
+                        ([0.25, 0.0, 0.0, 0.0], "axis_point"),
+                        ([0.2, 0.2, 0.2, 0.2], "inside_simplex"),
+                    ];
+
+                    for (coords, description) in test_points {
+                        test_4d_point(
+                            &vertices,
+                            coords,
+                            description,
+                            &center.coordinates(),
+                            radius,
+                        );
+                    }
+                }
+                Err(e) => println!("Error calculating circumradius: {e}"),
+            }
+        }
+        Err(e) => println!("Error calculating circumcenter: {e}"),
+    }
+
+    println!("4D circumsphere testing completed.\n");
+}
+
+/// Test a single 4D point against all circumsphere methods
+fn test_4d_point(
+    vertices: &[Vertex<f64, i32, 4>],
+    coords: [f64; 4],
+    description: &str,
+    center: &[f64; 4],
+    radius: f64,
+) {
+    let test_vertex = create_vertex_4d(coords, 99);
+
+    let result_insphere = insphere(vertices, test_vertex);
+    let result_distance = insphere_distance(vertices, test_vertex);
+    let result_lifted = insphere_lifted(vertices, test_vertex);
+
+    // Calculate actual distance to center
+    let distance_to_center = {
+        let diff = [
+            coords[0] - center[0],
+            coords[1] - center[1],
+            coords[2] - center[2],
+            coords[3] - center[3],
+        ];
+        (diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2] + diff[3] * diff[3]).sqrt()
+    };
+
+    println!("Point {description} {coords:?}:");
+    println!("  Distance to center: {distance_to_center:.6}");
+    println!("  Expected inside: {}", distance_to_center <= radius);
+    println!(
+        "  insphere:          {}",
+        insphere_to_string(&result_insphere)
+    );
+    println!(
+        "  insphere_distance: {}",
+        insphere_to_string(&result_distance)
+    );
+    println!(
+        "  insphere_lifted:   {}",
+        insphere_to_string(&result_lifted)
+    );
+
+    // Check agreement between methods
+    let methods_agree =
+        if let (Ok(r1), Ok(r2), Ok(r3)) = (&result_insphere, &result_distance, &result_lifted) {
+            r1 == r2 && r2 == r3
+        } else {
+            false
+        };
+
+    if methods_agree {
+        println!("  ✓ All methods agree");
+    } else {
+        println!("  ⚠ Methods disagree");
+    }
     println!();
-    println!("Examples:");
-    println!("  cargo run --example test_circumsphere 3d");
-    println!("  cargo run --example test_circumsphere matrix");
-    println!("  cargo run --example test_circumsphere debug3d");
-    println!("  cargo run --example test_circumsphere compare");
-    println!("  cargo run --example test_circumsphere all");
+}
+
+/// Run all orientation tests for 2D, 3D, and 4D
+fn test_all_orientations() {
+    println!("=============================================");
+    println!("Testing 2D, 3D, and 4D simplex orientations");
+    println!("=============================================");
+    test_simplex_orientation();
+    println!("Orientation tests completed\n");
+}
+
+/// Helper function to test and print a point for compatibility with existing code
+fn test_and_print_point(vertices: &[Vertex<f64, i32, 4>], coords: [f64; 4], description: &str) {
+    let test_vertex = create_vertex_4d(coords, 99);
+
+    let result_insphere = insphere(vertices, test_vertex);
+    let result_distance = insphere_distance(vertices, test_vertex);
+    let result_lifted = insphere_lifted(vertices, test_vertex);
+
+    println!("Testing point {description} {coords:?}:");
+    println!(
+        "  insphere:          {}",
+        insphere_to_string(&result_insphere)
+    );
+    println!(
+        "  insphere_distance: {}",
+        insphere_to_string(&result_distance)
+    );
+    println!(
+        "  insphere_lifted:   {}",
+        insphere_to_string(&result_lifted)
+    );
+
+    // Check agreement between methods
+    let methods_agree =
+        if let (Ok(r1), Ok(r2), Ok(r3)) = (&result_insphere, &result_distance, &result_lifted) {
+            r1 == r2 && r2 == r3
+        } else {
+            false
+        };
+
+    if methods_agree {
+        println!("  ✓ All methods agree");
+    } else {
+        println!("  ⚠ Methods disagree");
+    }
+    println!();
 }
 
 /// Test and compare both 4D circumsphere containment methods
@@ -1236,7 +1609,7 @@ fn debug_3d_circumsphere_properties() {
     println!("Matrix method result: {matrix_result:?}");
 }
 
-/// Debug 4D circumsphere properties analysis
+/// Debug 4D circumsphere properties analysis  
 fn debug_4d_circumsphere_properties() {
     println!("\n=== 4D Symmetric Simplex Analysis ===");
 
