@@ -15,6 +15,9 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::{cmp::Ordering, collections::HashMap, hash::Hash, iter::Sum};
 use uuid::Uuid;
 
+/// Default tolerance for geometric predicates and degeneracy detection
+const DEFAULT_TOLERANCE: f64 = 1e-10;
+
 /// Calculate the circumcenter of a set of vertices forming a simplex.
 ///
 /// The circumcenter is the unique point equidistant from all vertices of
@@ -399,7 +402,7 @@ where
     let det = matrix.det();
 
     // Use a tolerance for degenerate case detection
-    let tolerance = 1e-10;
+    let tolerance = DEFAULT_TOLERANCE;
 
     if det > tolerance {
         Ok(Orientation::POSITIVE)
@@ -676,7 +679,7 @@ where
     let orientation = simplex_orientation(simplex_vertices)?;
 
     // Use a tolerance for boundary detection
-    let tolerance = 1e-10;
+    let tolerance = DEFAULT_TOLERANCE;
 
     match orientation {
         Orientation::DEGENERATE => {
@@ -867,7 +870,7 @@ where
     let orientation = simplex_orientation(simplex_vertices)?;
 
     // Use a tolerance for boundary detection
-    let tolerance = 1e-10;
+    let tolerance = DEFAULT_TOLERANCE;
 
     match orientation {
         Orientation::DEGENERATE => {
@@ -996,6 +999,9 @@ mod tests {
     use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
+    /// Tolerance for distance comparisons in tests
+    const DISTANCE_TOLERANCE: f64 = 1e-9;
+
     #[test]
     fn predicates_circumcenter() {
         let points = vec![
@@ -1060,7 +1066,7 @@ mod tests {
         let radius = circumradius(&vertices).unwrap();
         let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 
-        assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
+        assert_relative_eq!(radius, expected_radius, epsilon = DISTANCE_TOLERANCE);
     }
 
     #[test]
@@ -1176,7 +1182,7 @@ mod tests {
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
-        assert_relative_eq!(radius, expected_radius, epsilon = 1e-10);
+        assert_relative_eq!(radius, expected_radius, epsilon = DEFAULT_TOLERANCE);
     }
 
     #[test]
@@ -2094,7 +2100,11 @@ mod tests {
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
 
-        assert_relative_eq!(min_coords.as_slice(), [-5.0].as_slice(), epsilon = 1e-9);
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [-5.0].as_slice(),
+            epsilon = DISTANCE_TOLERANCE
+        );
         assert_relative_eq!(max_coords.as_slice(), [10.0].as_slice(), epsilon = 1e-9);
     }
 

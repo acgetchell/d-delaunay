@@ -26,28 +26,14 @@ use d_delaunay::geometry::predicates::{
 };
 use nalgebra as na;
 use peroxide::fuga::{LinearAlgebra, zeros};
+use serde::{Serialize, de::DeserializeOwned};
 use std::env;
 
-/// Create a 2D test vertex
-fn create_vertex_2d(coords: [f64; 2], data: i32) -> Vertex<f64, i32, 2> {
-    VertexBuilder::default()
-        .point(Point::new(coords))
-        .data(data)
-        .build()
-        .unwrap()
-}
-
-/// Create a 3D test vertex
-fn create_vertex_3d(coords: [f64; 3], data: i32) -> Vertex<f64, i32, 3> {
-    VertexBuilder::default()
-        .point(Point::new(coords))
-        .data(data)
-        .build()
-        .unwrap()
-}
-
-/// Create a 4D test vertex
-fn create_vertex_4d(coords: [f64; 4], data: i32) -> Vertex<f64, i32, 4> {
+/// Create a test vertex with generic dimension
+fn create_vertex<const D: usize>(coords: [f64; D], data: i32) -> Vertex<f64, i32, D>
+where
+    [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
     VertexBuilder::default()
         .point(Point::new(coords))
         .data(data)
@@ -171,9 +157,9 @@ fn test_2d_circumsphere() {
 
     // Create a unit right triangle: (0,0), (1,0), (0,1)
     let vertices = vec![
-        create_vertex_2d([0.0, 0.0], 0),
-        create_vertex_2d([1.0, 0.0], 1),
-        create_vertex_2d([0.0, 1.0], 2),
+        create_vertex([0.0, 0.0], 0),
+        create_vertex([1.0, 0.0], 1),
+        create_vertex([0.0, 1.0], 2),
     ];
 
     println!("2D triangle vertices:");
@@ -230,7 +216,7 @@ fn test_2d_point(
     center: &[f64; 2],
     radius: f64,
 ) {
-    let test_vertex = create_vertex_2d(coords, 99);
+    let test_vertex = create_vertex(coords, 99);
 
     let result_insphere = insphere(vertices, test_vertex);
     let result_distance = insphere_distance(vertices, test_vertex);
@@ -282,10 +268,10 @@ fn test_3d_circumsphere() {
 
     // Create a unit tetrahedron: (0,0,0), (1,0,0), (0,1,0), (0,0,1)
     let vertices = vec![
-        create_vertex_3d([0.0, 0.0, 0.0], 0),
-        create_vertex_3d([1.0, 0.0, 0.0], 1),
-        create_vertex_3d([0.0, 1.0, 0.0], 2),
-        create_vertex_3d([0.0, 0.0, 1.0], 3),
+        create_vertex([0.0, 0.0, 0.0], 0),
+        create_vertex([1.0, 0.0, 0.0], 1),
+        create_vertex([0.0, 1.0, 0.0], 2),
+        create_vertex([0.0, 0.0, 1.0], 3),
     ];
 
     println!("3D tetrahedron vertices:");
@@ -342,7 +328,7 @@ fn test_3d_point(
     center: &[f64; 3],
     radius: f64,
 ) {
-    let test_vertex = create_vertex_3d(coords, 99);
+    let test_vertex = create_vertex(coords, 99);
 
     let result_insphere = insphere(vertices, test_vertex);
     let result_distance = insphere_distance(vertices, test_vertex);
@@ -398,11 +384,11 @@ fn test_4d_circumsphere() {
 
     // Create a unit 4-simplex: vertices at origin and unit vectors along each axis
     let vertices = vec![
-        create_vertex_4d([0.0, 0.0, 0.0, 0.0], 0),
-        create_vertex_4d([1.0, 0.0, 0.0, 0.0], 1),
-        create_vertex_4d([0.0, 1.0, 0.0, 0.0], 2),
-        create_vertex_4d([0.0, 0.0, 1.0, 0.0], 3),
-        create_vertex_4d([0.0, 0.0, 0.0, 1.0], 4),
+        create_vertex([0.0, 0.0, 0.0, 0.0], 0),
+        create_vertex([1.0, 0.0, 0.0, 0.0], 1),
+        create_vertex([0.0, 1.0, 0.0, 0.0], 2),
+        create_vertex([0.0, 0.0, 1.0, 0.0], 3),
+        create_vertex([0.0, 0.0, 0.0, 1.0], 4),
     ];
 
     println!("4D simplex vertices:");
@@ -462,7 +448,7 @@ fn test_4d_point(
     center: &[f64; 4],
     radius: f64,
 ) {
-    let test_vertex = create_vertex_4d(coords, 99);
+    let test_vertex = create_vertex(coords, 99);
 
     let result_insphere = insphere(vertices, test_vertex);
     let result_distance = insphere_distance(vertices, test_vertex);
@@ -522,7 +508,7 @@ fn test_all_orientations() {
 
 /// Helper function to test and print a point for compatibility with existing code
 fn test_and_print_point(vertices: &[Vertex<f64, i32, 4>], coords: [f64; 4], description: &str) {
-    let test_vertex = create_vertex_4d(coords, 99);
+    let test_vertex = create_vertex(coords, 99);
 
     let result_insphere = insphere(vertices, test_vertex);
     let result_distance = insphere_distance(vertices, test_vertex);
