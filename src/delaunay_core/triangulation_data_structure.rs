@@ -637,8 +637,8 @@ where
         }
 
         // Find the bounding box of all input vertices
-        let min_coords = find_extreme_coordinates(&self.vertices, Ordering::Less);
-        let max_coords = find_extreme_coordinates(&self.vertices, Ordering::Greater);
+        let min_coords = find_extreme_coordinates(&self.vertices, Ordering::Less)?;
+        let max_coords = find_extreme_coordinates(&self.vertices, Ordering::Greater)?;
 
         // Convert coordinates to f64 for calculations
         let mut center_f64 = [0.0f64; D];
@@ -986,7 +986,10 @@ where
 
         // Find cells whose circumsphere contains the vertex
         for (cell_id, cell) in &self.cells {
-            let contains = cell.circumsphere_contains_vertex(*vertex)?;
+            let contains = crate::geometry::predicates::circumsphere_contains_vertex(
+                cell.vertices(),
+                *vertex,
+            )?;
             if contains {
                 bad_cells.push(*cell_id);
             }
