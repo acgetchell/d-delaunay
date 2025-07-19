@@ -88,7 +88,7 @@ where
     }
 }
 
-/// Convert InSphere result to readable string
+/// Convert `InSphere` result to readable string
 fn format_result(result: &Result<InSphere, anyhow::Error>) -> &'static str {
     match result {
         Ok(InSphere::INSIDE) => "INSIDE",
@@ -161,7 +161,7 @@ fn main() {
             print_help();
         }
         Some(unknown) => {
-            println!("Unknown argument: {}", unknown);
+            println!("Unknown argument: {unknown}");
             print_help();
         }
         None => print_help(),
@@ -226,6 +226,8 @@ fn test_2d_circumsphere() {
         [0.0, 0.0] => "vertex_origin",
         [0.5, 0.0] => "edge_midpoint",
         [0.25, 0.25] => "inside_triangle",
+        [std::f64::consts::FRAC_1_SQRT_2, 0.0] => "boundary_distance", // approximately on circumcircle
+        [1e-15, 1e-15] => "numerical_precision", // test floating point precision issues
     );
 
     test_output!("2D", &vertices, test_points);
@@ -295,15 +297,11 @@ fn test_point_generic<const D: usize>(
     let result_distance = insphere_distance(vertices, test_vertex);
     let result_lifted = insphere_lifted(vertices, test_vertex);
 
-    // Calculate actual distance to center
-    let distance_to_center = {
-        coords
-            .iter()
-            .zip(center.iter())
-            .map(|(a, b)| (a - b).powi(2))
-            .sum::<f64>()
-            .sqrt()
-    };
+    // Calculate actual distance to center using nalgebra
+    let distance_to_center = na::distance(
+        &na::Point::<f64, D>::from(*center),
+        &na::Point::<f64, D>::from(coords),
+    );
 
     println!("Point {description} {coords:?}:");
     println!("  Distance to center: {distance_to_center:.6}");
@@ -406,43 +404,6 @@ fn test_all_orientations() {
     println!("Orientation tests completed\n");
 }
 
-/// Helper function to test and print a point for compatibility with existing code
-fn test_and_print_point(vertices: &[Vertex<f64, i32, 4>], coords: [f64; 4], description: &str) {
-    let test_vertex = vertex!(coords, Some(99));
-
-    let result_insphere = insphere(vertices, test_vertex);
-    let result_distance = insphere_distance(vertices, test_vertex);
-    let result_lifted = insphere_lifted(vertices, test_vertex);
-
-    println!("Testing point {description} {coords:?}:");
-    println!(
-        "  insphere:          {}",
-        insphere_to_string(&result_insphere)
-    );
-    println!(
-        "  insphere_distance: {}",
-        insphere_to_string(&result_distance)
-    );
-    println!(
-        "  insphere_lifted:   {}",
-        insphere_to_string(&result_lifted)
-    );
-
-    // Check agreement between methods
-    let methods_agree =
-        if let (Ok(r1), Ok(r2), Ok(r3)) = (&result_insphere, &result_distance, &result_lifted) {
-            r1 == r2 && r2 == r3
-        } else {
-            false
-        };
-
-    if methods_agree {
-        println!("  ✓ All methods agree");
-    } else {
-        println!("  ⚠ Methods disagree");
-    }
-    println!();
-}
 
 /// Test and compare both 4D circumsphere containment methods
 fn test_4d_circumsphere_methods() {
@@ -481,68 +442,7 @@ fn test_4d_circumsphere_methods() {
                     ];
 
                     for (coords, description) in test_points {
-                        test_and_print_point(vertices.as_slice(), coords, description);
-                        let test_vertex = vertex!(coords, Some(99));
-
-                        let result_standard = insphere(&vertices, test_vertex);
-                        let result_matrix = insphere_lifted(&vertices, test_vertex);
-
-                        // Calculate actual distance to center
-                        let distance_to_center = {
-                            let diff = [
-                                coords[0] - center.coordinates()[0],
-                                coords[1] - center.coordinates()[1],
-                                coords[2] - center.coordinates()[2],
-                                coords[3] - center.coordinates()[3],
-                            ];
-                            (diff[0] * diff[0]
-                                + diff[1] * diff[1]
-                                + diff[2] * diff[2]
-                                + diff[3] * diff[3])
-                                .sqrt()
-                        };
-
-                        println!("Point {description} {coords:?}:");
-                        println!("  Distance to center: {distance_to_center:.6}");
-                        println!("  Expected inside: {}", distance_to_center <= radius);
-                        println!(
-                            "  Standard method: {:?}",
-                            result_standard.as_ref().map(|s| match s {
-                                InSphere::INSIDE => "INSIDE",
-                                InSphere::BOUNDARY => "BOUNDARY",
-                                InSphere::OUTSIDE => "OUTSIDE",
-                            })
-                        );
-                        println!(
-                            "  Matrix method: {:?}",
-                            result_matrix.as_ref().map(|s| match s {
-                                InSphere::INSIDE => "INSIDE",
-                                InSphere::BOUNDARY => "BOUNDARY",
-                                InSphere::OUTSIDE => "OUTSIDE",
-                            })
-                        );
-
-                        // Check if methods agree
-                        if result_standard.is_ok() && result_matrix.is_ok() {
-                            // Note: We can't directly compare InSphere enum with bool
-                            // Convert both to simple inside/outside comparison
-                            let standard_inside =
-                                matches!(result_standard.as_ref().unwrap(), InSphere::INSIDE);
-                            let matrix_inside =
-                                matches!(result_matrix.as_ref().unwrap(), InSphere::INSIDE);
-                            let agree = standard_inside == matrix_inside;
-                            println!("  Methods agree: {agree}");
-                            if !agree {
-                                println!("  *** DISAGREEMENT DETECTED ***");
-                                println!(
-                                    "  NOTE: The matrix method uses an inverted sign convention for this specific simplex"
-                                );
-                                println!(
-                                    "        geometry, which may cause different results for some test cases."
-                                );
-                            }
-                        }
-                        println!();
+                        test_point_generic(vertices.as_slice(), coords, description, &center.coordinates(), radius);
                     }
                 }
                 Err(e) => println!("Error calculating circumradius: {e}"),
@@ -593,10 +493,16 @@ fn test_circumsphere_containment() {
         vertex!([0.0, 0.0, 0.0, 0.0], Some(14)), // Origin should be inside
     ];
 
+    // Calculate circumcenter and circumradius for testing
+    let (Ok(center), Ok(radius)) = (circumcenter(&vertices), circumradius(&vertices)) else {
+        println!("Error calculating circumcenter or circumradius");
+        return;
+    };
+
     println!("Testing points that should be INSIDE the circumsphere:");
     for point in test_points_inside {
         let coords: [f64; 4] = point.into();
-        test_and_print_point(vertices.as_slice(), coords, "inside");
+        test_point_generic(&vertices, coords, "inside", &center.coordinates(), radius);
     }
     println!();
 
@@ -966,8 +872,11 @@ fn test_boundary_vertex_case(simplex_vertices: &[Vertex<f64, i32, 3>]) {
     }
 }
 
-#[allow(clippy::too_many_lines)]
-fn test_3d_matrix_analysis() {
+// Type alias to simplify complex return type
+type Setup3DResult = (Vec<Vertex<f64, i32, 3>>, [f64; 3], Vertex<f64, i32, 3>);
+
+/// Set up the 3D test matrix data
+fn setup_3d_matrix_test() -> Setup3DResult {
     println!("\n=============================================");
     println!("3D Matrix Method Analysis - Step by Step");
     println!("=============================================");
@@ -995,6 +904,13 @@ fn test_3d_matrix_analysis() {
     println!("Reference vertex (v0): {ref_coords:?}");
     println!();
 
+    (simplex_vertices, test_point, test_vertex)
+}
+
+/// Build and analyze the matrix for the 3D test
+fn build_and_analyze_matrix(
+    simplex_vertices: &[Vertex<f64, i32, 3>],
+) -> (f64, bool) {
     // Manually build the matrix as in the matrix method
     let mut matrix = zeros(4, 4); // D+1 x D+1 for D=3
 
@@ -1064,8 +980,8 @@ fn test_3d_matrix_analysis() {
     println!();
     println!("Determinant: {det:.6}");
 
-    // Check simplex orientation
-    match simplex_orientation(&simplex_vertices) {
+    // Check simplex orientation and return determinant and matrix result
+    match simplex_orientation(simplex_vertices) {
         Ok(is_positive_orientation) => {
             let is_positive = matches!(is_positive_orientation, Orientation::POSITIVE);
             println!(
@@ -1088,107 +1004,134 @@ fn test_3d_matrix_analysis() {
             );
             println!("Matrix method result: {matrix_result}");
 
-            // Compare with actual geometric facts
-            match circumcenter(&simplex_vertices) {
-                Ok(circumcenter) => {
-                    match circumradius(&simplex_vertices) {
-                        Ok(circumradius) => {
-                            let distance_to_test = na::distance(
-                                &na::Point::<f64, 3>::from(circumcenter.coordinates()),
-                                &na::Point::<f64, 3>::from(test_point),
-                            );
+            (det, matrix_result)
+        }
+        Err(e) => {
+            println!("Error determining simplex orientation: {e}");
+            (det, false)
+        }
+    }
+}
 
-                            println!();
-                            println!("Geometric verification:");
-                            println!("  Circumcenter: {:?}", circumcenter.coordinates());
-                            println!("  Circumradius: {circumradius:.6}");
-                            println!("  Distance to test point: {distance_to_test:.6}");
-                            println!(
-                                "  Geometric truth (distance < radius): {}",
-                                distance_to_test < circumradius
-                            );
+/// Compare methods with geometry for the 3D test
+fn compare_methods_with_geometry(
+    simplex_vertices: &[Vertex<f64, i32, 3>],
+    test_point: [f64; 3],
+    test_vertex: Vertex<f64, i32, 3>,
+) -> Option<(f64, f64, bool, InSphere, InSphere)> {
+    match circumcenter(simplex_vertices) {
+        Ok(circumcenter) => {
+            match circumradius(simplex_vertices) {
+                Ok(circumradius) => {
+                    let distance_to_test = na::distance(
+                        &na::Point::<f64, 3>::from(circumcenter.coordinates()),
+                        &na::Point::<f64, 3>::from(test_point),
+                    );
 
-                            // Compare with both methods
-                            match insphere(&simplex_vertices, test_vertex) {
-                                Ok(standard_result) => {
-                                    match insphere_lifted(&simplex_vertices, test_vertex) {
-                                        Ok(matrix_method_result) => {
-                                            println!();
-                                            println!("Method comparison:");
-                                            println!("  Standard method: {standard_result:?}");
-                                            println!("  Matrix method: {matrix_method_result}");
-                                            println!(
-                                                "  Geometric truth: {}",
-                                                distance_to_test < circumradius
-                                            );
+                    println!();
+                    println!("Geometric verification:");
+                    println!("  Circumcenter: {:?}", circumcenter.coordinates());
+                    println!("  Circumradius: {circumradius:.6}");
+                    println!("  Distance to test point: {distance_to_test:.6}");
+                    println!(
+                        "  Geometric truth (distance < radius): {}",
+                        distance_to_test < circumradius
+                    );
 
-                                            println!();
-                                            let standard_inside =
-                                                matches!(standard_result, InSphere::INSIDE);
-                                            if standard_inside == (distance_to_test < circumradius)
-                                            {
-                                                println!(
-                                                    "✓ Standard method matches geometric truth"
-                                                );
-                                            } else {
-                                                println!(
-                                                    "✗ Standard method disagrees with geometric truth"
-                                                );
-                                            }
-
-                                            let matrix_inside =
-                                                matches!(matrix_method_result, InSphere::INSIDE);
-                                            let matrix_agrees =
-                                                matrix_inside == (distance_to_test < circumradius);
-                                            let standard_inside =
-                                                matches!(standard_result, InSphere::INSIDE);
-                                            let methods_agree = standard_inside == matrix_inside;
-
-                                            if matrix_agrees {
-                                                println!("✓ Matrix method matches geometric truth");
-                                            } else {
-                                                println!(
-                                                    "✗ Matrix method disagrees with geometric truth"
-                                                );
-                                                println!(
-                                                    "  NOTE: This disagreement is expected for this simplex geometry"
-                                                );
-                                                println!(
-                                                    "        due to the matrix method's inverted sign convention."
-                                                );
-                                            }
-
-                                            println!();
-                                            if methods_agree {
-                                                println!("✓ Both methods agree with each other");
-                                            } else {
-                                                println!(
-                                                    "⚠ Methods disagree (expected for this matrix formulation)"
-                                                );
-                                                println!(
-                                                    "  The matrix method uses coordinates relative to the first vertex,"
-                                                );
-                                                println!(
-                                                    "  which produces an inverted sign convention compared to the standard method."
-                                                );
-                                                println!(
-                                                    "  Both methods are mathematically correct but use different interpretations."
-                                                );
-                                            }
-                                        }
-                                        Err(e) => println!("Matrix method error: {e}"),
-                                    }
+                    // Compare with both methods
+                    match insphere(simplex_vertices, test_vertex) {
+                        Ok(standard_result) => {
+                            match insphere_lifted(simplex_vertices, test_vertex) {
+                                Ok(matrix_method_result) => {
+                                    Some((
+                                        distance_to_test,
+                                        circumradius,
+                                        distance_to_test < circumradius,
+                                        standard_result,
+                                        matrix_method_result,
+                                    ))
                                 }
-                                Err(e) => println!("Standard method error: {e}"),
+                                Err(e) => {
+                                    println!("Matrix method error: {e}");
+                                    None
+                                }
                             }
                         }
-                        Err(e) => println!("Error calculating circumradius: {e}"),
+                        Err(e) => {
+                            println!("Standard method error: {e}");
+                            None
+                        }
                     }
                 }
-                Err(e) => println!("Error calculating circumcenter: {e}"),
+                Err(e) => {
+                    println!("Error calculating circumradius: {e}");
+                    None
+                }
             }
         }
-        Err(e) => println!("Error determining simplex orientation: {e}"),
+        Err(e) => {
+            println!("Error calculating circumcenter: {e}");
+            None
+        }
+    }
+}
+
+/// Print the comparison results for the 3D test
+fn print_method_comparison_results(
+    geometric_truth: bool,
+    standard_result: InSphere,
+    matrix_method_result: InSphere,
+) {
+    println!();
+    println!("Method comparison:");
+    println!("  Standard method: {standard_result:?}");
+    println!("  Matrix method: {matrix_method_result}");
+    println!("  Geometric truth: {geometric_truth}");
+
+    println!();
+    let standard_inside = matches!(standard_result, InSphere::INSIDE);
+    if standard_inside == geometric_truth {
+        println!("✓ Standard method matches geometric truth");
+    } else {
+        println!("✗ Standard method disagrees with geometric truth");
+    }
+
+    let matrix_inside = matches!(matrix_method_result, InSphere::INSIDE);
+    let matrix_agrees = matrix_inside == geometric_truth;
+    let methods_agree = standard_inside == matrix_inside;
+
+    if matrix_agrees {
+        println!("✓ Matrix method matches geometric truth");
+    } else {
+        println!("✗ Matrix method disagrees with geometric truth");
+        println!("  NOTE: This disagreement is expected for this simplex geometry");
+        println!("        due to the matrix method's inverted sign convention.");
+    }
+
+    println!();
+    if methods_agree {
+        println!("✓ Both methods agree with each other");
+    } else {
+        println!("⚠ Methods disagree (expected for this matrix formulation)");
+        println!("  The matrix method uses coordinates relative to the first vertex,");
+        println!("  which produces an inverted sign convention compared to the standard method.");
+        println!("  Both methods are mathematically correct but use different interpretations.");
+    }
+}
+
+/// Main function for 3D matrix analysis - orchestrates all the smaller functions
+fn test_3d_matrix_analysis() {
+    let (simplex_vertices, test_point, test_vertex) = setup_3d_matrix_test();
+    build_and_analyze_matrix(&simplex_vertices);
+    
+    if let Some((_distance_to_test, _circumradius, geometric_truth, standard_result, matrix_method_result)) =
+        compare_methods_with_geometry(&simplex_vertices, test_point, test_vertex)
+    {
+        print_method_comparison_results(
+            geometric_truth,
+            standard_result,
+            matrix_method_result,
+        );
     }
 }
 
@@ -1210,8 +1153,10 @@ fn debug_3d_circumsphere_properties() {
     println!("Circumradius: {radius}");
 
     // Test the point (0.9, 0.9, 0.9)
-    let distance_to_center =
-        ((0.9_f64 - 0.5).powi(2) + (0.9_f64 - 0.5).powi(2) + (0.9_f64 - 0.5).powi(2)).sqrt();
+    let distance_to_center = na::distance(
+        &na::Point::<f64, 3>::from(center.coordinates()),
+        &na::Point::<f64, 3>::from([0.9, 0.9, 0.9]),
+    );
     println!("Point (0.9, 0.9, 0.9) distance to circumcenter: {distance_to_center}");
     println!(
         "Is point inside circumsphere (distance < radius)? {}",
@@ -1246,8 +1191,10 @@ fn debug_4d_circumsphere_properties() {
     println!("4D Circumradius: {radius_4d}");
 
     // Test the origin (0, 0, 0, 0)
-    let distance_to_center_4d =
-        (center_4d.coordinates().iter().map(|&x| x * x).sum::<f64>()).sqrt();
+    let distance_to_center_4d = na::distance(
+        &na::Point::<f64, 4>::from(center_4d.coordinates()),
+        &na::Point::<f64, 4>::from([0.0, 0.0, 0.0, 0.0]),
+    );
     println!("Origin distance to circumcenter: {distance_to_center_4d}");
     println!(
         "Is origin inside circumsphere (distance < radius)? {}",
