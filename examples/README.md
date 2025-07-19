@@ -24,90 +24,61 @@ with special emphasis on handling of NaN (Not a Number) and infinity values.
 
 **Run with:** `cargo run --example point_comparison_and_hashing`
 
-### 2. Implicit Conversion Example (`implicit_conversion.rs`)
+### 2. Circumsphere Containment and Simplex Orientation Testing (`test_circumsphere.rs`)
 
-This example summarizes the refactoring performed to enable implicit conversion
-of `vertex.point.coordinates()` to coordinate arrays using Rust's `From` trait.
+Demonstrates and compares two methods for determining if a point lies inside
+the circumsphere of a 4D simplex (5-cell/hypertetrahedron), plus comprehensive
+testing of simplex orientation across multiple dimensions.
 
-## Overview
+**Key Features:**
 
-The goal was to refactor the codebase so that `vertex.point.coordinates()`
-calls could be implicitly converted to coordinate arrays, making the code more
-ergonomic while maintaining backward compatibility.
+- **Distance-based method** (`circumsphere_contains`): Computes the circumcenter
+  and circumradius explicitly, then checks if the test point is within that
+  distance from the circumcenter.
+- **Determinant-based method** (`insphere`): Uses a matrix
+  determinant approach that avoids explicit circumcenter calculation and
+  provides superior numerical stability.
+- **4D simplex testing**: Uses a unit 4D simplex with vertices at:
+  - `[0,0,0,0]` (origin)
+  - `[1,0,0,0]` (unit vector along x-axis)
+  - `[0,1,0,0]` (unit vector along y-axis)
+  - `[0,0,1,0]` (unit vector along z-axis)
+  - `[0,0,0,1]` (unit vector along w-axis)
+- **Comprehensive testing**: Tests various categories of points including:
+  - Inside points (well within the circumsphere)
+  - Outside points (clearly beyond the circumsphere)
+  - Boundary points (on edges and faces of the 4D simplex)
+  - Vertex points (the simplex vertices themselves)
+- **Simplex orientation testing**: Tests simplex orientation across dimensions:
+  - 4D simplex orientation with positive and negative variants
+  - 3D tetrahedron orientation for comparison
+  - 2D triangle orientation with normal and reversed vertex ordering
+  - Degenerate cases (collinear points)
+- **Orientation impact demonstration**: Shows how the determinant-based method
+  automatically handles orientation differences while maintaining consistent results.
+- **Method comparison**: Shows how both methods perform on the same test cases,
+  demonstrating where they agree and where numerical differences may occur.
 
-## Changes Made
+**Run with:** `cargo run --example test_circumsphere`
 
-### 1. **Added Implicit Conversion Traits for Vertex**
+### 3. Implicit Conversion Example (`implicit_conversion.rs`)
 
-**File:** `src/delaunay_core/vertex.rs`
+Demonstrates the implicit conversion capabilities of the d-delaunay library,
+showing how vertices and points can be automatically converted to coordinate
+arrays using Rust's `From` trait.
 
-- **Added `From<Vertex<T, U, D>>` for `[T; D]`**: Allows owned vertices to be
-  implicitly converted to coordinate arrays
-- **Added `From<&Vertex<T, U, D>>` for `[T; D]`**: Allows vertex references to
-  be implicitly converted to coordinate arrays while preserving the original
-  vertex
-- **Added comprehensive tests**: `vertex_implicit_conversion_to_coordinates`
-  test verifies both owned and reference conversions work correctly
+**Key Features:**
 
-### 2. **Added Implicit Conversion Traits for Point**
+- **Vertex to coordinate conversion**: Both owned vertices and vertex references
+  can be implicitly converted to coordinate arrays
+- **Point to coordinate conversion**: Both owned points and point references
+  can be implicitly converted to coordinate arrays
+- **Type safety**: All conversions are compile-time checked and type-safe
+- **Zero-cost abstractions**: No runtime overhead for conversions
+- **Ergonomic syntax**: Cleaner, more readable code compared to explicit
+  coordinate access
 
-**File:** `src/delaunay_core/point.rs`
-
-- **Added `From<Point<T, D>>` for `[T; D]`**: Allows owned points to be
-  implicitly converted to coordinate arrays
-- **Added `From<&Point<T, D>>` for `[T; D]`**: Allows point references to be
-  implicitly converted to coordinate arrays while preserving the original point
-- **Added comprehensive tests**: `point_implicit_conversion_to_coordinates`
-  test verifies both owned and reference conversions work correctly
-
-### 3. **Refactored Codebase to Use Implicit Conversion**
-
-**Files Modified:**
-
-- `src/delaunay_core/utilities.rs`
-- `src/delaunay_core/triangulation_data_structure.rs`
-- `src/delaunay_core/facet.rs`
-- `src/delaunay_core/cell.rs`
-
-**Changes:**
-
-- Replaced explicit `.point.coordinates()` calls with implicit conversions
-  using `.into()` where appropriate
-- Used type annotations to make the conversion explicit:
-  `let coords: [T; D] = vertex.into();`
-- Maintained code clarity while making it more ergonomic
-
-### 4. **Fixed Type Conversion Issues**
-
-**File:** `src/delaunay_core/cell.rs`
-
-- **Fixed nalgebra compatibility**: Updated code that was trying to convert
-  `[T; D]` directly to `na::Point<f64, D>`
-- **Added proper type conversion**: Used `.map(|x| x.into())` to convert
-  coordinates to f64 arrays before creating nalgebra Points
-- **Maintained numerical stability**: Ensured all mathematical operations
-  continue to work correctly
-
-### 5. **Added Documentation and Examples**
-
-**File:** `examples/implicit_conversion.rs`
-
-- **Created comprehensive example**: Demonstrates all four types of implicit
-  conversions
-- **Added full documentation**: Includes crate-level docs, function docs, and
-  inline comments
-- **Shows before/after usage**: Demonstrates the ergonomic benefits of the
-  refactoring
-
-## Usage Examples
-
-### Before Refactoring
-
-```rust
-let coords: [f64; 3] = vertex.point.coordinates();
-```
-
-### After Refactoring
+**Usage Examples:**
 
 ```rust
 // From owned vertex
@@ -123,40 +94,4 @@ let coords: [f64; 3] = point.into();
 let coords: [f64; 3] = (&point).into();
 ```
 
-## Benefits
-
-1. **More Ergonomic**: Shorter, cleaner syntax for coordinate access
-2. **Backward Compatible**: All existing `.coordinates()` calls continue to work
-3. **Type Safe**: Leverages Rust's type system for automatic conversion
-4. **Performance**: Zero-cost abstractions - no runtime overhead
-5. **Flexible**: Works with both owned values and references
-
-## Testing
-
-- **All 190 existing tests pass**: Ensures no regression in functionality
-- **New tests added**: Specific tests for implicit conversion behavior
-- **Example works**: Demonstrates practical usage of the new feature
-- **Documentation tests pass**: All 22 doc tests continue to work
-
-## Type Safety
-
-The implicit conversions are fully type-safe:
-
-- Generic over coordinate type `T` and dimension `D`
-- Maintains all existing trait bounds
-- Compiler enforces correct usage at compile time
-- No runtime type checking required
-
-## Performance Impact
-
-- **Zero runtime cost**: Conversions are handled at compile time
-- **No allocations**: Direct access to underlying coordinate arrays
-- **Inlined**: Conversion functions are trivial and will be inlined by the
-  compiler
-
-## Conclusion
-
-The refactoring successfully enables implicit conversion from vertices and
-points to coordinate arrays while maintaining full backward compatibility, type
-safety, and performance. The codebase is now more ergonomic and easier to use
-while preserving all existing functionality.
+**Run with:** `cargo run --example implicit_conversion`
