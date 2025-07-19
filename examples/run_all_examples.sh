@@ -5,14 +5,15 @@
 echo "Running all examples for d-delaunay project..."
 echo "=============================================="
 
-examples=(
+# Simple examples that don't take arguments
+simple_examples=(
     "check_float_traits"
     "implicit_conversion"
     "point_comparison_and_hashing"
-    "test_circumsphere"
 )
 
-for example in "${examples[@]}"; do
+# Run simple examples
+for example in "${simple_examples[@]}"; do
     echo
     echo "=== Running $example ==="
     echo "--------------------------------------"
@@ -23,5 +24,26 @@ for example in "${examples[@]}"; do
     echo
 done
 
+# Run test_circumsphere with comprehensive test categories
+test_circumsphere_tests=(
+    "all"              # All basic dimensional tests and orientation tests
+    "test-all-points"   # Single point tests in all dimensions
+    "debug-all"         # All debug tests
+)
+
+echo
+echo "=== Running test_circumsphere comprehensive tests ==="
+echo "---------------------------------------------------"
+
+for test_name in "${test_circumsphere_tests[@]}"; do
+    echo
+    echo "--- Running test_circumsphere $test_name ---"
+    if ! cargo run --example test_circumsphere "$test_name"; then
+        echo "ERROR: test_circumsphere $test_name failed!"
+        exit 1
+    fi
+done
+
+echo
 echo "=============================================="
-echo "All examples completed successfully!"
+echo "All examples and tests completed successfully!"
