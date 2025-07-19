@@ -17,6 +17,8 @@ use uuid::Uuid;
 
 /// Default tolerance for geometric predicates and degeneracy detection
 const DEFAULT_TOLERANCE: f64 = 1e-10;
+/// Tolerance for distance comparisons
+const DISTANCE_TOLERANCE: f64 = 1e-9;
 
 /// Calculate the circumcenter of a set of vertices forming a simplex.
 ///
@@ -496,7 +498,8 @@ where
         &na::Point::<T, D>::from(vertex_coords_f64),
     );
 
-    let tolerance = T::from(1e-9).unwrap_or_else(|| T::from(f64::EPSILON).unwrap_or_default());
+    let tolerance =
+        T::from(DISTANCE_TOLERANCE).unwrap_or_else(|| T::from(f64::EPSILON).unwrap_or_default());
     if num_traits::Float::abs(circumradius - radius) < tolerance {
         Ok(InSphere::BOUNDARY)
     } else if circumradius > radius {
@@ -964,7 +967,11 @@ where
     }
 
     // Initialize with the first vertex's coordinates using implicit conversion
-    let mut extreme_coords: [T; D] = vertices.values().next().unwrap().into();
+    let mut extreme_coords: [T; D] = vertices
+        .values()
+        .next()
+        .expect("HashMap is unexpectedly empty despite earlier check")
+        .into();
 
     // Compare with remaining vertices
     for vertex in vertices.values().skip(1) {
@@ -998,9 +1005,6 @@ mod tests {
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
     use approx::assert_relative_eq;
-
-    /// Tolerance for distance comparisons in tests
-    const DISTANCE_TOLERANCE: f64 = 1e-9;
 
     #[test]
     fn predicates_circumcenter() {

@@ -29,10 +29,19 @@ use peroxide::fuga::{LinearAlgebra, zeros};
 use serde::{Serialize, de::DeserializeOwned};
 use std::env;
 
-/// Create a test vertex with generic dimension
-fn create_vertex<const D: usize>(coords: [f64; D], data: i32) -> Vertex<f64, i32, D>
+/// Create a test vertex with generic dimension and data type
+fn create_vertex<T, const D: usize>(coords: [f64; D], data: T) -> Vertex<f64, T, D>
 where
     [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    T: Clone
+        + Copy
+        + Eq
+        + std::hash::Hash
+        + Ord
+        + PartialEq
+        + PartialOrd
+        + DeserializeOwned
+        + Serialize,
 {
     VertexBuilder::default()
         .point(Point::new(coords))
@@ -61,7 +70,6 @@ fn main() {
             "4d" => test_4d_circumsphere(),
             "orientation" => test_all_orientations(),
             "debug-3d" => test_3d_simplex_analysis(),
-            "debug-4d" => debug_4d_circumsphere_properties(),
             "debug-3d-matrix" => test_3d_matrix_analysis(),
             "debug-3d-properties" => debug_3d_circumsphere_properties(),
             "debug-4d-properties" => debug_4d_circumsphere_properties(),
@@ -127,7 +135,6 @@ fn print_help() {
     println!();
     println!("Debug tests:");
     println!("  debug-3d           - Detailed 3D simplex analysis and debugging");
-    println!("  debug-4d           - Detailed 4D simplex analysis and debugging");
     println!("  debug-3d-matrix    - Step-by-step 3D matrix method analysis");
     println!("  debug-3d-properties - 3D circumsphere properties analysis");
     println!("  debug-4d-properties - 4D circumsphere properties analysis");
@@ -545,7 +552,6 @@ fn test_and_print_point(vertices: &[Vertex<f64, i32, 4>], coords: [f64; 4], desc
 }
 
 /// Test and compare both 4D circumsphere containment methods
-#[allow(clippy::too_many_lines)]
 fn test_4d_circumsphere_methods() {
     println!("=============================================");
     println!("Testing 4D circumsphere containment methods:");
@@ -554,31 +560,11 @@ fn test_4d_circumsphere_methods() {
 
     // Create a unit 4-simplex: vertices at origin and unit vectors along each axis
     let vertices: Vec<Vertex<f64, i32, 4>> = vec![
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0, 0.0, 0.0], 1),
+        create_vertex([1.0, 0.0, 0.0, 0.0], 1),
+        create_vertex([0.0, 1.0, 0.0, 0.0], 1),
+        create_vertex([0.0, 0.0, 1.0, 0.0], 1),
+        create_vertex([0.0, 0.0, 0.0, 1.0], 2),
     ];
 
     // Calculate circumcenter and circumradius for reference
@@ -603,11 +589,7 @@ fn test_4d_circumsphere_methods() {
 
                     for (coords, description) in test_points {
                         test_and_print_point(vertices.as_slice(), coords, description);
-                        let test_vertex = VertexBuilder::default()
-                            .point(Point::new(coords))
-                            .data(99)
-                            .build()
-                            .unwrap();
+                        let test_vertex = create_vertex(coords, 99);
 
                         let result_standard = insphere(&vertices, test_vertex);
                         let result_matrix = insphere_lifted(&vertices, test_vertex);
@@ -690,31 +672,11 @@ fn test_circumsphere_containment() {
     // along each coordinate axis. The circumcenter is at [0.5, 0.5, 0.5, 0.5] and
     // the circumradius is √4/2 = 1.0.
     let vertices: [Vertex<f64, i32, 4>; 5] = [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0])) // Origin
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0])) // Unit vector along x-axis
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0])) // Unit vector along y-axis
-            .data(2)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0])) // Unit vector along z-axis
-            .data(3)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0])) // Unit vector along w-axis
-            .data(4)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0, 0.0, 0.0], 0), // Origin
+        create_vertex([1.0, 0.0, 0.0, 0.0], 1), // Unit vector along x-axis
+        create_vertex([0.0, 1.0, 0.0, 0.0], 2), // Unit vector along y-axis
+        create_vertex([0.0, 0.0, 1.0, 0.0], 3), // Unit vector along z-axis
+        create_vertex([0.0, 0.0, 0.0, 1.0], 4), // Unit vector along w-axis
     ];
 
     println!("4D simplex vertices:");
@@ -731,31 +693,11 @@ fn test_circumsphere_containment() {
     // These are points with small coordinates that should be well within
     // the circumsphere radius of √4/2 = 1.0
     let test_points_inside: [Vertex<f64, i32, 4>; 5] = [
-        VertexBuilder::default()
-            .point(Point::new([0.25, 0.25, 0.25, 0.25]))
-            .data(10)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.1, 0.1, 0.1, 0.1]))
-            .data(11)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.2, 0.2, 0.2, 0.2]))
-            .data(12)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.3, 0.2, 0.1, 0.0]))
-            .data(13)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .data(14)
-            .build()
-            .unwrap(), // Origin should be inside
+        create_vertex([0.25, 0.25, 0.25, 0.25], 10),
+        create_vertex([0.1, 0.1, 0.1, 0.1], 11),
+        create_vertex([0.2, 0.2, 0.2, 0.2], 12),
+        create_vertex([0.3, 0.2, 0.1, 0.0], 13),
+        create_vertex([0.0, 0.0, 0.0, 0.0], 14), // Origin should be inside
     ];
 
     println!("Testing points that should be INSIDE the circumsphere:");
@@ -769,36 +711,12 @@ fn test_circumsphere_containment() {
     // These include points with large coordinates and points along the axes
     // that extend beyond the simplex vertices
     let test_points_outside: [Vertex<f64, i32, 4>; 6] = [
-        VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0, 2.0]))
-            .data(20)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0, 1.0]))
-            .data(21)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.8, 0.8, 0.8, 0.8]))
-            .data(22)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.5, 0.0, 0.0, 0.0]))
-            .data(23)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.5, 0.0, 0.0]))
-            .data(24)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.5, 0.0]))
-            .data(25)
-            .build()
-            .unwrap(),
+        create_vertex([2.0, 2.0, 2.0, 2.0], 20),
+        create_vertex([1.0, 1.0, 1.0, 1.0], 21),
+        create_vertex([0.8, 0.8, 0.8, 0.8], 22),
+        create_vertex([1.5, 0.0, 0.0, 0.0], 23),
+        create_vertex([0.0, 1.5, 0.0, 0.0], 24),
+        create_vertex([0.0, 0.0, 1.5, 0.0], 25),
     ];
 
     println!("Testing points that should be OUTSIDE the circumsphere:");
@@ -856,31 +774,11 @@ fn test_circumsphere_containment() {
     // These points lie on the boundary of the 4D simplex and test
     // numerical stability near the boundary
     let boundary_points: [Vertex<f64, i32, 4>; 5] = [
-        VertexBuilder::default()
-            .point(Point::new([0.5, 0.5, 0.0, 0.0]))
-            .data(30)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.5, 0.0, 0.5, 0.0]))
-            .data(31)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.5, 0.5, 0.0]))
-            .data(32)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.33, 0.33, 0.33, 0.01]))
-            .data(33)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.25, 0.25, 0.25, 0.25]))
-            .data(34)
-            .build()
-            .unwrap(),
+        create_vertex([0.5, 0.5, 0.0, 0.0], 30),
+        create_vertex([0.5, 0.0, 0.5, 0.0], 31),
+        create_vertex([0.0, 0.5, 0.5, 0.0], 32),
+        create_vertex([0.33, 0.33, 0.33, 0.01], 33),
+        create_vertex([0.25, 0.25, 0.25, 0.25], 34),
     ];
 
     println!("Testing boundary/edge points:");
@@ -904,7 +802,6 @@ fn test_circumsphere_containment() {
     }
 }
 
-#[allow(clippy::too_many_lines)]
 fn test_simplex_orientation() {
     println!("\n=============================================");
     println!("Testing simplex orientation:");
@@ -941,26 +838,10 @@ fn test_simplex_orientation() {
 
     // Test 3D orientation (tetrahedron) for comparison
     let tetrahedron_vertices: [Vertex<f64, i32, 3>; 4] = [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0])) // Origin
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0])) // Unit vector along x-axis
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0])) // Unit vector along y-axis
-            .data(2)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0])) // Unit vector along z-axis
-            .data(3)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0, 0.0], 0), // Origin
+        create_vertex([1.0, 0.0, 0.0], 1), // Unit vector along x-axis
+        create_vertex([0.0, 1.0, 0.0], 2), // Unit vector along y-axis
+        create_vertex([0.0, 0.0, 1.0], 3), // Unit vector along z-axis
     ];
 
     let orientation_3d = simplex_orientation(&tetrahedron_vertices);
@@ -976,21 +857,9 @@ fn test_simplex_orientation() {
 
     // Test 2D orientation (triangle)
     let triangle_vertices: [Vertex<f64, i32, 2>; 3] = [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0], 0),
+        create_vertex([1.0, 0.0], 1),
+        create_vertex([0.0, 1.0], 2),
     ];
 
     let orientation_2d = simplex_orientation(&triangle_vertices);
@@ -1006,21 +875,9 @@ fn test_simplex_orientation() {
 
     // Test 2D orientation with reversed vertex order
     let triangle_vertices_reversed: [Vertex<f64, i32, 2>; 3] = [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0])) // Swapped order
-            .data(2)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0])) // Swapped order
-            .data(1)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0], 0),
+        create_vertex([0.0, 1.0], 2), // Swapped order
+        create_vertex([1.0, 0.0], 1), // Swapped order
     ];
 
     let orientation_2d_reversed = simplex_orientation(&triangle_vertices_reversed);
@@ -1036,21 +893,9 @@ fn test_simplex_orientation() {
 
     // Test degenerate case (collinear points in 2D)
     let collinear_vertices: [Vertex<f64, i32, 2>; 3] = [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([2.0, 0.0])) // Collinear point
-            .data(2)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0], 0),
+        create_vertex([1.0, 0.0], 1),
+        create_vertex([2.0, 0.0], 2), // Collinear point
     ];
 
     let orientation_collinear = simplex_orientation(&collinear_vertices);
@@ -1067,61 +912,21 @@ fn test_simplex_orientation() {
 
 fn create_unit_4d_simplex() -> [Vertex<f64, i32, 4>; 5] {
     [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .data(2)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .data(4)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0, 0.0, 0.0], 0),
+        create_vertex([1.0, 0.0, 0.0, 0.0], 1),
+        create_vertex([0.0, 1.0, 0.0, 0.0], 2),
+        create_vertex([0.0, 0.0, 1.0, 0.0], 3),
+        create_vertex([0.0, 0.0, 0.0, 1.0], 4),
     ]
 }
 
 fn create_negative_4d_simplex() -> [Vertex<f64, i32, 4>; 5] {
     [
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .data(0)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .data(2)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap(),
-        VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .data(4)
-            .build()
-            .unwrap(),
+        create_vertex([0.0, 0.0, 0.0, 0.0], 0),
+        create_vertex([0.0, 1.0, 0.0, 0.0], 2),
+        create_vertex([1.0, 0.0, 0.0, 0.0], 1),
+        create_vertex([0.0, 0.0, 1.0, 0.0], 3),
+        create_vertex([0.0, 0.0, 0.0, 1.0], 4),
     ]
 }
 
@@ -1132,11 +937,7 @@ fn demonstrate_orientation_impact_on_circumsphere() {
     let vertices = create_unit_4d_simplex();
     let vertices_negative = create_negative_4d_simplex();
 
-    let test_point = VertexBuilder::default()
-        .point(Point::new([0.25, 0.25, 0.25, 0.25]))
-        .data(100)
-        .build()
-        .unwrap();
+    let test_point = create_vertex([0.25, 0.25, 0.25, 0.25], 100);
 
     let inside_positive = insphere(&vertices, test_point);
     let inside_negative = insphere(&vertices_negative, test_point);
@@ -1167,7 +968,6 @@ fn demonstrate_orientation_impact_on_circumsphere() {
     println!("\nTest completed!");
 }
 
-#[allow(clippy::too_many_lines)]
 fn test_3d_simplex_analysis() {
     println!("\n=============================================");
     println!("3D Simplex Analysis for Test Debugging");
@@ -1192,26 +992,10 @@ fn test_3d_simplex_analysis() {
 }
 
 fn create_3d_test_simplex() -> Vec<Vertex<f64, i32, 3>> {
-    let vertex1_3d: Vertex<f64, i32, 3> = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex2_3d = VertexBuilder::default()
-        .point(Point::new([1.0, 0.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex3_3d = VertexBuilder::default()
-        .point(Point::new([0.0, 1.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex4_3d = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 1.0]))
-        .data(2)
-        .build()
-        .unwrap();
+    let vertex1_3d: Vertex<f64, i32, 3> = create_vertex([0.0, 0.0, 0.0], 1);
+    let vertex2_3d = create_vertex([1.0, 0.0, 0.0], 1);
+    let vertex3_3d = create_vertex([0.0, 1.0, 0.0], 1);
+    let vertex4_3d = create_vertex([0.0, 0.0, 1.0], 2);
     vec![vertex1_3d, vertex2_3d, vertex3_3d, vertex4_3d]
 }
 
@@ -1233,12 +1017,7 @@ fn test_point_against_3d_simplex(
     circumradius_3d: f64,
 ) {
     // Test the point [0.9, 0.9, 0.9]
-    let test_point_3d = Point::new([0.9, 0.9, 0.9]);
-    let test_vertex_3d = VertexBuilder::default()
-        .point(test_point_3d)
-        .data(3)
-        .build()
-        .unwrap();
+    let test_vertex_3d = create_vertex([0.9, 0.9, 0.9], 3);
 
     // Calculate distance from circumcenter to test point
     let distance_to_test_3d = na::distance(
@@ -1301,26 +1080,10 @@ fn test_3d_matrix_analysis() {
     println!("=============================================");
 
     // Create the 3D simplex: vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
-    let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex2 = VertexBuilder::default()
-        .point(Point::new([1.0, 0.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex3 = VertexBuilder::default()
-        .point(Point::new([0.0, 1.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex4 = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 1.0]))
-        .data(2)
-        .build()
-        .unwrap();
+    let vertex1: Vertex<f64, i32, 3> = create_vertex([0.0, 0.0, 0.0], 1);
+    let vertex2 = create_vertex([1.0, 0.0, 0.0], 1);
+    let vertex3 = create_vertex([0.0, 1.0, 0.0], 1);
+    let vertex4 = create_vertex([0.0, 0.0, 1.0], 2);
     let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
     println!("3D Simplex vertices:");
@@ -1332,11 +1095,7 @@ fn test_3d_matrix_analysis() {
 
     // Test point
     let test_point = [0.9, 0.9, 0.9];
-    let test_vertex = VertexBuilder::default()
-        .point(Point::new(test_point))
-        .data(3)
-        .build()
-        .unwrap();
+    let test_vertex = create_vertex(test_point, 3);
 
     // Get reference vertex (first vertex)
     let ref_coords = [0.0, 0.0, 0.0];
@@ -1545,26 +1304,10 @@ fn debug_3d_circumsphere_properties() {
     println!("=== 3D Unit Tetrahedron Analysis ===");
 
     // Unit tetrahedron: vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
-    let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex2 = VertexBuilder::default()
-        .point(Point::new([1.0, 0.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex3 = VertexBuilder::default()
-        .point(Point::new([0.0, 1.0, 0.0]))
-        .data(1)
-        .build()
-        .unwrap();
-    let vertex4 = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 1.0]))
-        .data(2)
-        .build()
-        .unwrap();
+    let vertex1: Vertex<f64, i32, 3> = create_vertex([0.0, 0.0, 0.0], 1);
+    let vertex2 = create_vertex([1.0, 0.0, 0.0], 1);
+    let vertex3 = create_vertex([0.0, 1.0, 0.0], 1);
+    let vertex4 = create_vertex([0.0, 0.0, 1.0], 2);
     let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
     let center = circumcenter(&simplex_vertices).unwrap();
@@ -1582,11 +1325,7 @@ fn debug_3d_circumsphere_properties() {
         distance_to_center < radius
     );
 
-    let test_vertex = VertexBuilder::default()
-        .point(Point::new([0.9, 0.9, 0.9]))
-        .data(4)
-        .build()
-        .unwrap();
+    let test_vertex = create_vertex([0.9, 0.9, 0.9], 4);
 
     let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
     let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
@@ -1600,26 +1339,11 @@ fn debug_4d_circumsphere_properties() {
     println!("\n=== 4D Symmetric Simplex Analysis ===");
 
     // Regular 4D simplex with vertices forming a specific pattern
-    let vertex1: Vertex<f64, Option<()>, 4> = VertexBuilder::default()
-        .point(Point::new([1.0, 1.0, 1.0, 1.0]))
-        .build()
-        .unwrap();
-    let vertex2 = VertexBuilder::default()
-        .point(Point::new([1.0, -1.0, -1.0, -1.0]))
-        .build()
-        .unwrap();
-    let vertex3 = VertexBuilder::default()
-        .point(Point::new([-1.0, 1.0, -1.0, -1.0]))
-        .build()
-        .unwrap();
-    let vertex4 = VertexBuilder::default()
-        .point(Point::new([-1.0, -1.0, 1.0, -1.0]))
-        .build()
-        .unwrap();
-    let vertex5 = VertexBuilder::default()
-        .point(Point::new([-1.0, -1.0, -1.0, 1.0]))
-        .build()
-        .unwrap();
+    let vertex1: Vertex<f64, Option<()>, 4> = create_vertex([1.0, 1.0, 1.0, 1.0], None);
+    let vertex2 = create_vertex([1.0, -1.0, -1.0, -1.0], None);
+    let vertex3 = create_vertex([-1.0, 1.0, -1.0, -1.0], None);
+    let vertex4 = create_vertex([-1.0, -1.0, 1.0, -1.0], None);
+    let vertex5 = create_vertex([-1.0, -1.0, -1.0, 1.0], None);
     let simplex_vertices_4d = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
 
     let center_4d = circumcenter(&simplex_vertices_4d).unwrap();
@@ -1637,10 +1361,7 @@ fn debug_4d_circumsphere_properties() {
         distance_to_center_4d < radius_4d
     );
 
-    let origin_vertex = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-        .build()
-        .unwrap();
+    let origin_vertex = create_vertex([0.0, 0.0, 0.0, 0.0], None);
 
     let standard_result_4d = insphere_distance(&simplex_vertices_4d, origin_vertex).unwrap();
     let matrix_result_4d = insphere_lifted(&simplex_vertices_4d, origin_vertex).unwrap();
@@ -1654,18 +1375,9 @@ fn compare_circumsphere_methods() {
     println!("\n=== Comparing Circumsphere Methods ===");
 
     // Compare results between standard and matrix methods
-    let vertex1: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
-        .point(Point::new([0.0, 0.0]))
-        .build()
-        .unwrap();
-    let vertex2 = VertexBuilder::default()
-        .point(Point::new([1.0, 0.0]))
-        .build()
-        .unwrap();
-    let vertex3 = VertexBuilder::default()
-        .point(Point::new([0.0, 1.0]))
-        .build()
-        .unwrap();
+    let vertex1: Vertex<f64, Option<()>, 2> = create_vertex([0.0, 0.0], None);
+    let vertex2 = create_vertex([1.0, 0.0], None);
+    let vertex3 = create_vertex([0.0, 1.0], None);
     let simplex_vertices = vec![vertex1, vertex2, vertex3];
 
     // Test various points
@@ -1678,7 +1390,7 @@ fn compare_circumsphere_methods() {
     ];
 
     for (i, point) in test_points.iter().enumerate() {
-        let test_vertex = VertexBuilder::default().point(*point).build().unwrap();
+        let test_vertex = create_vertex(point.coordinates(), None);
 
         let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
         let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();

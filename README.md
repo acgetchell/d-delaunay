@@ -29,6 +29,21 @@ but for now I am developing this to use in my [research] without trying to
 figure out how to mesh with other libraries and coding conventions, and with
 the minimum number of [traits] to do generic computational geometry.
 
+## Benchmarks
+
+The library includes comprehensive performance benchmarks for circumsphere containment algorithms. Key findings:
+
+- **insphere_lifted**: Fastest method (~50% better than standard)
+- **insphere**: Best balance of performance and numerical stability  
+- **insphere_distance**: Slowest but most transparent for educational use
+
+Run benchmarks with:
+```bash
+cargo bench --bench circumsphere_containment
+```
+
+See [benches/README.md](benches/README.md) for detailed performance results and analysis.
+
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/
 [C++]: https://isocpp.org
