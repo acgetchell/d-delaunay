@@ -1,24 +1,25 @@
 //! Benchmarks for circumsphere containment algorithms.
 //!
-//! This benchmark suite compares the performance of two different algorithms for
+//! This benchmark suite compares the performance of three different algorithms for
 //! determining whether a vertex is contained within the circumsphere of a simplex:
-//! the standard algorithm and a matrix-based implementation.
+//!
+//! 1. **insphere**: Standard determinant-based method (most numerically stable)
+//! 2. **`insphere_distance`**: Distance-based method using explicit circumcenter calculation
+//! 3. **`insphere_lifted`**: Matrix determinant method with lifted paraboloid approach
 //!
 //! The benchmarks include:
 //! - Basic performance tests with fixed simplices
 //! - Random query tests with multiple vertices
 //! - Tests across different dimensions (2D, 3D, 4D)
 //! - Edge case tests with boundary and distant vertices
-//! - Numerical consistency validation between algorithms
+//! - Numerical consistency validation between all three algorithms
 
 #![allow(missing_docs)]
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 use d_delaunay::geometry::point::Point;
-use d_delaunay::geometry::predicates::{
-    circumsphere_contains_vertex, circumsphere_contains_vertex_matrix,
-};
+use d_delaunay::geometry::predicates::{insphere, insphere_distance, insphere_lifted};
 use rand::Rng;
 
 /// Generate a random simplex for benchmarking
@@ -78,23 +79,24 @@ fn benchmark_basic_circumsphere_containment(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    c.bench_function("basic/circumsphere_contains_vertex", |b| {
+    c.bench_function("basic/insphere", |b| {
+        b.iter(|| {
+            black_box(insphere(black_box(&simplex_vertices), black_box(test_vertex)).unwrap())
+        });
+    });
+
+    c.bench_function("basic/insphere_distance", |b| {
         b.iter(|| {
             black_box(
-                circumsphere_contains_vertex(black_box(&simplex_vertices), black_box(test_vertex))
-                    .unwrap(),
+                insphere_distance(black_box(&simplex_vertices), black_box(test_vertex)).unwrap(),
             )
         });
     });
 
-    c.bench_function("basic/circumsphere_contains_vertex_matrix", |b| {
+    c.bench_function("basic/insphere_lifted", |b| {
         b.iter(|| {
             black_box(
-                circumsphere_contains_vertex_matrix(
-                    black_box(&simplex_vertices),
-                    black_box(test_vertex),
-                )
-                .unwrap(),
+                insphere_lifted(black_box(&simplex_vertices), black_box(test_vertex)).unwrap(),
             )
         });
     });
@@ -112,36 +114,34 @@ fn benchmark_random_queries(c: &mut Criterion) {
         .map(|_| generate_random_test_vertex_3d(&mut rng))
         .collect();
 
-    c.bench_function("random/circumsphere_contains_vertex_1000_queries", |b| {
+    c.bench_function("random/insphere_1000_queries", |b| {
+        b.iter(|| {
+            for test_vertex in &test_vertices {
+                black_box(insphere(black_box(&simplex_vertices), black_box(*test_vertex)).unwrap());
+            }
+        });
+    });
+
+    c.bench_function("random/insphere_distance_1000_queries", |b| {
         b.iter(|| {
             for test_vertex in &test_vertices {
                 black_box(
-                    circumsphere_contains_vertex(
-                        black_box(&simplex_vertices),
-                        black_box(*test_vertex),
-                    )
-                    .unwrap(),
+                    insphere_distance(black_box(&simplex_vertices), black_box(*test_vertex))
+                        .unwrap(),
                 );
             }
         });
     });
 
-    c.bench_function(
-        "random/circumsphere_contains_vertex_matrix_1000_queries",
-        |b| {
-            b.iter(|| {
-                for test_vertex in &test_vertices {
-                    black_box(
-                        circumsphere_contains_vertex_matrix(
-                            black_box(&simplex_vertices),
-                            black_box(*test_vertex),
-                        )
-                        .unwrap(),
-                    );
-                }
-            });
-        },
-    );
+    c.bench_function("random/insphere_lifted_1000_queries", |b| {
+        b.iter(|| {
+            for test_vertex in &test_vertices {
+                black_box(
+                    insphere_lifted(black_box(&simplex_vertices), black_box(*test_vertex)).unwrap(),
+                );
+            }
+        });
+    });
 }
 
 /// Benchmark with different simplex sizes (2D, 3D, 4D)
@@ -171,24 +171,19 @@ fn benchmark_different_dimensions(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    c.bench_function("2d/circumsphere_contains_vertex", |b| {
+    c.bench_function("2d/insphere", |b| {
+        b.iter(|| black_box(insphere(black_box(&simplex_2d), black_box(test_vertex_2d)).unwrap()));
+    });
+
+    c.bench_function("2d/insphere_distance", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex(black_box(&simplex_2d), black_box(test_vertex_2d))
-                    .unwrap(),
-            )
+            black_box(insphere_distance(black_box(&simplex_2d), black_box(test_vertex_2d)).unwrap())
         });
     });
 
-    c.bench_function("2d/circumsphere_contains_vertex_matrix", |b| {
+    c.bench_function("2d/insphere_lifted", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex_matrix(
-                    black_box(&simplex_2d),
-                    black_box(test_vertex_2d),
-                )
-                .unwrap(),
-            )
+            black_box(insphere_lifted(black_box(&simplex_2d), black_box(test_vertex_2d)).unwrap())
         });
     });
 
@@ -225,24 +220,19 @@ fn benchmark_different_dimensions(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    c.bench_function("4d/circumsphere_contains_vertex", |b| {
+    c.bench_function("4d/insphere", |b| {
+        b.iter(|| black_box(insphere(black_box(&simplex_4d), black_box(test_vertex_4d)).unwrap()));
+    });
+
+    c.bench_function("4d/insphere_distance", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex(black_box(&simplex_4d), black_box(test_vertex_4d))
-                    .unwrap(),
-            )
+            black_box(insphere_distance(black_box(&simplex_4d), black_box(test_vertex_4d)).unwrap())
         });
     });
 
-    c.bench_function("4d/circumsphere_contains_vertex_matrix", |b| {
+    c.bench_function("4d/insphere_lifted", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex_matrix(
-                    black_box(&simplex_4d),
-                    black_box(test_vertex_4d),
-                )
-                .unwrap(),
-            )
+            black_box(insphere_lifted(black_box(&simplex_4d), black_box(test_vertex_4d)).unwrap())
         });
     });
 }
@@ -272,24 +262,19 @@ fn benchmark_edge_cases(c: &mut Criterion) {
     let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
     // Test with vertex on the boundary (one of the simplex vertices)
-    c.bench_function("edge_cases/boundary_vertex", |b| {
+    c.bench_function("edge_cases/boundary_vertex_insphere", |b| {
+        b.iter(|| black_box(insphere(black_box(&simplex_vertices), black_box(vertex1)).unwrap()));
+    });
+
+    c.bench_function("edge_cases/boundary_vertex_distance", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex(black_box(&simplex_vertices), black_box(vertex1))
-                    .unwrap(),
-            )
+            black_box(insphere_distance(black_box(&simplex_vertices), black_box(vertex1)).unwrap())
         });
     });
 
-    c.bench_function("edge_cases/boundary_vertex_matrix", |b| {
+    c.bench_function("edge_cases/boundary_vertex_lifted", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex_matrix(
-                    black_box(&simplex_vertices),
-                    black_box(vertex1),
-                )
-                .unwrap(),
-            )
+            black_box(insphere_lifted(black_box(&simplex_vertices), black_box(vertex1)).unwrap())
         });
     });
 
@@ -299,33 +284,35 @@ fn benchmark_edge_cases(c: &mut Criterion) {
         .data(3)
         .build()
         .unwrap();
-    c.bench_function("edge_cases/far_vertex", |b| {
+    c.bench_function("edge_cases/far_vertex_insphere", |b| {
+        b.iter(|| {
+            black_box(insphere(black_box(&simplex_vertices), black_box(far_vertex)).unwrap())
+        });
+    });
+
+    c.bench_function("edge_cases/far_vertex_distance", |b| {
         b.iter(|| {
             black_box(
-                circumsphere_contains_vertex(black_box(&simplex_vertices), black_box(far_vertex))
-                    .unwrap(),
+                insphere_distance(black_box(&simplex_vertices), black_box(far_vertex)).unwrap(),
             )
         });
     });
 
-    c.bench_function("edge_cases/far_vertex_matrix", |b| {
+    c.bench_function("edge_cases/far_vertex_lifted", |b| {
         b.iter(|| {
-            black_box(
-                circumsphere_contains_vertex_matrix(
-                    black_box(&simplex_vertices),
-                    black_box(far_vertex),
-                )
-                .unwrap(),
-            )
+            black_box(insphere_lifted(black_box(&simplex_vertices), black_box(far_vertex)).unwrap())
         });
     });
 }
 
-/// Numerical consistency test - compare results of both methods
+/// Numerical consistency test - compare results of all three methods
 fn numerical_consistency_test() {
     println!("\n=== Numerical Consistency Test ===");
     let mut rng = rand::rng();
-    let mut matches = 0;
+    let mut all_match = 0;
+    let mut insphere_distance_matches = 0;
+    let mut insphere_lifted_matches = 0;
+    let mut distance_lifted_matches = 0;
     let mut total = 0;
     let mut disagreements = Vec::new();
 
@@ -333,30 +320,72 @@ fn numerical_consistency_test() {
         let simplex_vertices = generate_random_simplex_3d(&mut rng);
         let test_vertex = generate_random_test_vertex_3d(&mut rng);
 
-        let result1 = circumsphere_contains_vertex(&simplex_vertices, test_vertex);
-        let result2 = circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex);
+        let result_insphere = insphere(&simplex_vertices, test_vertex);
+        let result_distance = insphere_distance(&simplex_vertices, test_vertex);
+        let result_lifted = insphere_lifted(&simplex_vertices, test_vertex);
 
-        if let (Ok(r1), Ok(r2)) = (result1, result2) {
+        if let (Ok(r1), Ok(r2), Ok(r3)) = (result_insphere, result_distance, result_lifted) {
             total += 1;
+
+            // Check pairwise agreements
             if r1 == r2 {
-                matches += 1;
+                insphere_distance_matches += 1;
+            }
+            if r1 == r3 {
+                insphere_lifted_matches += 1;
+            }
+            if r2 == r3 {
+                distance_lifted_matches += 1;
+            }
+
+            // Check if all three agree
+            if r1 == r2 && r2 == r3 {
+                all_match += 1;
             } else {
-                disagreements.push((simplex_vertices, test_vertex, r1, r2));
+                disagreements.push((simplex_vertices, test_vertex, r1, r2, r3));
             }
         }
     }
 
+    println!("Method Comparisons ({total} total tests):");
     println!(
-        "Consistency: {}/{} ({:.2}%)",
-        matches,
+        "  insphere vs insphere_distance:  {}/{} ({:.2}%)",
+        insphere_distance_matches,
         total,
-        (f64::from(matches) / f64::from(total)) * 100.0
+        (f64::from(insphere_distance_matches) / f64::from(total)) * 100.0
+    );
+    println!(
+        "  insphere vs insphere_lifted:    {}/{} ({:.2}%)",
+        insphere_lifted_matches,
+        total,
+        (f64::from(insphere_lifted_matches) / f64::from(total)) * 100.0
+    );
+    println!(
+        "  insphere_distance vs insphere_lifted: {}/{} ({:.2}%)",
+        distance_lifted_matches,
+        total,
+        (f64::from(distance_lifted_matches) / f64::from(total)) * 100.0
+    );
+    println!(
+        "  All three methods agree:        {}/{} ({:.2}%)",
+        all_match,
+        total,
+        (f64::from(all_match) / f64::from(total)) * 100.0
     );
 
     if !disagreements.is_empty() {
-        println!("Found {} disagreements:", disagreements.len());
-        for (i, (simplex, test, r1, r2)) in disagreements.iter().take(5).enumerate() {
-            println!("  Disagreement {}: standard={}, matrix={}", i + 1, r1, r2);
+        println!(
+            "\nFound {} cases where methods disagree:",
+            disagreements.len()
+        );
+        for (i, (simplex, test, r1, r2, r3)) in disagreements.iter().take(5).enumerate() {
+            println!(
+                "  Disagreement {}: insphere={}, distance={}, lifted={}",
+                i + 1,
+                r1,
+                r2,
+                r3
+            );
             println!("    Test point: {:?}", test.point().coordinates());
             println!(
                 "    Simplex: {:?}",

@@ -5,7 +5,7 @@
 //!
 //! 1. **Distance-based method** (`circumsphere_contains`): Computes the circumcenter
 //!    and circumradius explicitly, then checks if the test point is within that distance.
-//! 2. **Standard determinant-based method** (`circumsphere_contains_vertex`): Uses a matrix
+//! 2. **Standard determinant-based method** (`insphere`): Uses a matrix
 //!    determinant approach that is more numerically stable.
 //! 3. **Optimized matrix method** (`circumsphere_contains_vertex_matrix`): Uses a different
 //!    matrix formulation with inverted sign convention for better numerical conditioning.
@@ -51,12 +51,72 @@ use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 use d_delaunay::geometry::Point;
 use d_delaunay::geometry::predicates::{InSphere, Orientation};
 use d_delaunay::geometry::predicates::{
-    circumcenter, circumradius, circumsphere_contains, circumsphere_contains_vertex,
-    circumsphere_contains_vertex_matrix, simplex_orientation,
+    circumcenter, circumradius, insphere, insphere_distance, insphere_lifted, simplex_orientation,
 };
 use nalgebra as na;
 use peroxide::fuga::{LinearAlgebra, zeros};
 use std::env;
+
+/// Create a test vertex with given coordinates and data - specialized for f64 and i32
+fn create_test_vertex(coords: [f64; 4], data: i32) -> Vertex<f64, i32, 4> {
+    VertexBuilder::default()
+        .point(Point::new(coords))
+        .data(data)
+        .build()
+        .unwrap()
+}
+
+/// Convert InSphere result to string representation
+fn insphere_to_string(result: &Result<InSphere, anyhow::Error>) -> String {
+    match result {
+        Ok(InSphere::INSIDE) => "INSIDE".to_string(),
+        Ok(InSphere::BOUNDARY) => "BOUNDARY".to_string(),
+        Ok(InSphere::OUTSIDE) => "OUTSIDE".to_string(),
+        Err(_) => "ERROR".to_string(),
+    }
+}
+
+/// Test a point against all three circumsphere methods and print results - specialized for 4D
+fn test_and_print_point(
+    simplex_vertices: &[Vertex<f64, i32, 4>],
+    test_coords: [f64; 4],
+    description: &str,
+) {
+    let test_vertex = create_test_vertex(test_coords, 99);
+
+    let result_insphere = insphere(simplex_vertices, test_vertex);
+    let result_distance = insphere_distance(simplex_vertices, test_vertex);
+    let result_lifted = insphere_lifted(simplex_vertices, test_vertex);
+
+    println!("Point {description} {test_coords:?}:");
+    println!(
+        "  insphere:          {}",
+        insphere_to_string(&result_insphere)
+    );
+    println!(
+        "  insphere_distance: {}",
+        insphere_to_string(&result_distance)
+    );
+    println!(
+        "  insphere_lifted:   {}",
+        insphere_to_string(&result_lifted)
+    );
+
+    // Check agreement between methods
+    let methods_agree =
+        if let (Ok(r1), Ok(r2), Ok(r3)) = (&result_insphere, &result_distance, &result_lifted) {
+            r1 == r2 && r2 == r3
+        } else {
+            false
+        };
+
+    if methods_agree {
+        println!("  ✓ All methods agree");
+    } else {
+        println!("  ⚠ Methods disagree");
+    }
+    println!();
+}
 
 /// Main function that demonstrates circumsphere containment testing.
 ///
@@ -183,15 +243,15 @@ fn test_4d_circumsphere_methods() {
                     ];
 
                     for (coords, description) in test_points {
+                        test_and_print_point(vertices.as_slice(), coords, description);
                         let test_vertex = VertexBuilder::default()
                             .point(Point::new(coords))
                             .data(99)
                             .build()
                             .unwrap();
 
-                        let result_standard = circumsphere_contains_vertex(&vertices, test_vertex);
-                        let result_matrix =
-                            circumsphere_contains_vertex_matrix(&vertices, test_vertex);
+                        let result_standard = insphere(&vertices, test_vertex);
+                        let result_matrix = insphere_lifted(&vertices, test_vertex);
 
                         // Calculate actual distance to center
                         let distance_to_center = {
@@ -263,9 +323,7 @@ fn test_4d_circumsphere_methods() {
 #[allow(clippy::too_many_lines)]
 fn test_circumsphere_containment() {
     println!("Testing circumsphere containment:");
-    println!(
-        "  determinant-based (circumsphere_contains_vertex) vs distance-based (circumsphere_contains)"
-    );
+    println!("  determinant-based (insphere) vs distance-based (circumsphere_contains)");
     println!("=============================================");
 
     // Define the 4D simplex vertices that form a unit 5-cell
@@ -342,30 +400,9 @@ fn test_circumsphere_containment() {
     ];
 
     println!("Testing points that should be INSIDE the circumsphere:");
-    for (i, point) in test_points_inside.iter().enumerate() {
-        let result_determinant = circumsphere_contains_vertex(&vertices, *point);
-        let result_distance = circumsphere_contains(&vertices, *point);
+    for point in test_points_inside {
         let coords: [f64; 4] = point.into();
-        println!(
-            "  Point {}: [{}, {}, {}, {}] -> Det: {}, Dist: {}",
-            i,
-            coords[0],
-            coords[1],
-            coords[2],
-            coords[3],
-            match result_determinant {
-                Ok(InSphere::INSIDE) => "INSIDE",
-                Ok(InSphere::BOUNDARY) => "BOUNDARY",
-                Ok(InSphere::OUTSIDE) => "OUTSIDE",
-                Err(_) => "ERROR",
-            },
-            match result_distance {
-                Ok(InSphere::INSIDE) => "INSIDE",
-                Ok(InSphere::BOUNDARY) => "BOUNDARY",
-                Ok(InSphere::OUTSIDE) => "OUTSIDE",
-                Err(_) => "ERROR",
-            }
-        );
+        test_and_print_point(vertices.as_slice(), coords, "inside");
     }
     println!();
 
@@ -407,8 +444,8 @@ fn test_circumsphere_containment() {
 
     println!("Testing points that should be OUTSIDE the circumsphere:");
     for (i, point) in test_points_outside.iter().enumerate() {
-        let result_determinant = circumsphere_contains_vertex(&vertices, *point);
-        let result_distance = circumsphere_contains(&vertices, *point);
+        let result_determinant = insphere(&vertices, *point);
+        let result_distance = insphere_distance(&vertices, *point);
         let coords: [f64; 4] = point.into();
         println!(
             "  Point {}: [{}, {}, {}, {}] -> Det: {}, Dist: {}",
@@ -437,7 +474,7 @@ fn test_circumsphere_containment() {
     // These should be on the boundary of the circumsphere (distance = radius)
     println!("Testing the simplex vertices themselves:");
     for (i, vertex) in vertices.iter().enumerate() {
-        let result = circumsphere_contains_vertex(&vertices, *vertex);
+        let result = insphere(&vertices, *vertex);
         let coords: [f64; 4] = vertex.into();
         println!(
             "  Vertex {}: [{}, {}, {}, {}] -> {}",
@@ -489,7 +526,7 @@ fn test_circumsphere_containment() {
 
     println!("Testing boundary/edge points:");
     for (i, point) in boundary_points.iter().enumerate() {
-        let result = circumsphere_contains_vertex(&vertices, *point);
+        let result = insphere(&vertices, *point);
         let coords: [f64; 4] = point.into();
         println!(
             "  Point {}: [{}, {}, {}, {}] -> {}",
@@ -742,8 +779,8 @@ fn demonstrate_orientation_impact_on_circumsphere() {
         .build()
         .unwrap();
 
-    let inside_positive = circumsphere_contains_vertex(&vertices, test_point);
-    let inside_negative = circumsphere_contains_vertex(&vertices_negative, test_point);
+    let inside_positive = insphere(&vertices, test_point);
+    let inside_negative = insphere(&vertices_negative, test_point);
 
     println!(
         "Point [0.25, 0.25, 0.25, 0.25] in positive 4D simplex: {}",
@@ -764,7 +801,7 @@ fn demonstrate_orientation_impact_on_circumsphere() {
         }
     );
 
-    println!("\nNote: The circumsphere_contains_vertex function automatically handles");
+    println!("\nNote: The insphere function automatically handles");
     println!("      orientation by calling simplex_orientation internally.");
     println!("      Both results should be the same regardless of vertex ordering!");
 
@@ -868,16 +905,14 @@ fn test_circumsphere_methods(
     simplex_vertices: &[Vertex<f64, i32, 3>],
     test_vertex: Vertex<f64, i32, 3>,
 ) {
-    match circumsphere_contains_vertex(simplex_vertices, test_vertex) {
-        Ok(standard_method_3d) => {
-            match circumsphere_contains_vertex_matrix(simplex_vertices, test_vertex) {
-                Ok(matrix_method_3d) => {
-                    println!("Standard method result: {:?}", standard_method_3d);
-                    println!("Matrix method result: {:?}", matrix_method_3d);
-                }
-                Err(e) => println!("Matrix method error: {e}"),
+    match insphere(simplex_vertices, test_vertex) {
+        Ok(standard_method_3d) => match insphere_lifted(simplex_vertices, test_vertex) {
+            Ok(matrix_method_3d) => {
+                println!("Standard method result: {standard_method_3d:?}");
+                println!("Matrix method result: {matrix_method_3d:?}");
             }
-        }
+            Err(e) => println!("Matrix method error: {e}"),
+        },
         Err(e) => println!("Standard method error: {e}"),
     }
 }
@@ -886,16 +921,14 @@ fn test_boundary_vertex_case(simplex_vertices: &[Vertex<f64, i32, 3>]) {
     println!();
     println!("Testing boundary vertex (vertex1):");
     let vertex1 = simplex_vertices[0];
-    match circumsphere_contains_vertex(simplex_vertices, vertex1) {
-        Ok(standard_vertex) => {
-            match circumsphere_contains_vertex_matrix(simplex_vertices, vertex1) {
-                Ok(matrix_vertex) => {
-                    println!("Standard method for vertex1: {:?}", standard_vertex);
-                    println!("Matrix method for vertex1: {:?}", matrix_vertex);
-                }
-                Err(e) => println!("Matrix method error for vertex1: {e}"),
+    match insphere(simplex_vertices, vertex1) {
+        Ok(standard_vertex) => match insphere_lifted(simplex_vertices, vertex1) {
+            Ok(matrix_vertex) => {
+                println!("Standard method for vertex1: {standard_vertex:?}");
+                println!("Matrix method for vertex1: {matrix_vertex:?}");
             }
-        }
+            Err(e) => println!("Matrix method error for vertex1: {e}"),
+        },
         Err(e) => {
             println!("Standard method error for vertex1: {e}");
         }
@@ -1065,16 +1098,13 @@ fn test_3d_matrix_analysis() {
                             );
 
                             // Compare with both methods
-                            match circumsphere_contains_vertex(&simplex_vertices, test_vertex) {
+                            match insphere(&simplex_vertices, test_vertex) {
                                 Ok(standard_result) => {
-                                    match circumsphere_contains_vertex_matrix(
-                                        &simplex_vertices,
-                                        test_vertex,
-                                    ) {
+                                    match insphere_lifted(&simplex_vertices, test_vertex) {
                                         Ok(matrix_method_result) => {
                                             println!();
                                             println!("Method comparison:");
-                                            println!("  Standard method: {:?}", standard_result);
+                                            println!("  Standard method: {standard_result:?}");
                                             println!("  Matrix method: {matrix_method_result}");
                                             println!(
                                                 "  Geometric truth: {}",
@@ -1199,12 +1229,11 @@ fn debug_3d_circumsphere_properties() {
         .build()
         .unwrap();
 
-    let standard_result = circumsphere_contains(&simplex_vertices, test_vertex).unwrap();
-    let matrix_result =
-        circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex).unwrap();
+    let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
+    let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
 
-    println!("Standard method result: {:?}", standard_result);
-    println!("Matrix method result: {:?}", matrix_result);
+    println!("Standard method result: {standard_result:?}");
+    println!("Matrix method result: {matrix_result:?}");
 }
 
 /// Debug 4D circumsphere properties analysis
@@ -1254,15 +1283,11 @@ fn debug_4d_circumsphere_properties() {
         .build()
         .unwrap();
 
-    let standard_result_4d = circumsphere_contains(&simplex_vertices_4d, origin_vertex).unwrap();
-    let matrix_result_4d =
-        circumsphere_contains_vertex_matrix(&simplex_vertices_4d, origin_vertex).unwrap();
+    let standard_result_4d = insphere_distance(&simplex_vertices_4d, origin_vertex).unwrap();
+    let matrix_result_4d = insphere_lifted(&simplex_vertices_4d, origin_vertex).unwrap();
 
-    println!(
-        "Standard method result for origin: {:?}",
-        standard_result_4d
-    );
-    println!("Matrix method result for origin: {:?}", matrix_result_4d);
+    println!("Standard method result for origin: {standard_result_4d:?}");
+    println!("Matrix method result for origin: {matrix_result_4d:?}");
 }
 
 /// Compare results between standard and matrix methods
@@ -1296,9 +1321,8 @@ fn compare_circumsphere_methods() {
     for (i, point) in test_points.iter().enumerate() {
         let test_vertex = VertexBuilder::default().point(*point).build().unwrap();
 
-        let standard_result = circumsphere_contains(&simplex_vertices, test_vertex).unwrap();
-        let matrix_result =
-            circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex).unwrap();
+        let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
+        let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
 
         println!(
             "Point {i}: {:?} -> Standard: {:?}, Matrix: {:?}",

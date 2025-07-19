@@ -35,7 +35,7 @@ testing of simplex orientation across multiple dimensions.
 - **Distance-based method** (`circumsphere_contains`): Computes the circumcenter
   and circumradius explicitly, then checks if the test point is within that
   distance from the circumcenter.
-- **Determinant-based method** (`circumsphere_contains_vertex`): Uses a matrix
+- **Determinant-based method** (`insphere`): Uses a matrix
   determinant approach that avoids explicit circumcenter calculation and
   provides superior numerical stability.
 - **4D simplex testing**: Uses a unit 4D simplex with vertices at:

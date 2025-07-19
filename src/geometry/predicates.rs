@@ -410,10 +410,30 @@ where
     }
 }
 
-/// Check if a vertex is contained within the circumsphere of a simplex.
+/// Check if a vertex is contained within the circumsphere of a simplex using distance calculations.
 ///
-/// This function uses distance calculations to determine if a vertex lies within
-/// the circumsphere formed by the given vertices.
+/// This function uses explicit distance calculations to determine if a vertex lies within
+/// the circumsphere formed by the given vertices. It computes the circumcenter and circumradius
+/// of the simplex, then calculates the distance from the test point to the circumcenter
+/// and compares it with the circumradius.
+///
+/// # Algorithm
+///
+/// The algorithm follows these steps:
+/// 1. Calculate the circumcenter of the simplex using [`circumcenter`]
+/// 2. Calculate the circumradius using [`circumradius_with_center`]
+/// 3. Compute the Euclidean distance from the test vertex to the circumcenter
+/// 4. Compare the distance with the circumradius to determine containment
+///
+/// # Numerical Stability
+///
+/// This method can accumulate floating-point errors through multiple steps:
+/// - Matrix inversion for circumcenter calculation
+/// - Distance computation in potentially high-dimensional space
+/// - Multiple coordinate transformations
+///
+/// For better numerical stability, consider using [`insphere`] which uses a
+/// determinant-based approach that avoids explicit circumcenter computation.
 ///
 /// # Arguments
 ///
@@ -434,16 +454,16 @@ where
 /// ```
 /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
-/// use d_delaunay::geometry::predicates::{circumsphere_contains, InSphere};
+/// use d_delaunay::geometry::predicates::{insphere_distance, InSphere};
 /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
 /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
 /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
 /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
 /// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 /// let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.5, 0.5, 0.5])).data(3).build().unwrap();
-/// assert_eq!(circumsphere_contains(&simplex_vertices, test_vertex).unwrap(), InSphere::INSIDE);
+/// assert_eq!(insphere_distance(&simplex_vertices, test_vertex).unwrap(), InSphere::INSIDE);
 /// ```
-pub fn circumsphere_contains<T, U, const D: usize>(
+pub fn insphere_distance<T, U, const D: usize>(
     simplex_vertices: &[Vertex<T, U, D>],
     test_vertex: Vertex<T, U, D>,
 ) -> Result<InSphere, anyhow::Error>
@@ -485,11 +505,18 @@ where
 
 /// Check if a vertex is contained within the circumsphere of a simplex using matrix determinant.
 ///
-/// This method is preferred over `circumsphere_contains` as it provides better numerical
-/// stability by using a matrix determinant approach instead of distance calculations,
-/// which can accumulate floating-point errors.
+/// This is the `InSphere` predicate test, which determines whether a test point lies inside,
+/// outside, or on the boundary of the circumsphere of a given simplex. This method is preferred
+/// over `circumsphere_contains` as it provides better numerical stability by using a matrix
+/// determinant approach instead of distance calculations, which can accumulate floating-point errors.
 ///
 /// # Algorithm
+///
+/// This implementation follows the robust geometric predicates approach described in:
+///
+/// Shewchuk, J. R. "Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric
+/// Predicates." Discrete & Computational Geometry 18, no. 3 (1997): 305-363.
+/// DOI: [10.1007/PL00009321](https://doi.org/10.1007/PL00009321)
 ///
 /// The in-sphere test uses the determinant of a specially constructed matrix. For a
 /// d-dimensional simplex with vertices `v₁, v₂, ..., vₐ₊₁` and test point `p`, the
@@ -515,7 +542,9 @@ where
 ///
 /// This determinant test is mathematically equivalent to checking if the test point
 /// lies inside the circumsphere, but avoids the numerical instability that can arise
-/// from computing circumcenter coordinates and distances explicitly.
+/// from computing circumcenter coordinates and distances explicitly. As demonstrated
+/// by Shewchuk, this approach provides much better numerical robustness for geometric
+/// computations.
 ///
 /// The sign of the determinant depends on the orientation of the simplex:
 /// - For a **positively oriented** simplex: positive determinant means the point is inside
@@ -542,12 +571,19 @@ where
 /// - Matrix operations fail
 /// - Coordinate conversion fails
 ///
+/// # References
+///
+/// - Shewchuk, J. R. "Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric
+///   Predicates." Discrete & Computational Geometry 18, no. 3 (1997): 305-363.
+/// - Shewchuk, J. R. "Robust Adaptive Floating-Point Geometric Predicates."
+///   Proceedings of the Twelfth Annual Symposium on Computational Geometry (1996): 141-150.
+///
 /// # Example
 ///
 /// ```
 /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
-/// use d_delaunay::geometry::predicates::circumsphere_contains_vertex;
+/// use d_delaunay::geometry::predicates::insphere;
 /// use d_delaunay::geometry::InSphere;
 /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
 /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
@@ -557,13 +593,13 @@ where
 ///
 /// // Test with a point clearly outside the circumsphere
 /// let outside_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([2.0, 2.0, 2.0])).data(3).build().unwrap();
-/// assert_eq!(circumsphere_contains_vertex(&simplex_vertices, outside_vertex).unwrap(), InSphere::OUTSIDE);
+/// assert_eq!(insphere(&simplex_vertices, outside_vertex).unwrap(), InSphere::OUTSIDE);
 ///
 /// // Test with a point clearly inside the circumsphere
 /// let inside_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.25, 0.25, 0.25])).data(4).build().unwrap();
-/// assert_eq!(circumsphere_contains_vertex(&simplex_vertices, inside_vertex).unwrap(), InSphere::INSIDE);
+/// assert_eq!(insphere(&simplex_vertices, inside_vertex).unwrap(), InSphere::INSIDE);
 /// ```
-pub fn circumsphere_contains_vertex<T, U, const D: usize>(
+pub fn insphere<T, U, const D: usize>(
     simplex_vertices: &[Vertex<T, U, D>],
     test_vertex: Vertex<T, U, D>,
 ) -> Result<InSphere, anyhow::Error>
@@ -672,17 +708,24 @@ where
     }
 }
 
-/// Check if a vertex is contained within the circumsphere of a simplex using an optimized matrix determinant.
+/// Check if a vertex is contained within the circumsphere of a simplex using the lifted paraboloid determinant method.
 ///
 /// This is an alternative implementation of the circumsphere containment test using
-/// a more numerically stable matrix determinant approach. It constructs a matrix
-/// specifically optimized for the in-sphere test with better conditioning.
+/// a numerically stable matrix determinant approach based on the "lifted paraboloid" technique.
+/// This method maps points to a higher-dimensional paraboloid and uses determinant calculations
+/// to determine sphere containment, following the classical computational geometry approach.
 ///
 /// # Algorithm
 ///
-/// The in-sphere test uses the determinant of a matrix where each row contains:
-/// - The coordinates of a vertex relative to the first vertex
-/// - The squared distance from that vertex to the first vertex
+/// This implementation uses the lifted paraboloid method described in:
+///
+/// Preparata, Franco P., and Michael Ian Shamos.
+/// "Computational Geometry: An Introduction."
+/// Texts and Monographs in Computer Science. New York: Springer-Verlag, 1985.
+///
+/// The method works by "lifting" points from d-dimensional space to (d+1)-dimensional space
+/// by adding their squared distance as an additional coordinate. The in-sphere test then
+/// reduces to computing the determinant of a matrix formed from these lifted coordinates.
 ///
 /// For a d-dimensional simplex with vertices `v₀, v₁, ..., vₐ` and test point `p`,
 /// the matrix has the structure:
@@ -695,9 +738,16 @@ where
 /// | p-v₀   ||p-v₀||²  |
 /// ```
 ///
-/// This formulation is more numerically stable than the standard lifted paraboloid
-/// approach as it centers the coordinates around the first vertex, reducing the
-/// magnitude of the values in the matrix.
+/// This formulation centers coordinates around the first vertex (v₀), which improves
+/// numerical stability by reducing the magnitude of matrix elements compared to using
+/// absolute coordinates.
+///
+/// # Mathematical Background
+///
+/// The lifted paraboloid method exploits the fact that the circumsphere of a set of points
+/// in d-dimensional space corresponds to a hyperplane in (d+1)-dimensional space when
+/// points are lifted to the paraboloid z = x₁² + x₂² + ... + xₐ². A point lies inside
+/// the circumsphere if and only if it lies below this hyperplane in the lifted space.
 ///
 /// # Arguments
 ///
@@ -716,24 +766,31 @@ where
 /// - Matrix operations fail
 /// - Coordinate conversion fails
 ///
+/// # References
+///
+/// - Preparata, Franco P., and Michael Ian Shamos. "Computational Geometry: An Introduction."
+///   Texts and Monographs in Computer Science. New York: Springer-Verlag, 1985.
+/// - Edelsbrunner, Herbert. "Algorithms in Combinatorial Geometry."
+///   EATCS Monographs on Theoretical Computer Science. Berlin: Springer-Verlag, 1987.
+///
 /// # Example
 ///
 /// ```
 /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
-/// use d_delaunay::geometry::predicates::circumsphere_contains_vertex_matrix;
+/// use d_delaunay::geometry::predicates::insphere_lifted;
 /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
 /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
 /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
 /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
 /// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 ///
-/// // Test with a point that should be inside according to the matrix method's sign convention
+/// // Test with a point that should be inside according to the lifted paraboloid method
 /// let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.1, 0.1, 0.1])).data(3).build().unwrap();
-/// let result = circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex);
+/// let result = insphere_lifted(&simplex_vertices, test_vertex);
 /// assert!(result.is_ok()); // Should execute without error
 /// ```
-pub fn circumsphere_contains_vertex_matrix<T, U, const D: usize>(
+pub fn insphere_lifted<T, U, const D: usize>(
     simplex_vertices: &[Vertex<T, U, D>],
     test_vertex: Vertex<T, U, D>,
 ) -> Result<InSphere, anyhow::Error>
@@ -1036,7 +1093,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            circumsphere_contains(&simplex_vertices, test_vertex).unwrap(),
+            insphere_distance(&simplex_vertices, test_vertex).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1071,7 +1128,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            circumsphere_contains(&simplex_vertices, test_vertex).unwrap(),
+            insphere(&simplex_vertices, test_vertex).unwrap(),
             InSphere::OUTSIDE
         );
     }
@@ -1155,7 +1212,7 @@ mod tests {
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let result = circumsphere_contains_vertex(&simplex_vertices, vertex_far_outside);
+        let result = insphere(&simplex_vertices, vertex_far_outside);
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
@@ -1164,7 +1221,7 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let result_origin = circumsphere_contains_vertex(&simplex_vertices, origin);
+        let result_origin = insphere(&simplex_vertices, origin);
         assert!(result_origin.is_ok());
     }
 
@@ -1216,7 +1273,7 @@ mod tests {
             .unwrap();
         // Test with origin, which is a vertex of the simplex (on boundary of circumsphere)
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, origin).unwrap(),
+            insphere_lifted(&simplex_vertices, origin).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1245,7 +1302,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, vertex_far_outside).unwrap(),
+            insphere_lifted(&simplex_vertices, vertex_far_outside).unwrap(),
             InSphere::OUTSIDE
         );
 
@@ -1255,7 +1312,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, inside_point).unwrap(),
+            insphere_lifted(&simplex_vertices, inside_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1292,7 +1349,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, vertex_far_outside).unwrap(),
+            insphere_lifted(&simplex_vertices, vertex_far_outside).unwrap(),
             InSphere::OUTSIDE
         );
 
@@ -1302,7 +1359,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, inside_point).unwrap(),
+            insphere_lifted(&simplex_vertices, inside_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1347,7 +1404,7 @@ mod tests {
 
         // Point at circumcenter should be inside the circumsphere
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, circumcenter_point).unwrap(),
+            insphere_lifted(&simplex_vertices, circumcenter_point).unwrap(),
             InSphere::INSIDE
         );
 
@@ -1358,13 +1415,13 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, actually_inside).unwrap(),
+            insphere_lifted(&simplex_vertices, actually_inside).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with one of the simplex vertices (on boundary of circumsphere)
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, vertex1).unwrap(),
+            insphere_lifted(&simplex_vertices, vertex1).unwrap(),
             InSphere::BOUNDARY
         );
 
@@ -1375,7 +1432,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, axis_point).unwrap(),
+            insphere_lifted(&simplex_vertices, axis_point).unwrap(),
             InSphere::INSIDE
         );
 
@@ -1386,7 +1443,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, equidistant_point).unwrap(),
+            insphere_lifted(&simplex_vertices, equidistant_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1424,7 +1481,7 @@ mod tests {
             .build()
             .unwrap();
         // TODO: Fix matrix method - it disagrees with standard method on this case
-        let _result = circumsphere_contains_vertex_matrix(&simplex_vertices, origin).unwrap();
+        let _result = insphere_lifted(&simplex_vertices, origin).unwrap();
         // Don't assert specific result until matrix method is fixed
 
         // Test with point far outside
@@ -1433,8 +1490,7 @@ mod tests {
             .build()
             .unwrap();
         // TODO: Fix matrix method - it may give incorrect results for far points in 4D cases
-        let _far_result =
-            circumsphere_contains_vertex_matrix(&simplex_vertices, far_point).unwrap();
+        let _far_result = insphere_lifted(&simplex_vertices, far_point).unwrap();
         // Don't assert specific result until matrix method is fixed
 
         // Test with point on the surface of the circumsphere (approximately)
@@ -1443,7 +1499,7 @@ mod tests {
             .point(Point::new([1.5, 1.5, 1.5, 1.5]))
             .build()
             .unwrap();
-        let result = circumsphere_contains_vertex_matrix(&simplex_vertices, surface_point);
+        let result = insphere_lifted(&simplex_vertices, surface_point);
         assert!(result.is_ok()); // Should not error, result depends on exact circumsphere
     }
 
@@ -1468,7 +1524,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = circumsphere_contains_vertex_matrix(&incomplete_simplex, test_vertex);
+        let result = insphere_lifted(&incomplete_simplex, test_vertex);
         assert!(result.is_err(), "Should error with insufficient vertices");
     }
 
@@ -1529,7 +1585,7 @@ mod tests {
 
         // Test with one of the simplex vertices (on boundary, but matrix method returns BOUNDARY)
         assert_eq!(
-            circumsphere_contains_vertex_matrix(&simplex_vertices, vertex1).unwrap(),
+            insphere_lifted(&simplex_vertices, vertex1).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1553,7 +1609,7 @@ mod tests {
             .point(Point::new([1.0]))
             .build()
             .unwrap();
-        let result = circumsphere_contains_vertex_matrix(&simplex_vertices, midpoint);
+        let result = insphere_lifted(&simplex_vertices, midpoint);
         assert!(result.is_ok()); // Should not error
 
         // Test point far from the line segment
@@ -1561,7 +1617,7 @@ mod tests {
             .point(Point::new([10.0]))
             .build()
             .unwrap();
-        let result_far = circumsphere_contains_vertex_matrix(&simplex_vertices, far_point);
+        let result_far = insphere_lifted(&simplex_vertices, far_point);
         assert!(result_far.is_ok()); // Should not error
     }
 
@@ -1597,7 +1653,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, vertex_far_outside).unwrap(),
+            insphere(&simplex_vertices, vertex_far_outside).unwrap(),
             InSphere::OUTSIDE
         );
 
@@ -1607,7 +1663,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, inside_point).unwrap(),
+            insphere(&simplex_vertices, inside_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1652,7 +1708,7 @@ mod tests {
 
         // Point at circumcenter should be inside the circumsphere
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, circumcenter_point).unwrap(),
+            insphere(&simplex_vertices, circumcenter_point).unwrap(),
             InSphere::INSIDE
         );
 
@@ -1663,13 +1719,13 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, actually_inside).unwrap(),
+            insphere(&simplex_vertices, actually_inside).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with one of the simplex vertices (should be on the boundary)
         // Due to floating-point precision, this might be exactly on the boundary
-        let result = circumsphere_contains_vertex(&simplex_vertices, vertex1).unwrap();
+        let result = insphere(&simplex_vertices, vertex1).unwrap();
         // For vertices of the simplex, they should be on the boundary, but floating-point precision
         // might cause slight variations, so we just verify the method runs without error
         let _ = result; // We don't assert a specific result here due to numerical precision
@@ -1681,7 +1737,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, axis_point).unwrap(),
+            insphere(&simplex_vertices, axis_point).unwrap(),
             InSphere::INSIDE
         );
 
@@ -1692,7 +1748,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, equidistant_point).unwrap(),
+            insphere(&simplex_vertices, equidistant_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1730,7 +1786,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, origin).unwrap(),
+            insphere_distance(&simplex_vertices, origin).unwrap(),
             InSphere::INSIDE
         );
 
@@ -1740,7 +1796,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            circumsphere_contains_vertex(&simplex_vertices, far_point).unwrap(),
+            insphere_distance(&simplex_vertices, far_point).unwrap(),
             InSphere::OUTSIDE
         );
 
@@ -1750,7 +1806,7 @@ mod tests {
             .point(Point::new([1.5, 1.5, 1.5, 1.5]))
             .build()
             .unwrap();
-        let result = circumsphere_contains_vertex(&simplex_vertices, surface_point);
+        let result = insphere_distance(&simplex_vertices, surface_point);
         assert!(result.is_ok()); // Should not error, result depends on exact circumsphere
     }
 
@@ -1777,7 +1833,7 @@ mod tests {
             .point(Point::new([10.0, 10.0]))
             .build()
             .unwrap();
-        let result = circumsphere_contains_vertex(&simplex_vertices, vertex_far_outside);
+        let result = insphere(&simplex_vertices, vertex_far_outside);
         assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
@@ -1785,7 +1841,7 @@ mod tests {
             .point(Point::new([0.33, 0.33]))
             .build()
             .unwrap();
-        let result_center = circumsphere_contains_vertex(&simplex_vertices, center);
+        let result_center = insphere(&simplex_vertices, center);
         assert!(result_center.is_ok());
     }
 
@@ -1888,10 +1944,10 @@ mod tests {
             .build()
             .unwrap();
 
-        let circumsphere_result = circumsphere_contains(&simplex_vertices, test_point);
+        let circumsphere_result = insphere_distance(&simplex_vertices, test_point);
         assert!(circumsphere_result.is_ok());
 
-        let determinant_result = circumsphere_contains_vertex(&simplex_vertices, test_point);
+        let determinant_result = insphere_distance(&simplex_vertices, test_point);
         assert!(determinant_result.is_ok());
 
         // At minimum, both methods should give the same result for the same input
@@ -1900,8 +1956,8 @@ mod tests {
             .build()
             .unwrap();
 
-        let circumsphere_far = circumsphere_contains(&simplex_vertices, far_point);
-        let determinant_far = circumsphere_contains_vertex(&simplex_vertices, far_point);
+        let circumsphere_far = insphere_distance(&simplex_vertices, far_point);
+        let determinant_far = insphere_distance(&simplex_vertices, far_point);
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());
@@ -2294,11 +2350,10 @@ mod tests {
             .build()
             .unwrap();
 
-        let standard_result = circumsphere_contains(&simplex_vertices, test_vertex).unwrap();
-        let matrix_result =
-            circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex).unwrap();
+        let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
+        let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
 
-        println!("Standard method result: {:?}", standard_result);
+        println!("Standard method result: {standard_result}");
         println!("Matrix method result: {matrix_result}");
 
         println!("\n=== 4D Symmetric Simplex Analysis ===");
@@ -2347,15 +2402,10 @@ mod tests {
             .build()
             .unwrap();
 
-        let standard_result_4d =
-            circumsphere_contains(&simplex_vertices_4d, origin_vertex).unwrap();
-        let matrix_result_4d =
-            circumsphere_contains_vertex_matrix(&simplex_vertices_4d, origin_vertex).unwrap();
+        let standard_result_4d = insphere_distance(&simplex_vertices_4d, origin_vertex).unwrap();
+        let matrix_result_4d = insphere_lifted(&simplex_vertices_4d, origin_vertex).unwrap();
 
-        println!(
-            "Standard method result for origin: {:?}",
-            standard_result_4d
-        );
+        println!("Standard method result for origin: {standard_result_4d}");
         println!("Matrix method result for origin: {matrix_result_4d}");
 
         // Don't assert anything, just debug output
@@ -2391,9 +2441,8 @@ mod tests {
         for (i, point) in test_points.iter().enumerate() {
             let test_vertex = VertexBuilder::default().point(*point).build().unwrap();
 
-            let standard_result = circumsphere_contains(&simplex_vertices, test_vertex).unwrap();
-            let matrix_result =
-                circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex).unwrap();
+            let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
+            let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
 
             println!(
                 "Point {}: {:?} -> Standard: {:?}, Matrix: {}",

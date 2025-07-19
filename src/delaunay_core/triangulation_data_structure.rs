@@ -986,10 +986,8 @@ where
 
         // Find cells whose circumsphere contains the vertex
         for (cell_id, cell) in &self.cells {
-            let contains = crate::geometry::predicates::circumsphere_contains_vertex(
-                cell.vertices(),
-                *vertex,
-            )?;
+            let vertices_vector: Vec<_> = cell.vertices().clone();
+            let contains = crate::geometry::predicates::insphere(&vertices_vector, *vertex)?;
             if matches!(contains, crate::geometry::InSphere::INSIDE) {
                 bad_cells.push(*cell_id);
             }

@@ -1735,10 +1735,7 @@ mod tests {
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let result = crate::geometry::predicates::circumsphere_contains_vertex(
-            &cell.vertices,
-            vertex_far_outside,
-        );
+        let result = crate::geometry::predicates::insphere(&cell.vertices, vertex_far_outside);
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
@@ -1747,8 +1744,7 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let result_origin =
-            crate::geometry::predicates::circumsphere_contains_vertex(&cell.vertices, origin);
+        let result_origin = crate::geometry::predicates::insphere(&cell.vertices, origin);
         assert!(result_origin.is_ok());
     }
 
@@ -1778,10 +1774,7 @@ mod tests {
             .point(Point::new([10.0, 10.0]))
             .build()
             .unwrap();
-        let result = crate::geometry::predicates::circumsphere_contains_vertex(
-            &cell.vertices,
-            vertex_far_outside,
-        );
+        let result = crate::geometry::predicates::insphere(&cell.vertices, vertex_far_outside);
         assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
@@ -1789,8 +1782,7 @@ mod tests {
             .point(Point::new([0.33, 0.33]))
             .build()
             .unwrap();
-        let result_center =
-            crate::geometry::predicates::circumsphere_contains_vertex(&cell.vertices, center);
+        let result_center = crate::geometry::predicates::insphere(&cell.vertices, center);
         assert!(result_center.is_ok());
     }
 
@@ -2079,11 +2071,10 @@ mod tests {
             .unwrap();
 
         let circumsphere_result =
-            crate::geometry::predicates::circumsphere_contains(&cell.vertices, test_point);
+            crate::geometry::predicates::insphere_distance(&cell.vertices, test_point);
         assert!(circumsphere_result.is_ok());
 
-        let determinant_result =
-            crate::geometry::predicates::circumsphere_contains_vertex(&cell.vertices, test_point);
+        let determinant_result = crate::geometry::predicates::insphere(&cell.vertices, test_point);
         assert!(determinant_result.is_ok());
 
         // At minimum, both methods should give the same result for the same input
@@ -2093,9 +2084,8 @@ mod tests {
             .unwrap();
 
         let circumsphere_far =
-            crate::geometry::predicates::circumsphere_contains(&cell.vertices, far_point);
-        let determinant_far =
-            crate::geometry::predicates::circumsphere_contains_vertex(&cell.vertices, far_point);
+            crate::geometry::predicates::insphere_distance(&cell.vertices, far_point);
+        let determinant_far = crate::geometry::predicates::insphere(&cell.vertices, far_point);
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());
