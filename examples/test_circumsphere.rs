@@ -49,6 +49,7 @@
 
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 use d_delaunay::geometry::Point;
+use d_delaunay::geometry::predicates::{InSphere, Orientation};
 use d_delaunay::geometry::predicates::{
     circumcenter, circumradius, circumsphere_contains, circumsphere_contains_vertex,
     circumsphere_contains_vertex_matrix, simplex_orientation,
@@ -212,20 +213,30 @@ fn test_4d_circumsphere_methods() {
                         println!("  Expected inside: {}", distance_to_center <= radius);
                         println!(
                             "  Standard method: {:?}",
-                            result_standard
-                                .as_ref()
-                                .map(|b| if *b { "INSIDE" } else { "OUTSIDE" })
+                            result_standard.as_ref().map(|s| match s {
+                                InSphere::INSIDE => "INSIDE",
+                                InSphere::BOUNDARY => "BOUNDARY",
+                                InSphere::OUTSIDE => "OUTSIDE",
+                            })
                         );
                         println!(
                             "  Matrix method: {:?}",
-                            result_matrix
-                                .as_ref()
-                                .map(|b| if *b { "INSIDE" } else { "OUTSIDE" })
+                            result_matrix.as_ref().map(|s| match s {
+                                InSphere::INSIDE => "INSIDE",
+                                InSphere::BOUNDARY => "BOUNDARY",
+                                InSphere::OUTSIDE => "OUTSIDE",
+                            })
                         );
 
                         // Check if methods agree
                         if result_standard.is_ok() && result_matrix.is_ok() {
-                            let agree = result_standard.unwrap() == result_matrix.unwrap();
+                            // Note: We can't directly compare InSphere enum with bool
+                            // Convert both to simple inside/outside comparison
+                            let standard_inside =
+                                matches!(result_standard.as_ref().unwrap(), InSphere::INSIDE);
+                            let matrix_inside =
+                                matches!(result_matrix.as_ref().unwrap(), InSphere::INSIDE);
+                            let agree = standard_inside == matrix_inside;
                             println!("  Methods agree: {agree}");
                             if !agree {
                                 println!("  *** DISAGREEMENT DETECTED ***");
@@ -342,15 +353,17 @@ fn test_circumsphere_containment() {
             coords[1],
             coords[2],
             coords[3],
-            if result_determinant.unwrap_or(false) {
-                "INSIDE"
-            } else {
-                "OUTSIDE"
+            match result_determinant {
+                Ok(InSphere::INSIDE) => "INSIDE",
+                Ok(InSphere::BOUNDARY) => "BOUNDARY",
+                Ok(InSphere::OUTSIDE) => "OUTSIDE",
+                Err(_) => "ERROR",
             },
-            if result_distance.unwrap_or(false) {
-                "INSIDE"
-            } else {
-                "OUTSIDE"
+            match result_distance {
+                Ok(InSphere::INSIDE) => "INSIDE",
+                Ok(InSphere::BOUNDARY) => "BOUNDARY",
+                Ok(InSphere::OUTSIDE) => "OUTSIDE",
+                Err(_) => "ERROR",
             }
         );
     }
@@ -404,15 +417,17 @@ fn test_circumsphere_containment() {
             coords[1],
             coords[2],
             coords[3],
-            if result_determinant.unwrap_or(false) {
-                "INSIDE"
-            } else {
-                "OUTSIDE"
+            match result_determinant {
+                Ok(InSphere::INSIDE) => "INSIDE",
+                Ok(InSphere::BOUNDARY) => "BOUNDARY",
+                Ok(InSphere::OUTSIDE) => "OUTSIDE",
+                Err(_) => "ERROR",
             },
-            if result_distance.unwrap_or(false) {
-                "INSIDE"
-            } else {
-                "OUTSIDE"
+            match result_distance {
+                Ok(InSphere::INSIDE) => "INSIDE",
+                Ok(InSphere::BOUNDARY) => "BOUNDARY",
+                Ok(InSphere::OUTSIDE) => "OUTSIDE",
+                Err(_) => "ERROR",
             }
         );
     }
@@ -431,10 +446,11 @@ fn test_circumsphere_containment() {
             coords[1],
             coords[2],
             coords[3],
-            if result.unwrap_or(false) {
-                "INSIDE"
-            } else {
-                "OUTSIDE"
+            match result {
+                Ok(InSphere::INSIDE) => "INSIDE",
+                Ok(InSphere::BOUNDARY) => "BOUNDARY",
+                Ok(InSphere::OUTSIDE) => "OUTSIDE",
+                Err(_) => "ERROR",
             }
         );
     }
@@ -482,10 +498,11 @@ fn test_circumsphere_containment() {
             coords[1],
             coords[2],
             coords[3],
-            if result.unwrap_or(false) {
-                "INSIDE"
-            } else {
-                "OUTSIDE"
+            match result {
+                Ok(InSphere::INSIDE) => "INSIDE",
+                Ok(InSphere::BOUNDARY) => "BOUNDARY",
+                Ok(InSphere::OUTSIDE) => "OUTSIDE",
+                Err(_) => "ERROR",
             }
         );
     }
@@ -504,10 +521,11 @@ fn test_simplex_orientation() {
     let orientation_original = simplex_orientation(&vertices);
     println!(
         "Original 4D simplex orientation: {}",
-        if orientation_original.unwrap_or(false) {
-            "POSITIVE"
-        } else {
-            "NEGATIVE"
+        match orientation_original {
+            Ok(Orientation::POSITIVE) => "POSITIVE",
+            Ok(Orientation::NEGATIVE) => "NEGATIVE",
+            Ok(Orientation::DEGENERATE) => "DEGENERATE",
+            Err(_) => "ERROR",
         }
     );
 
@@ -517,10 +535,11 @@ fn test_simplex_orientation() {
     let orientation_negative = simplex_orientation(&vertices_negative);
     println!(
         "Negatively oriented 4D simplex: {}",
-        if orientation_negative.unwrap_or(false) {
-            "POSITIVE"
-        } else {
-            "NEGATIVE"
+        match orientation_negative {
+            Ok(Orientation::POSITIVE) => "POSITIVE",
+            Ok(Orientation::NEGATIVE) => "NEGATIVE",
+            Ok(Orientation::DEGENERATE) => "DEGENERATE",
+            Err(_) => "ERROR",
         }
     );
 
@@ -551,10 +570,11 @@ fn test_simplex_orientation() {
     let orientation_3d = simplex_orientation(&tetrahedron_vertices);
     println!(
         "3D tetrahedron orientation: {}",
-        if orientation_3d.unwrap_or(false) {
-            "POSITIVE"
-        } else {
-            "NEGATIVE"
+        match orientation_3d {
+            Ok(Orientation::POSITIVE) => "POSITIVE",
+            Ok(Orientation::NEGATIVE) => "NEGATIVE",
+            Ok(Orientation::DEGENERATE) => "DEGENERATE",
+            Err(_) => "ERROR",
         }
     );
 
@@ -580,10 +600,11 @@ fn test_simplex_orientation() {
     let orientation_2d = simplex_orientation(&triangle_vertices);
     println!(
         "2D triangle orientation: {}",
-        if orientation_2d.unwrap_or(false) {
-            "POSITIVE"
-        } else {
-            "NEGATIVE"
+        match orientation_2d {
+            Ok(Orientation::POSITIVE) => "POSITIVE",
+            Ok(Orientation::NEGATIVE) => "NEGATIVE",
+            Ok(Orientation::DEGENERATE) => "DEGENERATE",
+            Err(_) => "ERROR",
         }
     );
 
@@ -609,10 +630,11 @@ fn test_simplex_orientation() {
     let orientation_2d_reversed = simplex_orientation(&triangle_vertices_reversed);
     println!(
         "2D triangle (reversed order): {}",
-        if orientation_2d_reversed.unwrap_or(false) {
-            "POSITIVE"
-        } else {
-            "NEGATIVE"
+        match orientation_2d_reversed {
+            Ok(Orientation::POSITIVE) => "POSITIVE",
+            Ok(Orientation::NEGATIVE) => "NEGATIVE",
+            Ok(Orientation::DEGENERATE) => "DEGENERATE",
+            Err(_) => "ERROR",
         }
     );
 
@@ -638,10 +660,11 @@ fn test_simplex_orientation() {
     let orientation_collinear = simplex_orientation(&collinear_vertices);
     println!(
         "Collinear 2D points: {}",
-        if orientation_collinear.unwrap_or(false) {
-            "POSITIVE"
-        } else {
-            "NEGATIVE/DEGENERATE"
+        match orientation_collinear {
+            Ok(Orientation::POSITIVE) => "POSITIVE",
+            Ok(Orientation::NEGATIVE) => "NEGATIVE",
+            Ok(Orientation::DEGENERATE) => "DEGENERATE",
+            Err(_) => "ERROR",
         }
     );
 }
@@ -724,18 +747,20 @@ fn demonstrate_orientation_impact_on_circumsphere() {
 
     println!(
         "Point [0.25, 0.25, 0.25, 0.25] in positive 4D simplex: {}",
-        if inside_positive.unwrap_or(false) {
-            "INSIDE"
-        } else {
-            "OUTSIDE"
+        match inside_positive {
+            Ok(InSphere::INSIDE) => "INSIDE",
+            Ok(InSphere::BOUNDARY) => "BOUNDARY",
+            Ok(InSphere::OUTSIDE) => "OUTSIDE",
+            Err(_) => "ERROR",
         }
     );
     println!(
         "Point [0.25, 0.25, 0.25, 0.25] in negative 4D simplex: {}",
-        if inside_negative.unwrap_or(false) {
-            "INSIDE"
-        } else {
-            "OUTSIDE"
+        match inside_negative {
+            Ok(InSphere::INSIDE) => "INSIDE",
+            Ok(InSphere::BOUNDARY) => "BOUNDARY",
+            Ok(InSphere::OUTSIDE) => "OUTSIDE",
+            Err(_) => "ERROR",
         }
     );
 
@@ -847,8 +872,8 @@ fn test_circumsphere_methods(
         Ok(standard_method_3d) => {
             match circumsphere_contains_vertex_matrix(simplex_vertices, test_vertex) {
                 Ok(matrix_method_3d) => {
-                    println!("Standard method result: {standard_method_3d}");
-                    println!("Matrix method result: {matrix_method_3d}");
+                    println!("Standard method result: {:?}", standard_method_3d);
+                    println!("Matrix method result: {:?}", matrix_method_3d);
                 }
                 Err(e) => println!("Matrix method error: {e}"),
             }
@@ -865,8 +890,8 @@ fn test_boundary_vertex_case(simplex_vertices: &[Vertex<f64, i32, 3>]) {
         Ok(standard_vertex) => {
             match circumsphere_contains_vertex_matrix(simplex_vertices, vertex1) {
                 Ok(matrix_vertex) => {
-                    println!("Standard method for vertex1: {standard_vertex}");
-                    println!("Matrix method for vertex1: {matrix_vertex}");
+                    println!("Standard method for vertex1: {:?}", standard_vertex);
+                    println!("Matrix method for vertex1: {:?}", matrix_vertex);
                 }
                 Err(e) => println!("Matrix method error for vertex1: {e}"),
             }
@@ -998,18 +1023,15 @@ fn test_3d_matrix_analysis() {
     // Check simplex orientation
     match simplex_orientation(&simplex_vertices) {
         Ok(is_positive_orientation) => {
+            let is_positive = matches!(is_positive_orientation, Orientation::POSITIVE);
             println!(
                 "Simplex orientation: {} (positive: {})",
-                if is_positive_orientation {
-                    "POSITIVE"
-                } else {
-                    "NEGATIVE"
-                },
-                is_positive_orientation
+                if is_positive { "POSITIVE" } else { "NEGATIVE" },
+                is_positive
             );
 
             // Apply the sign interpretation from the matrix method
-            let matrix_result = if is_positive_orientation {
+            let matrix_result = if is_positive {
                 det < 0.0 // For positive orientation, negative det means inside
             } else {
                 det > 0.0 // For negative orientation, positive det means inside  
@@ -1052,7 +1074,7 @@ fn test_3d_matrix_analysis() {
                                         Ok(matrix_method_result) => {
                                             println!();
                                             println!("Method comparison:");
-                                            println!("  Standard method: {standard_result}");
+                                            println!("  Standard method: {:?}", standard_result);
                                             println!("  Matrix method: {matrix_method_result}");
                                             println!(
                                                 "  Geometric truth: {}",
@@ -1060,7 +1082,9 @@ fn test_3d_matrix_analysis() {
                                             );
 
                                             println!();
-                                            if standard_result == (distance_to_test < circumradius)
+                                            let standard_inside =
+                                                matches!(standard_result, InSphere::INSIDE);
+                                            if standard_inside == (distance_to_test < circumradius)
                                             {
                                                 println!(
                                                     "✓ Standard method matches geometric truth"
@@ -1071,10 +1095,13 @@ fn test_3d_matrix_analysis() {
                                                 );
                                             }
 
-                                            let matrix_agrees = matrix_method_result
-                                                == (distance_to_test < circumradius);
-                                            let methods_agree =
-                                                standard_result == matrix_method_result;
+                                            let matrix_inside =
+                                                matches!(matrix_method_result, InSphere::INSIDE);
+                                            let matrix_agrees =
+                                                matrix_inside == (distance_to_test < circumradius);
+                                            let standard_inside =
+                                                matches!(standard_result, InSphere::INSIDE);
+                                            let methods_agree = standard_inside == matrix_inside;
 
                                             if matrix_agrees {
                                                 println!("✓ Matrix method matches geometric truth");
@@ -1176,8 +1203,8 @@ fn debug_3d_circumsphere_properties() {
     let matrix_result =
         circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex).unwrap();
 
-    println!("Standard method result: {standard_result}");
-    println!("Matrix method result: {matrix_result}");
+    println!("Standard method result: {:?}", standard_result);
+    println!("Matrix method result: {:?}", matrix_result);
 }
 
 /// Debug 4D circumsphere properties analysis
@@ -1231,8 +1258,11 @@ fn debug_4d_circumsphere_properties() {
     let matrix_result_4d =
         circumsphere_contains_vertex_matrix(&simplex_vertices_4d, origin_vertex).unwrap();
 
-    println!("Standard method result for origin: {standard_result_4d}");
-    println!("Matrix method result for origin: {matrix_result_4d}");
+    println!(
+        "Standard method result for origin: {:?}",
+        standard_result_4d
+    );
+    println!("Matrix method result for origin: {:?}", matrix_result_4d);
 }
 
 /// Compare results between standard and matrix methods
@@ -1271,8 +1301,10 @@ fn compare_circumsphere_methods() {
             circumsphere_contains_vertex_matrix(&simplex_vertices, test_vertex).unwrap();
 
         println!(
-            "Point {i}: {:?} -> Standard: {standard_result}, Matrix: {matrix_result}",
-            point.coordinates()
+            "Point {i}: {:?} -> Standard: {:?}, Matrix: {:?}",
+            point.coordinates(),
+            standard_result,
+            matrix_result
         );
     }
 }
