@@ -38,11 +38,32 @@ The library includes comprehensive performance benchmarks for circumsphere conta
 - **insphere_distance**: Slowest but most transparent for educational use
 
 Run benchmarks with:
+
 ```bash
 cargo bench --bench circumsphere_containment
 ```
 
 See [benches/README.md](benches/README.md) for detailed performance results and analysis.
+
+## References
+
+The library's geometric predicates and algorithms are based on established computational geometry literature:
+
+### Circumcenter and Circumradius Calculations
+
+- Lévy, Bruno, and Yang Liu. "Lp Centroidal Voronoi Tessellation and Its Applications." *ACM Transactions on Graphics* 29, no. 4 (July 26, 2010):
+  119:1-119:11. DOI: [10.1145/1778765.1778856](https://doi.org/10.1145/1778765.1778856)
+
+### Robust Geometric Predicates
+
+- Shewchuk, J. R. "Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates." *Discrete & Computational Geometry* 18,
+  no. 3 (1997): 305-363. DOI: [10.1007/PL00009321](https://doi.org/10.1007/PL00009321)
+- Shewchuk, J. R. "Robust Adaptive Floating-Point Geometric Predicates." *Proceedings of the Twelfth Annual Symposium on Computational Geometry* (1996): 141-150.
+
+### Lifted Paraboloid Method
+
+- Preparata, Franco P., and Michael Ian Shamos. "Computational Geometry: An Introduction." Texts and Monographs in Computer Science. New York: Springer-Verlag, 1985.
+- Edelsbrunner, Herbert. "Algorithms in Combinatorial Geometry." EATCS Monographs on Theoretical Computer Science. Berlin: Springer-Verlag, 1987.
 
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/
