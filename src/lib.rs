@@ -35,9 +35,18 @@ pub mod geometry {
     pub mod matrix;
     pub mod point;
     pub mod predicates;
+    /// Traits module containing reusable trait definitions.
+    ///
+    /// This module contains common traits used throughout the geometry system,
+    /// providing interfaces for validation and computation on geometric types.
+    pub mod traits {
+        pub mod finitecheck;
+        pub use finitecheck::*;
+    }
     pub use matrix::*;
     pub use point::*;
     pub use predicates::*;
+    pub use traits::*;
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.

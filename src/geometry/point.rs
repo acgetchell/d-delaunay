@@ -17,6 +17,7 @@
 
 #![allow(clippy::similar_names)]
 
+use crate::geometry::traits::finitecheck::FiniteCheck;
 use num_traits::{Float, Zero};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -198,28 +199,6 @@ where
         Ok(())
     }
 }
-
-/// Helper trait for checking finiteness of coordinates.
-pub trait FiniteCheck {
-    /// Returns true if the value is finite (not NaN or infinite).
-    fn is_finite_generic(&self) -> bool;
-}
-
-// Unified macro for implementing FiniteCheck
-macro_rules! impl_finite_check {
-    (float: $($t:ty),*) => {
-        $(
-            impl FiniteCheck for $t {
-                #[inline(always)]
-                fn is_finite_generic(&self) -> bool {
-                    self.is_finite()
-                }
-            }
-        )*
-    };
-}
-
-impl_finite_check!(float: f32, f64);
 
 /// Helper trait for hashing individual coordinates for non-hashable types
 /// like f32 and f64.
@@ -1451,31 +1430,6 @@ mod tests {
         assert_ne!(point_f32_nan, point_f32_zero);
         assert_ne!(point_f32_nan, point_f32_neg_zero);
         assert_eq!(point_f32_zero, point_f32_neg_zero);
-    }
-
-    #[test]
-    fn finite_check_trait_coverage() {
-        // Test FiniteCheck trait implementations for all numeric types
-
-        // Test floating point types
-        assert!(1.0f32.is_finite_generic());
-        assert!(1.0f64.is_finite_generic());
-        assert!(!f32::NAN.is_finite_generic());
-        assert!(!f64::NAN.is_finite_generic());
-        assert!(!f32::INFINITY.is_finite_generic());
-        assert!(!f64::INFINITY.is_finite_generic());
-        assert!(!f32::NEG_INFINITY.is_finite_generic());
-        assert!(!f64::NEG_INFINITY.is_finite_generic());
-
-        // Test edge cases for floating point
-        assert!(f32::MAX.is_finite_generic());
-        assert!(f64::MAX.is_finite_generic());
-        assert!(f32::MIN.is_finite_generic());
-        assert!(f64::MIN.is_finite_generic());
-        assert!(f32::MIN_POSITIVE.is_finite_generic());
-        assert!(f64::MIN_POSITIVE.is_finite_generic());
-        assert!(0.0f32.is_finite_generic());
-        assert!((-0.0f64).is_finite_generic());
     }
 
     #[test]

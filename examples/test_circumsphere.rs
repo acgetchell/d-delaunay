@@ -404,7 +404,6 @@ fn test_all_orientations() {
     println!("Orientation tests completed\n");
 }
 
-
 /// Test and compare both 4D circumsphere containment methods
 fn test_4d_circumsphere_methods() {
     println!("=============================================");
@@ -442,7 +441,13 @@ fn test_4d_circumsphere_methods() {
                     ];
 
                     for (coords, description) in test_points {
-                        test_point_generic(vertices.as_slice(), coords, description, &center.coordinates(), radius);
+                        test_point_generic(
+                            vertices.as_slice(),
+                            coords,
+                            description,
+                            &center.coordinates(),
+                            radius,
+                        );
                     }
                 }
                 Err(e) => println!("Error calculating circumradius: {e}"),
@@ -908,9 +913,7 @@ fn setup_3d_matrix_test() -> Setup3DResult {
 }
 
 /// Build and analyze the matrix for the 3D test
-fn build_and_analyze_matrix(
-    simplex_vertices: &[Vertex<f64, i32, 3>],
-) -> (f64, bool) {
+fn build_and_analyze_matrix(simplex_vertices: &[Vertex<f64, i32, 3>]) -> (f64, bool) {
     // Manually build the matrix as in the matrix method
     let mut matrix = zeros(4, 4); // D+1 x D+1 for D=3
 
@@ -1042,15 +1045,13 @@ fn compare_methods_with_geometry(
                     match insphere(simplex_vertices, test_vertex) {
                         Ok(standard_result) => {
                             match insphere_lifted(simplex_vertices, test_vertex) {
-                                Ok(matrix_method_result) => {
-                                    Some((
-                                        distance_to_test,
-                                        circumradius,
-                                        distance_to_test < circumradius,
-                                        standard_result,
-                                        matrix_method_result,
-                                    ))
-                                }
+                                Ok(matrix_method_result) => Some((
+                                    distance_to_test,
+                                    circumradius,
+                                    distance_to_test < circumradius,
+                                    standard_result,
+                                    matrix_method_result,
+                                )),
                                 Err(e) => {
                                     println!("Matrix method error: {e}");
                                     None
@@ -1123,15 +1124,16 @@ fn print_method_comparison_results(
 fn test_3d_matrix_analysis() {
     let (simplex_vertices, test_point, test_vertex) = setup_3d_matrix_test();
     build_and_analyze_matrix(&simplex_vertices);
-    
-    if let Some((_distance_to_test, _circumradius, geometric_truth, standard_result, matrix_method_result)) =
-        compare_methods_with_geometry(&simplex_vertices, test_point, test_vertex)
+
+    if let Some((
+        _distance_to_test,
+        _circumradius,
+        geometric_truth,
+        standard_result,
+        matrix_method_result,
+    )) = compare_methods_with_geometry(&simplex_vertices, test_point, test_vertex)
     {
-        print_method_comparison_results(
-            geometric_truth,
-            standard_result,
-            matrix_method_result,
-        );
+        print_method_comparison_results(geometric_truth, standard_result, matrix_method_result);
     }
 }
 

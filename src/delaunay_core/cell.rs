@@ -7,7 +7,10 @@ use super::{
     utilities::make_uuid,
     vertex::{Vertex, VertexValidationError},
 };
-use crate::geometry::point::{OrderedEq, Point};
+use crate::geometry::{
+    FiniteCheck,
+    point::{HashCoordinate, OrderedEq, Point},
+};
 use na::ComplexField;
 use nalgebra as na;
 use num_traits::Float;
@@ -351,9 +354,9 @@ where
     /// # Type Parameters
     ///
     /// This method requires the coordinate type `T` to implement additional traits:
-    /// - [`FiniteCheck`](super::point::FiniteCheck): Enables checking that all coordinate values are finite
+    /// - [`FiniteCheck`](crate::geometry::FiniteCheck): Enables checking that all coordinate values are finite
     ///   (not infinite or NaN), which is essential for geometric computations.
-    /// - [`HashCoordinate`](super::point::HashCoordinate): Enables hashing of coordinate values,
+    /// - [`HashCoordinate`](crate::geometry::point::HashCoordinate): Enables hashing of coordinate values,
     ///   which is required for detecting duplicate vertices efficiently.
     /// - [`Copy`]: Required for efficient comparison operations.
     ///
@@ -390,7 +393,7 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), CellValidationError>
     where
-        T: crate::geometry::point::FiniteCheck + crate::geometry::point::HashCoordinate + Copy,
+        T: FiniteCheck + HashCoordinate + Copy,
     {
         // Check if all vertices are valid
         for vertex in &self.vertices {
@@ -552,6 +555,9 @@ mod tests {
     use super::*;
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
+    use crate::geometry::predicates::{
+        circumcenter, circumradius, circumradius_with_center, insphere, insphere_distance,
+    };
     use approx::assert_relative_eq;
 
     #[test]
@@ -1585,7 +1591,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        let circumradius = crate::geometry::predicates::circumradius(&cell.vertices).unwrap();
+        let circumradius = circumradius(&cell.vertices).unwrap();
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
@@ -1735,7 +1741,7 @@ mod tests {
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let result = crate::geometry::predicates::insphere(&cell.vertices, vertex_far_outside);
+        let result = insphere(&cell.vertices, vertex_far_outside);
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
@@ -1744,7 +1750,7 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let result_origin = crate::geometry::predicates::insphere(&cell.vertices, origin);
+        let result_origin = insphere(&cell.vertices, origin);
         assert!(result_origin.is_ok());
     }
 
@@ -1774,7 +1780,7 @@ mod tests {
             .point(Point::new([10.0, 10.0]))
             .build()
             .unwrap();
-        let result = crate::geometry::predicates::insphere(&cell.vertices, vertex_far_outside);
+        let result = insphere(&cell.vertices, vertex_far_outside);
         assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
@@ -1782,7 +1788,7 @@ mod tests {
             .point(Point::new([0.33, 0.33]))
             .build()
             .unwrap();
-        let result_center = crate::geometry::predicates::insphere(&cell.vertices, center);
+        let result_center = insphere(&cell.vertices, center);
         assert!(result_center.is_ok());
     }
 
@@ -1811,10 +1817,9 @@ mod tests {
             .build()
             .unwrap();
 
-        let circumcenter = crate::geometry::predicates::circumcenter(&cell.vertices).unwrap();
-        let radius_with_center =
-            crate::geometry::predicates::circumradius_with_center(&cell.vertices, &circumcenter);
-        let radius_direct = crate::geometry::predicates::circumradius(&cell.vertices).unwrap();
+        let circumcenter = circumcenter(&cell.vertices).unwrap();
+        let radius_with_center = circumradius_with_center(&cell.vertices, &circumcenter);
+        let radius_direct = circumradius(&cell.vertices).unwrap();
 
         assert_relative_eq!(radius_with_center.unwrap(), radius_direct, epsilon = 1e-10);
     }
@@ -1853,10 +1858,8 @@ mod tests {
         }
 
         // All vertices should be represented in facets
-        let all_facet_vertices: std::collections::HashSet<_> = facets
-            .iter()
-            .flat_map(super::super::facet::Facet::vertices)
-            .collect();
+        let all_facet_vertices: std::collections::HashSet<_> =
+            facets.iter().flat_map(Facet::vertices).collect();
         assert!(all_facet_vertices.contains(&vertex1));
         assert!(all_facet_vertices.contains(&vertex2));
         assert!(all_facet_vertices.contains(&vertex3));
@@ -2070,11 +2073,10 @@ mod tests {
             .build()
             .unwrap();
 
-        let circumsphere_result =
-            crate::geometry::predicates::insphere_distance(&cell.vertices, test_point);
+        let circumsphere_result = insphere_distance(&cell.vertices, test_point);
         assert!(circumsphere_result.is_ok());
 
-        let determinant_result = crate::geometry::predicates::insphere(&cell.vertices, test_point);
+        let determinant_result = insphere(&cell.vertices, test_point);
         assert!(determinant_result.is_ok());
 
         // At minimum, both methods should give the same result for the same input
@@ -2083,9 +2085,8 @@ mod tests {
             .build()
             .unwrap();
 
-        let circumsphere_far =
-            crate::geometry::predicates::insphere_distance(&cell.vertices, far_point);
-        let determinant_far = crate::geometry::predicates::insphere(&cell.vertices, far_point);
+        let circumsphere_far = insphere_distance(&cell.vertices, far_point);
+        let determinant_far = insphere(&cell.vertices, far_point);
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());

@@ -4,8 +4,12 @@ use super::utilities::make_uuid;
 use crate::geometry::point::{OrderedEq, Point, PointValidationError};
 use num_traits::Float;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::fmt::Debug;
-use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -247,7 +251,7 @@ where
     /// ```
     pub fn is_valid(self) -> Result<(), VertexValidationError>
     where
-        T: crate::geometry::point::FiniteCheck + Copy + Debug,
+        T: crate::geometry::FiniteCheck + Copy + Debug,
     {
         // Check if the point is valid (all coordinates are finite)
         self.point.is_valid()?;
@@ -342,7 +346,7 @@ where
     Point<T, D>: Hash,
 {
     /// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.point.hash(state);
         self.uuid.hash(state);
         self.incident_cell.hash(state);
@@ -611,7 +615,6 @@ mod tests {
     #[test]
     fn vertex_hash() {
         use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
 
         let vertex1: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
