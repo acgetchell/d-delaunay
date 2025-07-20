@@ -6,7 +6,7 @@
 
 use crate::delaunay_core::{utilities::vec_to_array, vertex::Vertex};
 use crate::geometry::matrix::invert;
-use crate::geometry::point::{OrderedEq, Point};
+use crate::geometry::{OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::Float;
@@ -281,9 +281,9 @@ pub enum InSphere {
 impl std::fmt::Display for InSphere {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InSphere::OUTSIDE => write!(f, "OUTSIDE"),
-            InSphere::BOUNDARY => write!(f, "BOUNDARY"),
-            InSphere::INSIDE => write!(f, "INSIDE"),
+            Self::OUTSIDE => write!(f, "OUTSIDE"),
+            Self::BOUNDARY => write!(f, "BOUNDARY"),
+            Self::INSIDE => write!(f, "INSIDE"),
         }
     }
 }
@@ -302,9 +302,9 @@ pub enum Orientation {
 impl std::fmt::Display for Orientation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Orientation::NEGATIVE => write!(f, "NEGATIVE"),
-            Orientation::DEGENERATE => write!(f, "DEGENERATE"),
-            Orientation::POSITIVE => write!(f, "POSITIVE"),
+            Self::NEGATIVE => write!(f, "NEGATIVE"),
+            Self::DEGENERATE => write!(f, "DEGENERATE"),
+            Self::POSITIVE => write!(f, "POSITIVE"),
         }
     }
 }

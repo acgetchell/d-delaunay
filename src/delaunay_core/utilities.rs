@@ -1,5 +1,7 @@
 //! Utility functions
 
+use anyhow::Error;
+use std::array;
 use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
@@ -36,13 +38,11 @@ pub fn make_uuid() -> Uuid {
 /// # use approx::assert_relative_eq;
 /// assert_relative_eq!(array.as_slice(), [1.0, 2.0, 3.0].as_slice(), epsilon = 1e-9);
 /// ```
-pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], anyhow::Error> {
+pub fn vec_to_array<const D: usize>(vec: &[f64]) -> Result<[f64; D], Error> {
     if vec.len() != D {
-        return Err(anyhow::Error::msg(
-            "Vector length does not match array dimension!",
-        ));
+        return Err(Error::msg("Vector length does not match array dimension!"));
     }
-    let array: [f64; D] = std::array::from_fn(|i| vec[i]);
+    let array: [f64; D] = array::from_fn(|i| vec[i]);
 
     Ok(array)
 }

@@ -1,11 +1,18 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::utilities::make_uuid;
-use crate::geometry::point::{OrderedEq, Point, PointValidationError};
+use crate::geometry::{
+    OrderedEq,
+    point::{Point, PointValidationError},
+};
 use num_traits::Float;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::fmt::Debug;
-use std::{cmp::Ordering, collections::HashMap, hash::Hash, option::Option};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -159,7 +166,7 @@ where
     /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
-    pub fn point(&self) -> &Point<T, D> {
+    pub const fn point(&self) -> &Point<T, D> {
         &self.point
     }
 
@@ -186,7 +193,7 @@ where
     /// assert_ne!(vertex.uuid(), another_vertex.uuid());
     /// ```
     #[inline]
-    pub fn uuid(&self) -> Uuid {
+    pub const fn uuid(&self) -> Uuid {
         self.uuid
     }
 
@@ -206,7 +213,7 @@ where
     /// assert_eq!(vertex.dim(), 4);
     /// ```
     #[inline]
-    pub fn dim(&self) -> usize {
+    pub const fn dim(&self) -> usize {
         D
     }
 
@@ -247,7 +254,7 @@ where
     /// ```
     pub fn is_valid(self) -> Result<(), VertexValidationError>
     where
-        T: crate::geometry::point::FiniteCheck + Copy + Debug,
+        T: crate::geometry::FiniteCheck + Copy + Debug,
     {
         // Check if the point is valid (all coordinates are finite)
         self.point.is_valid()?;
@@ -329,7 +336,7 @@ where
     T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Vertex<T, U, D>: Hash,
+    Self: Hash,
 {
     // Generic Eq implementation for Vertex based on point equality
 }
@@ -342,7 +349,7 @@ where
     Point<T, D>: Hash,
 {
     /// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.point.hash(state);
         self.uuid.hash(state);
         self.incident_cell.hash(state);
@@ -611,7 +618,6 @@ mod tests {
     #[test]
     fn vertex_hash() {
         use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
 
         let vertex1: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))

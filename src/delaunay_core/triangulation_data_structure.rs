@@ -8,8 +8,8 @@ use super::{
     facet::Facet,
     vertex::Vertex,
 };
-use crate::geometry::point::{OrderedEq, Point};
-use crate::geometry::predicates::find_extreme_coordinates;
+use crate::geometry::predicates::{InSphere, find_extreme_coordinates, insphere};
+use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, NumCast};
@@ -898,11 +898,8 @@ where
                     message: format!("Failed to create supercell: {e}"),
                 })?;
 
-        let supercell_vertices: HashSet<Uuid> = supercell
-            .vertices()
-            .iter()
-            .map(super::vertex::Vertex::uuid)
-            .collect();
+        let supercell_vertices: HashSet<Uuid> =
+            supercell.vertices().iter().map(Vertex::uuid).collect();
 
         self.cells.insert(supercell.uuid(), supercell.clone());
 
@@ -986,9 +983,9 @@ where
 
         // Find cells whose circumsphere contains the vertex
         for (cell_id, cell) in &self.cells {
-            let vertices_vector: Vec<_> = cell.vertices().clone();
-            let contains = crate::geometry::predicates::insphere(&vertices_vector, *vertex)?;
-            if matches!(contains, crate::geometry::InSphere::INSIDE) {
+            // Re-use the existing slice, no allocation
+            let contains = insphere(cell.vertices(), *vertex)?;
+            if matches!(contains, InSphere::INSIDE) {
                 bad_cells.push(*cell_id);
             }
         }
@@ -1029,11 +1026,8 @@ where
             .cells
             .iter()
             .filter(|(_, cell)| {
-                let cell_vertex_uuids: HashSet<Uuid> = cell
-                    .vertices()
-                    .iter()
-                    .map(super::vertex::Vertex::uuid)
-                    .collect();
+                let cell_vertex_uuids: HashSet<Uuid> =
+                    cell.vertices().iter().map(Vertex::uuid).collect();
                 let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
 
                 // Remove cells that don't consist entirely of input vertices
@@ -1053,11 +1047,7 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell
-                .vertices()
-                .iter()
-                .map(super::vertex::Vertex::uuid)
-                .collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -1185,11 +1175,7 @@ where
         // First pass: identify duplicate cells
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell
-                .vertices()
-                .iter()
-                .map(super::vertex::Vertex::uuid)
-                .collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
             vertex_uuids.sort();
 
             if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -1233,11 +1219,7 @@ where
 
         for (cell_id, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell
-                .vertices()
-                .iter()
-                .map(super::vertex::Vertex::uuid)
-                .collect();
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
             vertex_uuids.sort();
 
             if let Some(existing_cell_id) = unique_cells.get(&vertex_uuids) {
@@ -1389,11 +1371,8 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), TriangulationValidationError>
     where
-        T: crate::geometry::point::FiniteCheck
-            + crate::geometry::point::HashCoordinate
-            + Copy
-            + Debug,
-        [T; D]: serde::de::DeserializeOwned + serde::Serialize + Sized,
+        T: FiniteCheck + HashCoordinate + Copy + Debug,
+        [T; D]: DeserializeOwned + Serialize + Sized,
     {
         // First, validate cell uniqueness (quick check for duplicate cells)
         self.validate_no_duplicate_cells()?;
@@ -1425,11 +1404,7 @@ where
             HashMap::with_capacity(self.cells.len());
 
         for (cell_id, cell) in &self.cells {
-            let vertices: HashSet<Uuid> = cell
-                .vertices()
-                .iter()
-                .map(super::vertex::Vertex::uuid)
-                .collect();
+            let vertices: HashSet<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
             cell_vertices.insert(*cell_id, vertices);
         }
 

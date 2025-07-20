@@ -7,7 +7,7 @@
 //! directly, but created on the fly when needed.
 
 use super::{cell::Cell, vertex::Vertex};
-use crate::geometry::point::OrderedEq;
+use crate::geometry::OrderedEq;
 use num_traits::Float;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
@@ -91,7 +91,7 @@ where
             return Err(FacetError::CellIsZeroSimplex.into());
         }
 
-        Ok(Facet { cell, vertex })
+        Ok(Self { cell, vertex })
     }
 
     /// Returns a reference to the [Cell] that contains this facet.
@@ -126,7 +126,7 @@ where
     /// assert_eq!(facet_cell.uuid(), cell.uuid());
     /// ```
     #[inline]
-    pub fn cell(&self) -> &Cell<T, U, V, D> {
+    pub const fn cell(&self) -> &Cell<T, U, V, D> {
         &self.cell
     }
 
@@ -173,7 +173,7 @@ where
     /// assert!(facet_vertices.contains(&vertex4));
     /// ```
     #[inline]
-    pub fn vertex(&self) -> &Vertex<T, U, D> {
+    pub const fn vertex(&self) -> &Vertex<T, U, D> {
         &self.vertex
     }
 

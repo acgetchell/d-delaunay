@@ -35,9 +35,22 @@ pub mod geometry {
     pub mod matrix;
     pub mod point;
     pub mod predicates;
+    /// Traits module containing reusable trait definitions.
+    ///
+    /// This module contains common traits used throughout the geometry system,
+    /// providing interfaces for validation and computation on geometric types.
+    pub mod traits {
+        pub mod finitecheck;
+        pub mod hashcoordinate;
+        pub mod orderedeq;
+        pub use finitecheck::*;
+        pub use hashcoordinate::*;
+        pub use orderedeq::*;
+    }
     pub use matrix::*;
     pub use point::*;
     pub use predicates::*;
+    pub use traits::*;
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.
@@ -45,7 +58,7 @@ pub mod geometry {
 /// testing.
 #[allow(clippy::extra_unused_type_parameters)]
 #[must_use]
-pub fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
+pub const fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true
 }
 
