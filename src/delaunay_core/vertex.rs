@@ -1,7 +1,10 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
 use super::utilities::make_uuid;
-use crate::geometry::point::{OrderedEq, Point, PointValidationError};
+use crate::geometry::{
+    OrderedEq,
+    point::{Point, PointValidationError},
+};
 use num_traits::Float;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
@@ -163,7 +166,7 @@ where
     /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
-    pub fn point(&self) -> &Point<T, D> {
+    pub const fn point(&self) -> &Point<T, D> {
         &self.point
     }
 
@@ -190,7 +193,7 @@ where
     /// assert_ne!(vertex.uuid(), another_vertex.uuid());
     /// ```
     #[inline]
-    pub fn uuid(&self) -> Uuid {
+    pub const fn uuid(&self) -> Uuid {
         self.uuid
     }
 
@@ -210,7 +213,7 @@ where
     /// assert_eq!(vertex.dim(), 4);
     /// ```
     #[inline]
-    pub fn dim(&self) -> usize {
+    pub const fn dim(&self) -> usize {
         D
     }
 
@@ -333,7 +336,7 @@ where
     T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Vertex<T, U, D>: Hash,
+    Self: Hash,
 {
     // Generic Eq implementation for Vertex based on point equality
 }

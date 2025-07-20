@@ -207,8 +207,7 @@ mod tests {
             assert_eq!(
                 value.is_finite_generic(),
                 value.is_finite(),
-                "is_finite_generic should match is_finite for value: {}",
-                value
+                "is_finite_generic should match is_finite for value: {value}"
             );
         }
 
@@ -231,8 +230,7 @@ mod tests {
             assert_eq!(
                 value.is_finite_generic(),
                 value.is_finite(),
-                "is_finite_generic should match is_finite for value: {}",
-                value
+                "is_finite_generic should match is_finite for value: {value}"
             );
         }
     }

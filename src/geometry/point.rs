@@ -17,10 +17,8 @@
 
 #![allow(clippy::similar_names)]
 
-use crate::geometry::traits::finitecheck::FiniteCheck;
-use crate::geometry::traits::hashcoordinate::HashCoordinate;
+use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq};
 use num_traits::{Float, Zero};
-use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -90,7 +88,7 @@ where
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
     #[inline]
-    pub fn new(coords: [T; D]) -> Self {
+    pub const fn new(coords: [T; D]) -> Self {
         Self { coords }
     }
 
@@ -110,7 +108,7 @@ where
     /// ```
     #[must_use]
     #[inline]
-    pub fn dim(&self) -> usize {
+    pub const fn dim(&self) -> usize {
         D
     }
 
@@ -128,7 +126,7 @@ where
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
     #[inline]
-    pub fn coordinates(&self) -> [T; D] {
+    pub const fn coordinates(&self) -> [T; D] {
         self.coords
     }
 
@@ -213,41 +211,6 @@ where
         }
     }
 }
-
-/// Helper trait for OrderedFloat-based equality comparison that handles NaN properly
-pub trait OrderedEq {
-    /// Compares two values for equality using ordered comparison semantics.
-    ///
-    /// This method provides a way to compare floating-point numbers that treats
-    /// NaN values as equal to themselves, which is different from the default
-    /// floating-point equality comparison where NaN != NaN.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The other value to compare with
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if the values are equal according to ordered comparison,
-    /// `false` otherwise.
-    fn ordered_eq(&self, other: &Self) -> bool;
-}
-
-// Unified macro for implementing OrderedEq
-macro_rules! impl_ordered_eq {
-    (float: $($t:ty),*) => {
-        $(
-            impl OrderedEq for $t {
-                #[inline(always)]
-                fn ordered_eq(&self, other: &Self) -> bool {
-                    OrderedFloat(*self) == OrderedFloat(*other)
-                }
-            }
-        )*
-    };
-}
-
-impl_ordered_eq!(float: f32, f64);
 
 // Custom PartialEq implementation using OrderedFloat for consistent NaN handling
 impl<T, const D: usize> PartialEq for Point<T, D>
@@ -1386,33 +1349,6 @@ mod tests {
         assert_ne!(point_f32_nan, point_f32_zero);
         assert_ne!(point_f32_nan, point_f32_neg_zero);
         assert_eq!(point_f32_zero, point_f32_neg_zero);
-    }
-
-    #[test]
-    fn ordered_eq_trait_coverage() {
-        // Test OrderedEq trait implementations
-
-        // Test floating point types with normal values
-        assert!(1.0f32.ordered_eq(&1.0f32));
-        assert!(1.0f64.ordered_eq(&1.0f64));
-        assert!(!1.0f32.ordered_eq(&2.0f32));
-        assert!(!1.0f64.ordered_eq(&2.0f64));
-
-        // Test NaN equality (should be true with OrderedEq)
-        assert!(f32::NAN.ordered_eq(&f32::NAN));
-        assert!(f64::NAN.ordered_eq(&f64::NAN));
-
-        // Test infinity values
-        assert!(f32::INFINITY.ordered_eq(&f32::INFINITY));
-        assert!(f64::INFINITY.ordered_eq(&f64::INFINITY));
-        assert!(f32::NEG_INFINITY.ordered_eq(&f32::NEG_INFINITY));
-        assert!(f64::NEG_INFINITY.ordered_eq(&f64::NEG_INFINITY));
-        assert!(!f32::INFINITY.ordered_eq(&f32::NEG_INFINITY));
-        assert!(!f64::INFINITY.ordered_eq(&f64::NEG_INFINITY));
-
-        // Test zero comparisons
-        assert!(0.0f32.ordered_eq(&(-0.0f32)));
-        assert!(0.0f64.ordered_eq(&(-0.0f64)));
     }
 
     #[test]

@@ -7,11 +7,7 @@ use super::{
     utilities::make_uuid,
     vertex::{Vertex, VertexValidationError},
 };
-use crate::geometry::{
-    FiniteCheck,
-    point::{OrderedEq, Point},
-    traits::hashcoordinate::HashCoordinate,
-};
+use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
 use na::ComplexField;
 use nalgebra as na;
 use num_traits::Float;
@@ -166,7 +162,7 @@ where
     /// assert_eq!(cell.vertices().len(), 3);
     /// ```
     #[inline]
-    pub fn vertices(&self) -> &Vec<Vertex<T, U, D>> {
+    pub const fn vertices(&self) -> &Vec<Vertex<T, U, D>> {
         &self.vertices
     }
 
@@ -188,7 +184,7 @@ where
     /// assert_ne!(cell.uuid(), Uuid::nil());
     /// ```
     #[inline]
-    pub fn uuid(&self) -> Uuid {
+    pub const fn uuid(&self) -> Uuid {
         self.uuid
     }
 
@@ -290,7 +286,7 @@ where
     /// let cell2: Cell<f64, i32, &str, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data("one-three cell").build().unwrap();
     /// assert!(cell.contains_vertex_of(&cell2));
     /// ```
-    pub fn contains_vertex_of(&self, cell: &Cell<T, U, V, D>) -> bool {
+    pub fn contains_vertex_of(&self, cell: &Self) -> bool {
         self.vertices.iter().any(|v| cell.vertices.contains(v))
     }
 
@@ -335,7 +331,7 @@ where
         let uuid = make_uuid();
         let neighbors = None;
         let data = None;
-        Ok(Cell {
+        Ok(Self {
             vertices,
             uuid,
             neighbors,

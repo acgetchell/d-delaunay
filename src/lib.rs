@@ -42,8 +42,10 @@ pub mod geometry {
     pub mod traits {
         pub mod finitecheck;
         pub mod hashcoordinate;
+        pub mod orderedeq;
         pub use finitecheck::*;
         pub use hashcoordinate::*;
+        pub use orderedeq::*;
     }
     pub use matrix::*;
     pub use point::*;
@@ -56,7 +58,7 @@ pub mod geometry {
 /// testing.
 #[allow(clippy::extra_unused_type_parameters)]
 #[must_use]
-pub fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
+pub const fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true
 }
 
