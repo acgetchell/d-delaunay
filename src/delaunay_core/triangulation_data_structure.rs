@@ -9,8 +9,9 @@ use super::{
     vertex::Vertex,
 };
 use crate::geometry::FiniteCheck;
-use crate::geometry::point::{HashCoordinate, OrderedEq, Point};
+use crate::geometry::point::{OrderedEq, Point};
 use crate::geometry::predicates::{InSphere, find_extreme_coordinates, insphere};
+use crate::geometry::traits::hashcoordinate::HashCoordinate;
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, NumCast};

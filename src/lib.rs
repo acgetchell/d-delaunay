@@ -41,7 +41,9 @@ pub mod geometry {
     /// providing interfaces for validation and computation on geometric types.
     pub mod traits {
         pub mod finitecheck;
+        pub mod hashcoordinate;
         pub use finitecheck::*;
+        pub use hashcoordinate::*;
     }
     pub use matrix::*;
     pub use point::*;

@@ -9,7 +9,8 @@ use super::{
 };
 use crate::geometry::{
     FiniteCheck,
-    point::{HashCoordinate, OrderedEq, Point},
+    point::{OrderedEq, Point},
+    traits::hashcoordinate::HashCoordinate,
 };
 use na::ComplexField;
 use nalgebra as na;
@@ -354,9 +355,9 @@ where
     /// # Type Parameters
     ///
     /// This method requires the coordinate type `T` to implement additional traits:
-    /// - [`FiniteCheck`](crate::geometry::FiniteCheck): Enables checking that all coordinate values are finite
+    /// - [`FiniteCheck`]: Enables checking that all coordinate values are finite
     ///   (not infinite or NaN), which is essential for geometric computations.
-    /// - [`HashCoordinate`](crate::geometry::point::HashCoordinate): Enables hashing of coordinate values,
+    /// - [`HashCoordinate`]: Enables hashing of coordinate values,
     ///   which is required for detecting duplicate vertices efficiently.
     /// - [`Copy`]: Required for efficient comparison operations.
     ///
