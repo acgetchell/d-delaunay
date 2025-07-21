@@ -14,15 +14,15 @@ nalgebra = "0.33.0"
 num-traits = "0.2.19"
 ordered-float = { version = "5.0.0", features = ["serde"] }
 peroxide = "0.39.10"
-rand = "0.9.1"
+rand = "0.9.2"
 serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128" 
+serde_json = "1.0.141" 
 serde_test = "1.0.177"
 thiserror = "2.0.12"
 uuid = { version = "1.10.0", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.6", features = ["html_reports"] }
 
 [[bench]]
 name = "circumsphere_containment"
