@@ -535,9 +535,9 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "peroxide"
-version = "0.39.10"
+version = "0.39.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e4ad46b5cacfc11c0a94a1de1f7ebba2e96bfb11d81028f899adb6491c16e7a"
+checksum = "e8ce552607ac7612b85c66ecb026ce6157997d17d4a467e6b7761c58c930afca"
 dependencies = [
  "anyhow",
  "matrixmultiply",
