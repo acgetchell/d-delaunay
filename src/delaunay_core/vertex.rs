@@ -330,6 +330,20 @@ where
     }
 }
 
+/// Enable implicit conversion from Vertex reference to Point
+/// This allows `&vertex` to be implicitly converted to `Point<T, D>`
+impl<T, U, const D: usize> From<&Vertex<T, U, D>> for Point<T, D>
+where
+    T: Default + OrderedEq + Float,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn from(vertex: &Vertex<T, U, D>) -> Point<T, D> {
+        *vertex.point()
+    }
+}
+
 // Group 2: Eq implementation with additional Hash requirement
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
@@ -1061,6 +1075,46 @@ mod tests {
             [4.0, 5.0, 6.0].as_slice(),
             epsilon = 1e-9
         );
+    }
+
+    #[test]
+    fn vertex_implicit_conversion_to_point() {
+        let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .build()
+            .unwrap();
+
+        // Test implicit conversion from vertex reference to Point
+        let point_from_vertex: Point<f64, 3> = (&vertex).into();
+        assert_relative_eq!(
+            point_from_vertex.coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
+
+        // Test that the converted point is equal to the original point
+        assert_eq!(point_from_vertex, *vertex.point());
+
+        // Verify the original vertex is still available after conversion
+        assert_relative_eq!(
+            vertex.point().coordinates().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
+
+        // Test with different dimensions
+        let vertex_2d: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([10.5, -5.3]))
+            .build()
+            .unwrap();
+
+        let point_2d: Point<f64, 2> = (&vertex_2d).into();
+        assert_relative_eq!(
+            point_2d.coordinates().as_slice(),
+            [10.5, -5.3].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_eq!(point_2d, *vertex_2d.point());
     }
 
     #[test]

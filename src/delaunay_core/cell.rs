@@ -1589,7 +1589,7 @@ mod tests {
             .build()
             .unwrap();
         let circumradius =
-            circumradius(&cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>()).unwrap();
+            circumradius(&cell.vertices.iter().map(Point::from).collect::<Vec<_>>()).unwrap();
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
@@ -1739,7 +1739,7 @@ mod tests {
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(Point::from).collect();
         let result = insphere(&vertex_points, *vertex_far_outside.point());
         assert!(result.is_ok());
 
@@ -1749,7 +1749,7 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(Point::from).collect();
         let result_origin = insphere(&vertex_points, *origin.point());
         assert!(result_origin.is_ok());
     }

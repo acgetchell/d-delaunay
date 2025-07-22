@@ -264,7 +264,7 @@ fn test_circumsphere_generic<const D: usize>(
     println!();
 
     // Calculate circumcenter and circumradius
-    let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(Point::from).collect();
     match (circumcenter(&vertex_points), circumradius(&vertex_points)) {
         (Ok(center), Ok(radius)) => {
             println!("Circumcenter: {:?}", center.coordinates());
@@ -294,10 +294,10 @@ fn test_point_generic<const D: usize>(
 {
     let test_vertex = vertex!(coords, Some(99));
 
-    let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(|v| *v.point()).collect();
-    let result_insphere = insphere(&vertex_points, *test_vertex.point());
-    let result_distance = insphere_distance(&vertex_points, *test_vertex.point());
-    let result_lifted = insphere_lifted(&vertex_points, *test_vertex.point());
+    let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(Point::from).collect();
+    let result_insphere = insphere(&vertex_points, Point::from(&test_vertex));
+    let result_distance = insphere_distance(&vertex_points, Point::from(&test_vertex));
+    let result_lifted = insphere_lifted(&vertex_points, Point::from(&test_vertex));
 
     // Calculate actual distance to center using nalgebra
     let distance_to_center = na::distance(
@@ -423,7 +423,7 @@ fn test_4d_circumsphere_methods() {
     ];
 
     // Calculate circumcenter and circumradius for reference
-    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     match circumcenter(&vertex_points) {
         Ok(center) => {
             println!("Circumcenter: {:?}", center.coordinates());
@@ -502,7 +502,7 @@ fn test_circumsphere_containment() {
     ];
 
     // Calculate circumcenter and circumradius for testing
-    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     let (Ok(center), Ok(radius)) = (circumcenter(&vertex_points), circumradius(&vertex_points))
     else {
         println!("Error calculating circumcenter or circumradius");
@@ -530,9 +530,9 @@ fn test_circumsphere_containment() {
 
     println!("Testing points that should be OUTSIDE the circumsphere:");
     for (i, point) in test_points_outside.iter().enumerate() {
-        let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
-        let result_determinant = insphere(&vertex_points, *point.point());
-        let result_distance = insphere_distance(&vertex_points, *point.point());
+        let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
+        let result_determinant = insphere(&vertex_points, Point::from(point));
+        let result_distance = insphere_distance(&vertex_points, Point::from(point));
         let coords: [f64; 4] = point.into();
         println!(
             "  Point {}: [{}, {}, {}, {}] -> Det: {}, Dist: {}",
@@ -561,8 +561,8 @@ fn test_circumsphere_containment() {
     // These should be on the boundary of the circumsphere (distance = radius)
     println!("Testing the simplex vertices themselves:");
     for (i, vertex) in vertices.iter().enumerate() {
-        let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
-        let result = insphere(&vertex_points, *vertex.point());
+        let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
+        let result = insphere(&vertex_points, Point::from(vertex));
         let coords: [f64; 4] = vertex.into();
         println!(
             "  Vertex {}: [{}, {}, {}, {}] -> {}",
@@ -594,8 +594,8 @@ fn test_circumsphere_containment() {
 
     println!("Testing boundary/edge points:");
     for (i, point) in boundary_points.iter().enumerate() {
-        let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
-        let result = insphere(&vertex_points, *point.point());
+        let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
+        let result = insphere(&vertex_points, Point::from(point));
         let coords: [f64; 4] = point.into();
         println!(
             "  Point {}: [{}, {}, {}, {}] -> {}",
@@ -623,7 +623,7 @@ fn test_simplex_orientation() {
     let vertices = create_unit_4d_simplex();
 
     // Test the original 4D simplex's orientation
-    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     let orientation_original = simplex_orientation(&vertex_points);
     println!(
         "Original 4D simplex orientation: {}",
@@ -639,7 +639,7 @@ fn test_simplex_orientation() {
     let vertices_negative = create_negative_4d_simplex();
 
     let vertex_points_negative: Vec<Point<f64, 4>> =
-        vertices_negative.iter().map(|v| *v.point()).collect();
+        vertices_negative.iter().map(Point::from).collect();
     let orientation_negative = simplex_orientation(&vertex_points_negative);
     println!(
         "Negatively oriented 4D simplex: {}",
@@ -660,7 +660,7 @@ fn test_simplex_orientation() {
     ];
 
     let tetrahedron_points: Vec<Point<f64, 3>> =
-        tetrahedron_vertices.iter().map(|v| *v.point()).collect();
+        tetrahedron_vertices.iter().map(Point::from).collect();
     let orientation_3d = simplex_orientation(&tetrahedron_points);
     println!(
         "3D tetrahedron orientation: {}",
@@ -679,8 +679,7 @@ fn test_simplex_orientation() {
         vertex!([0.0, 1.0], Some(2)),
     ];
 
-    let triangle_points: Vec<Point<f64, 2>> =
-        triangle_vertices.iter().map(|v| *v.point()).collect();
+    let triangle_points: Vec<Point<f64, 2>> = triangle_vertices.iter().map(Point::from).collect();
     let orientation_2d = simplex_orientation(&triangle_points);
     println!(
         "2D triangle orientation: {}",
@@ -699,10 +698,8 @@ fn test_simplex_orientation() {
         vertex!([1.0, 0.0], Some(1)), // Swapped order
     ];
 
-    let triangle_points_reversed: Vec<Point<f64, 2>> = triangle_vertices_reversed
-        .iter()
-        .map(|v| *v.point())
-        .collect();
+    let triangle_points_reversed: Vec<Point<f64, 2>> =
+        triangle_vertices_reversed.iter().map(Point::from).collect();
     let orientation_2d_reversed = simplex_orientation(&triangle_points_reversed);
     println!(
         "2D triangle (reversed order): {}",
@@ -721,8 +718,7 @@ fn test_simplex_orientation() {
         vertex!([2.0, 0.0], Some(2)), // Collinear point
     ];
 
-    let collinear_points: Vec<Point<f64, 2>> =
-        collinear_vertices.iter().map(|v| *v.point()).collect();
+    let collinear_points: Vec<Point<f64, 2>> = collinear_vertices.iter().map(Point::from).collect();
     let orientation_collinear = simplex_orientation(&collinear_points);
     println!(
         "Collinear 2D points: {}",
@@ -764,11 +760,11 @@ fn demonstrate_orientation_impact_on_circumsphere() {
 
     let test_point = vertex!([0.25, 0.25, 0.25, 0.25], Some(100));
 
-    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     let vertex_points_negative: Vec<Point<f64, 4>> =
-        vertices_negative.iter().map(|v| *v.point()).collect();
-    let inside_positive = insphere(&vertex_points, *test_point.point());
-    let inside_negative = insphere(&vertex_points_negative, *test_point.point());
+        vertices_negative.iter().map(Point::from).collect();
+    let inside_positive = insphere(&vertex_points, Point::from(&test_point));
+    let inside_negative = insphere(&vertex_points_negative, Point::from(&test_point));
 
     println!(
         "Point [0.25, 0.25, 0.25, 0.25] in positive 4D simplex: {}",
@@ -804,7 +800,7 @@ fn test_3d_simplex_analysis() {
     let simplex_vertices_3d = create_3d_test_simplex();
 
     let simplex_points_3d: Vec<Point<f64, 3>> =
-        simplex_vertices_3d.iter().map(|v| *v.point()).collect();
+        simplex_vertices_3d.iter().map(Point::from).collect();
     match circumcenter(&simplex_points_3d) {
         Ok(circumcenter_3d) => match circumradius(&simplex_points_3d) {
             Ok(circumradius_3d) => {
@@ -873,9 +869,10 @@ fn test_circumsphere_methods(
     simplex_vertices: &[Vertex<f64, i32, 3>],
     test_vertex: Vertex<f64, i32, 3>,
 ) {
-    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
-    match insphere(&simplex_points, *test_vertex.point()) {
-        Ok(standard_method_3d) => match insphere_lifted(&simplex_points, *test_vertex.point()) {
+    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(Point::from).collect();
+    match insphere(&simplex_points, Point::from(&test_vertex)) {
+        Ok(standard_method_3d) => match insphere_lifted(&simplex_points, Point::from(&test_vertex))
+        {
             Ok(matrix_method_3d) => {
                 println!("Standard method result: {standard_method_3d:?}");
                 println!("Matrix method result: {matrix_method_3d:?}");
@@ -890,9 +887,9 @@ fn test_boundary_vertex_case(simplex_vertices: &[Vertex<f64, i32, 3>]) {
     println!();
     println!("Testing boundary vertex (vertex1):");
     let vertex1 = simplex_vertices[0];
-    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
-    match insphere(&simplex_points, *vertex1.point()) {
-        Ok(standard_vertex) => match insphere_lifted(&simplex_points, *vertex1.point()) {
+    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(Point::from).collect();
+    match insphere(&simplex_points, Point::from(&vertex1)) {
+        Ok(standard_vertex) => match insphere_lifted(&simplex_points, Point::from(&vertex1)) {
             Ok(matrix_vertex) => {
                 println!("Standard method for vertex1: {standard_vertex:?}");
                 println!("Matrix method for vertex1: {matrix_vertex:?}");
@@ -1012,7 +1009,7 @@ fn build_and_analyze_matrix(simplex_vertices: &[Vertex<f64, i32, 3>]) -> (f64, b
     println!("Determinant: {det:.6}");
 
     // Check simplex orientation and return determinant and matrix result
-    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(Point::from).collect();
     match simplex_orientation(&simplex_points) {
         Ok(is_positive_orientation) => {
             let is_positive = matches!(is_positive_orientation, Orientation::POSITIVE);
@@ -1051,7 +1048,7 @@ fn compare_methods_with_geometry(
     test_point: [f64; 3],
     test_vertex: Vertex<f64, i32, 3>,
 ) -> Option<(f64, f64, bool, InSphere, InSphere)> {
-    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(Point::from).collect();
     match circumcenter(&simplex_points) {
         Ok(circumcenter) => {
             match circumradius(&simplex_points) {
@@ -1072,9 +1069,9 @@ fn compare_methods_with_geometry(
                     );
 
                     // Compare with both methods
-                    match insphere(&simplex_points, *test_vertex.point()) {
+                    match insphere(&simplex_points, Point::from(&test_vertex)) {
                         Ok(standard_result) => {
-                            match insphere_lifted(&simplex_points, *test_vertex.point()) {
+                            match insphere_lifted(&simplex_points, Point::from(&test_vertex)) {
                                 Ok(matrix_method_result) => Some((
                                     distance_to_test,
                                     circumradius,
@@ -1178,7 +1175,7 @@ fn debug_3d_circumsphere_properties() {
     let vertex4 = vertex!([0.0, 0.0, 1.0], Some(2));
     let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
-    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+    let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(Point::from).collect();
     let center = circumcenter(&simplex_points).unwrap();
     let radius = circumradius(&simplex_points).unwrap();
 
@@ -1198,8 +1195,8 @@ fn debug_3d_circumsphere_properties() {
 
     let test_vertex = vertex!([0.9, 0.9, 0.9], Some(4));
 
-    let standard_result = insphere_distance(&simplex_points, *test_vertex.point()).unwrap();
-    let matrix_result = insphere_lifted(&simplex_points, *test_vertex.point()).unwrap();
+    let standard_result = insphere_distance(&simplex_points, Point::from(&test_vertex)).unwrap();
+    let matrix_result = insphere_lifted(&simplex_points, Point::from(&test_vertex)).unwrap();
 
     println!("Standard method result: {standard_result:?}");
     println!("Matrix method result: {matrix_result:?}");
@@ -1218,7 +1215,7 @@ fn debug_4d_circumsphere_properties() {
     let simplex_vertices_4d = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
 
     let simplex_points_4d: Vec<Point<f64, 4>> =
-        simplex_vertices_4d.iter().map(|v| *v.point()).collect();
+        simplex_vertices_4d.iter().map(Point::from).collect();
     let center_4d = circumcenter(&simplex_points_4d).unwrap();
     let radius_4d = circumradius(&simplex_points_4d).unwrap();
 
@@ -1238,8 +1235,10 @@ fn debug_4d_circumsphere_properties() {
 
     let origin_vertex: Vertex<f64, Option<()>, 4> = vertex!([0.0, 0.0, 0.0, 0.0], None);
 
-    let standard_result_4d = insphere_distance(&simplex_points_4d, *origin_vertex.point()).unwrap();
-    let matrix_result_4d = insphere_lifted(&simplex_points_4d, *origin_vertex.point()).unwrap();
+    let standard_result_4d =
+        insphere_distance(&simplex_points_4d, Point::from(&origin_vertex)).unwrap();
+    let matrix_result_4d =
+        insphere_lifted(&simplex_points_4d, Point::from(&origin_vertex)).unwrap();
 
     println!("Standard method result for origin: {standard_result_4d:?}");
     println!("Matrix method result for origin: {matrix_result_4d:?}");
@@ -1266,11 +1265,11 @@ fn compare_circumsphere_methods() {
 
     for (i, point) in test_points.iter().enumerate() {
         let test_vertex: Vertex<f64, Option<()>, 2> = vertex!(point.coordinates(), None);
-        let simplex_points: Vec<Point<f64, 2>> =
-            simplex_vertices.iter().map(|v| *v.point()).collect();
+        let simplex_points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(Point::from).collect();
 
-        let standard_result = insphere_distance(&simplex_points, *test_vertex.point()).unwrap();
-        let matrix_result = insphere_lifted(&simplex_points, *test_vertex.point()).unwrap();
+        let standard_result =
+            insphere_distance(&simplex_points, Point::from(&test_vertex)).unwrap();
+        let matrix_result = insphere_lifted(&simplex_points, Point::from(&test_vertex)).unwrap();
 
         println!(
             "Point {i}: {:?} -> Standard: {:?}, Matrix: {:?}",
@@ -1349,7 +1348,7 @@ fn test_single_2d_point() {
     ];
 
     // Calculate circumcenter and circumradius
-    let vertex_points: Vec<Point<f64, 2>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 2>> = vertices.iter().map(Point::from).collect();
     match (circumcenter(&vertex_points), circumradius(&vertex_points)) {
         (Ok(center), Ok(radius)) => {
             println!("Triangle vertices:");
@@ -1392,7 +1391,7 @@ fn test_single_3d_point() {
     ];
 
     // Calculate circumcenter and circumradius
-    let vertex_points: Vec<Point<f64, 3>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 3>> = vertices.iter().map(Point::from).collect();
     match (circumcenter(&vertex_points), circumradius(&vertex_points)) {
         (Ok(center), Ok(radius)) => {
             println!("Tetrahedron vertices:");
@@ -1436,7 +1435,7 @@ fn test_single_4d_point() {
     ];
 
     // Calculate circumcenter and circumradius
-    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(|v| *v.point()).collect();
+    let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     match (circumcenter(&vertex_points), circumradius(&vertex_points)) {
         (Ok(center), Ok(radius)) => {
             println!("4D simplex vertices:");

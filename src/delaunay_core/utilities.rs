@@ -53,7 +53,8 @@ pub fn make_uuid() -> Uuid {
 ///
 /// # Panics
 ///
-/// Panics if the vertices `HashMap` is empty (this should be caught by the early return).
+/// This function should not panic under normal circumstances as the empty `HashMap`
+/// case is handled by returning an error.
 ///
 /// # Example
 ///
