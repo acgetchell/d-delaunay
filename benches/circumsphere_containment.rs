@@ -16,11 +16,12 @@
 
 #![allow(missing_docs)]
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 use d_delaunay::geometry::point::Point;
 use d_delaunay::geometry::predicates::{insphere, insphere_distance, insphere_lifted};
 use rand::Rng;
+use std::hint::black_box;
 
 /// Generate a random simplex for benchmarking
 fn generate_random_simplex_3d(rng: &mut impl Rng) -> Vec<Vertex<f64, i32, 3>> {
