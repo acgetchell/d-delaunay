@@ -8,7 +8,8 @@ use super::{
     facet::Facet,
     vertex::Vertex,
 };
-use crate::geometry::predicates::{InSphere, find_extreme_coordinates, insphere};
+use crate::delaunay_core::utilities::find_extreme_coordinates;
+use crate::geometry::predicates::{InSphere, insphere};
 use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;

@@ -4,7 +4,6 @@
 //! that operate on points and simplices, including circumcenter and circumradius
 //! calculations.
 
-use crate::delaunay_core::{utilities::vec_to_array, vertex::Vertex};
 use crate::geometry::matrix::invert;
 use crate::geometry::{OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
@@ -12,8 +11,7 @@ use nalgebra as na;
 use num_traits::Float;
 use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
 use serde::{Serialize, de::DeserializeOwned};
-use std::{cmp::Ordering, collections::HashMap, hash::Hash, iter::Sum};
-use uuid::Uuid;
+use std::iter::Sum;
 
 /// Default tolerance for geometric predicates and degeneracy detection
 const DEFAULT_TOLERANCE: f64 = 1e-10;
@@ -69,7 +67,7 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// Returns an error if:
 /// - The points do not form a valid simplex
 /// - The matrix inversion fails due to degeneracy
-/// - Vector to array conversion fails
+/// - Array conversion fails
 ///
 /// # Example
 ///
@@ -137,7 +135,12 @@ where
     let a_inv = invert(&matrix)?;
     let solution = a_inv * b * 0.5;
     let solution_vec = solution.col(0).clone();
-    let solution_array = vec_to_array(&solution_vec).map_err(anyhow::Error::msg)?;
+    // Try different array conversion approaches
+    // Approach 1: Using try_from (most idiomatic)
+    let solution_slice: &[f64] = &solution_vec;
+    let solution_array: [f64; D] = solution_slice
+        .try_into()
+        .map_err(|_| anyhow::Error::msg("Failed to convert solution vector to array"))?;
 
     Ok(Point::<f64, D>::from(solution_array))
 }
@@ -891,104 +894,9 @@ where
     }
 }
 
-/// Find the extreme coordinates (minimum or maximum) across all vertices in a `HashMap`.
-///
-/// This function takes a `HashMap` of vertices and returns the minimum or maximum
-/// coordinates based on the specified ordering.
-///
-/// # Arguments
-///
-/// * `vertices` - A `HashMap` containing Vertex objects, where the key is a
-///   Uuid and the value is a Vertex.
-/// * `ordering` - The ordering parameter is of type Ordering and is used to
-///   specify whether the function should find the minimum or maximum
-///   coordinates. Ordering is an enum with three possible values: `Less`,
-///   `Equal`, and `Greater`.
-///
-/// # Returns
-///
-/// Returns `Ok([T; D])` containing the minimum or maximum coordinate for each dimension,
-/// or an error if the vertices `HashMap` is empty.
-///
-/// # Errors
-///
-/// Returns an error if the vertices `HashMap` is empty.
-///
-/// # Panics
-///
-/// Panics if the vertices `HashMap` is empty (this should be caught by the early return).
-///
-/// # Example
-///
-/// ```
-/// use d_delaunay::geometry::predicates::find_extreme_coordinates;
-/// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::geometry::point::Point;
-/// use std::collections::HashMap;
-/// use std::cmp::Ordering;
-/// let points = vec![
-///     Point::new([-1.0, 2.0, 3.0]),
-///     Point::new([4.0, -5.0, 6.0]),
-///     Point::new([7.0, 8.0, -9.0]),
-/// ];
-/// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-/// let hashmap = Vertex::into_hashmap(vertices);
-/// let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-/// # use approx::assert_relative_eq;
-/// assert_relative_eq!(min_coords.as_slice(), [-1.0, -5.0, -9.0].as_slice(), epsilon = 1e-9);
-/// ```
-pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHasher>(
-    vertices: &HashMap<Uuid, Vertex<T, U, D>, S>,
-    ordering: Ordering,
-) -> Result<[T; D], anyhow::Error>
-where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    [T; D]: Default + DeserializeOwned + Serialize + Sized,
-{
-    if vertices.is_empty() {
-        return Err(anyhow::Error::msg(
-            "Cannot find extreme coordinates: vertices HashMap is empty",
-        ));
-    }
-
-    // Initialize with the first vertex's coordinates using implicit conversion
-    let mut extreme_coords: [T; D] = vertices
-        .values()
-        .next()
-        .expect("HashMap is unexpectedly empty despite earlier check")
-        .into();
-
-    // Compare with remaining vertices
-    for vertex in vertices.values().skip(1) {
-        let vertex_coords: [T; D] = vertex.into();
-        for (i, coord) in vertex_coords.iter().enumerate() {
-            match ordering {
-                Ordering::Less => {
-                    if *coord < extreme_coords[i] {
-                        extreme_coords[i] = *coord;
-                    }
-                }
-                Ordering::Greater => {
-                    if *coord > extreme_coords[i] {
-                        extreme_coords[i] = *coord;
-                    }
-                }
-                Ordering::Equal => {
-                    // For Equal ordering, return the first vertex's coordinates
-                    // This behavior maintains backward compatibility
-                }
-            }
-        }
-    }
-
-    Ok(extreme_coords)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
     use approx::assert_relative_eq;
 
@@ -1007,25 +915,11 @@ mod tests {
 
     #[test]
     fn predicates_circumcenter_fail() {
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3]
-            .iter()
-            .map(|v| *v.point())
-            .collect();
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+        ];
         let center = circumcenter(&points);
 
         assert!(center.is_err());
@@ -1033,30 +927,12 @@ mod tests {
 
     #[test]
     fn predicates_circumradius() {
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3, vertex4]
-            .iter()
-            .map(|v| *v.point())
-            .collect();
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
         let radius = circumradius(&points).unwrap();
         let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 
@@ -1081,62 +957,27 @@ mod tests {
 
     #[test]
     fn predicates_circumsphere_does_not_contain() {
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
-        let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0]))
-            .data(3)
-            .build()
-            .unwrap();
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+        let test_point = Point::new([2.0, 2.0, 2.0]);
 
-        let vertex_points: Vec<Point<f64, 3>> =
-            simplex_vertices.iter().map(|v| *v.point()).collect();
         assert_eq!(
-            insphere(&vertex_points, *test_vertex.point()).unwrap(),
+            insphere(&simplex_points, test_point).unwrap(),
             InSphere::OUTSIDE
         );
     }
 
     #[test]
     fn predicates_circumcenter_2d() {
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([2.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex3: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([1.0, 2.0]))
-                .build()
-                .unwrap();
-        let points: Vec<Point<f64, 2>> = [vertex1, vertex2, vertex3]
-            .iter()
-            .map(|v| *v.point())
-            .collect();
+        let points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([2.0, 0.0]),
+            Point::new([1.0, 2.0]),
+        ];
         let center = circumcenter(&points).unwrap();
 
         // For this triangle, circumcenter should be at (1.0, 0.75)
@@ -1146,25 +987,11 @@ mod tests {
 
     #[test]
     fn predicates_circumradius_2d() {
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex3: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0]))
-                .build()
-                .unwrap();
-        let points: Vec<Point<f64, 2>> = [vertex1, vertex2, vertex3]
-            .iter()
-            .map(|v| *v.point())
-            .collect();
+        let points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([1.0, 0.0]),
+            Point::new([0.0, 1.0]),
+        ];
         let radius = circumradius(&points).unwrap();
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
@@ -1176,49 +1003,22 @@ mod tests {
     fn predicates_circumsphere_contains_vertex_determinant() {
         // Test the matrix determinant method for circumsphere containment
         // Use a simple, well-known case: unit tetrahedron
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
-        // Test vertex clearly outside circumsphere
-        let vertex_far_outside: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0, 10.0]))
-            .data(4)
-            .build()
-            .unwrap();
+        // Test point clearly outside circumsphere
+        let point_far_outside = Point::new([10.0, 10.0, 10.0]);
         // Just check that the method runs without error for now
-        let vertex_points: Vec<Point<f64, 3>> =
-            simplex_vertices.iter().map(|v| *v.point()).collect();
-        let result = insphere(&vertex_points, *vertex_far_outside.point());
+        let result = insphere(&simplex_points, point_far_outside);
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
-        let origin: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap();
-        let vertex_points: Vec<Point<f64, 3>> =
-            simplex_vertices.iter().map(|v| *v.point()).collect();
-        let result_origin = insphere(&vertex_points, *origin.point());
+        let origin = Point::new([0.0, 0.0, 0.0]);
+        let result_origin = insphere(&simplex_points, origin);
         assert!(result_origin.is_ok());
     }
 
@@ -1226,53 +1026,22 @@ mod tests {
     fn predicates_circumsphere_contains_vertex_matrix() {
         // Test the optimized matrix determinant method for circumsphere containment
         // Use a simple, well-known case: unit tetrahedron
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
-        // Test vertex clearly outside circumsphere
-        let _vertex_far_outside: crate::delaunay_core::vertex::Vertex<f64, i32, 3> =
-            VertexBuilder::default()
-                .point(Point::new([10.0, 10.0, 10.0]))
-                .data(4)
-                .build()
-                .unwrap();
-        // TODO: Matrix method should correctly identify this as outside, but currently fails
-        // This is why we use circumsphere_contains_vertex in bowyer_watson instead
-        // assert_eq!(
-        //     circumsphere_contains_vertex_matrix(&simplex_vertices, _vertex_far_outside).unwrap(),
-        //     InSphere::OUTSIDE
-        // );
+        // Test point clearly outside circumsphere
+        let _point_far_outside = Point::new([10.0, 10.0, 10.0]);
+        // Using placeholder assertion due to method inconsistency
+        // assert_eq!(insphere_lifted(&simplex_points, point_far_outside).unwrap(), InSphere::OUTSIDE);
 
         // Test with origin (should be inside or on boundary)
-        let origin: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap();
-        // Test with origin, which is a vertex of the simplex (on boundary of circumsphere)
-        let vertex_points: Vec<Point<f64, 3>> =
-            simplex_vertices.iter().map(|v| *v.point()).collect();
+        let origin = Point::new([0.0, 0.0, 0.0]);
         assert_eq!(
-            insphere_lifted(&vertex_points, *origin.point()).unwrap(),
+            insphere_lifted(&simplex_points, origin).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1553,49 +1322,33 @@ mod tests {
     #[test]
     fn predicates_circumsphere_contains_vertex_4d_degenerate_cases() {
         // Test with 4D simplex that has some special properties
-        // Regular 4D simplex with vertices forming a specific pattern
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
-            VertexBuilder::default()
-                .point(Point::new([1.0, 1.0, 1.0, 1.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, -1.0, -1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([-1.0, 1.0, -1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([-1.0, -1.0, 1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([-1.0, -1.0, -1.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        // Regular 4D simplex with points forming a specific pattern
+        let simplex_points = vec![
+            Point::new([1.0, 1.0, 1.0, 1.0]),
+            Point::new([1.0, -1.0, -1.0, -1.0]),
+            Point::new([-1.0, 1.0, -1.0, -1.0]),
+            Point::new([-1.0, -1.0, 1.0, -1.0]),
+            Point::new([-1.0, -1.0, -1.0, 1.0]),
+        ];
 
         // Test with origin (should be inside this symmetric simplex)
         let origin_point = Point::new([0.0, 0.0, 0.0, 0.0]);
-        let points: Vec<Point<f64, 4>> = simplex_vertices.iter().map(|v| *v.point()).collect();
         assert_eq!(
-            insphere_distance(&points, origin_point).unwrap(),
+            insphere_distance(&simplex_points, origin_point).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with point far outside
         let far_point = Point::new([10.0, 10.0, 10.0, 10.0]);
         assert_eq!(
-            insphere_distance(&points, far_point).unwrap(),
+            insphere_distance(&simplex_points, far_point).unwrap(),
             InSphere::OUTSIDE
         );
 
         // Test with point on the surface of the circumsphere (approximately)
         // This is challenging to compute exactly, so we test a point that should be close
         let surface_point = Point::new([1.5, 1.5, 1.5, 1.5]);
-        let result = insphere_distance(&points, surface_point);
+        let result = insphere_distance(&simplex_points, surface_point);
         assert!(result.is_ok()); // Should not error, result depends on exact circumsphere
     }
 
@@ -1622,18 +1375,9 @@ mod tests {
     #[test]
     fn predicates_circumcenter_error_cases() {
         // Test circumcenter calculation with degenerate cases
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let points: Vec<Point<f64, 2>> = [vertex1, vertex2].iter().map(|v| *v.point()).collect();
+        let points = vec![Point::new([0.0, 0.0]), Point::new([1.0, 0.0])]; // Only 2 points for 2D
 
-        // Test with insufficient vertices for proper simplex (2 vertices in 2D space)
+        // Test with insufficient vertices for proper simplex
         let center_result = circumcenter(&points);
         assert!(center_result.is_err());
     }
@@ -1641,27 +1385,12 @@ mod tests {
     #[test]
     fn predicates_circumcenter_collinear_points() {
         // Test circumcenter with collinear points (should fail)
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([2.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([3.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3, vertex4]
-            .iter()
-            .map(|v| *v.point())
-            .collect();
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([2.0, 0.0, 0.0]),
+            Point::new([3.0, 0.0, 0.0]),
+        ];
 
         // This should fail because points are collinear
         let center_result = circumcenter(&points);
@@ -1671,27 +1400,12 @@ mod tests {
     #[test]
     fn predicates_circumradius_with_center() {
         // Test the circumradius_with_center function
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3, vertex4]
-            .iter()
-            .map(|v| *v.point())
-            .collect();
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
         let center = circumcenter(&points).unwrap();
         let radius_with_center = circumradius_with_center(&points, &center);
@@ -1703,265 +1417,19 @@ mod tests {
     #[test]
     fn predicates_circumsphere_edge_cases() {
         // Test circumsphere containment with simple cases
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = [vertex1, vertex2, vertex3];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([1.0, 0.0]),
+            Point::new([0.0, 1.0]),
+        ];
 
         // Test that the methods run without error
-        let test_point_coords = Point::new([0.25, 0.25]);
-        let points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(|v| *v.point()).collect();
-        let circumsphere_result = insphere_distance(&points, test_point_coords);
-        assert!(circumsphere_result.is_ok());
-
-        let determinant_result = insphere_distance(&points, test_point_coords);
-        assert!(determinant_result.is_ok());
+        let test_point = Point::new([0.25, 0.25]);
+        assert!(insphere_distance(&simplex_points, test_point).is_ok());
 
         // At minimum, both methods should give the same result for the same input
-        let far_point_coords = Point::new([100.0, 100.0]);
-
-        let circumsphere_far = insphere_distance(&points, far_point_coords);
-        let determinant_far = insphere_distance(&points, far_point_coords);
-
-        assert!(circumsphere_far.is_ok());
-        assert!(determinant_far.is_ok());
-    }
-
-    #[test]
-    fn predicates_find_min_coordinate() {
-        let points = vec![
-            Point::new([-1.0, 2.0, 3.0]),
-            Point::new([4.0, -5.0, 6.0]),
-            Point::new([7.0, 8.0, -9.0]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-
-        assert_relative_eq!(
-            min_coords.as_slice(),
-            [-1.0, -5.0, -9.0].as_slice(),
-            epsilon = 1e-9
-        );
-
-        // Human readable output for cargo test -- --nocapture
-        println!("min_coords = {min_coords:?}");
-    }
-
-    #[test]
-    fn predicates_find_max_coordinate() {
-        let points = vec![
-            Point::new([-1.0, 2.0, 3.0]),
-            Point::new([4.0, -5.0, 6.0]),
-            Point::new([7.0, 8.0, -9.0]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        assert_relative_eq!(
-            max_coords.as_slice(),
-            [7.0, 8.0, 6.0].as_slice(),
-            epsilon = 1e-9
-        );
-
-        // Human readable output for cargo test -- --nocapture
-        println!("max_coords = {max_coords:?}");
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_empty() {
-        let empty_hashmap: HashMap<Uuid, crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            HashMap::new();
-        let min_coords_result = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
-        let max_coords_result = find_extreme_coordinates(&empty_hashmap, Ordering::Greater);
-
-        // With empty hashmap, should return an error
-        assert!(min_coords_result.is_err());
-        assert!(max_coords_result.is_err());
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_single_point() {
-        let points = vec![Point::new([5.0, -3.0, 7.0])];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        // With single point, min and max should be the same
-        assert_relative_eq!(
-            min_coords.as_slice(),
-            [5.0, -3.0, 7.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_relative_eq!(
-            max_coords.as_slice(),
-            [5.0, -3.0, 7.0].as_slice(),
-            epsilon = 1e-9
-        );
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_equal_ordering() {
-        let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        // Using Ordering::Equal should return the first vertex's coordinates unchanged
-        let coords = find_extreme_coordinates(&hashmap, Ordering::Equal).unwrap();
-        // The first vertex in the iteration (order is not guaranteed in HashMap)
-        // but the result should be one of the input coordinates
-        let matches_first = approx::relative_eq!(
-            coords.as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        let matches_second = approx::relative_eq!(
-            coords.as_slice(),
-            [4.0, 5.0, 6.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert!(matches_first || matches_second);
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_2d() {
-        let points = vec![
-            Point::new([1.0, 4.0]),
-            Point::new([3.0, 2.0]),
-            Point::new([2.0, 5.0]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        assert_relative_eq!(min_coords.as_slice(), [1.0, 2.0].as_slice(), epsilon = 1e-9);
-        assert_relative_eq!(max_coords.as_slice(), [3.0, 5.0].as_slice(), epsilon = 1e-9);
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_1d() {
-        let points = vec![Point::new([10.0]), Point::new([-5.0]), Point::new([3.0])];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        assert_relative_eq!(
-            min_coords.as_slice(),
-            [-5.0].as_slice(),
-            epsilon = DISTANCE_TOLERANCE
-        );
-        assert_relative_eq!(max_coords.as_slice(), [10.0].as_slice(), epsilon = 1e-9);
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_with_typed_data() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, -1.0, 2.0]),
-            Point::new([-2.0, 5.0, 1.0]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, i32, 3>> = points
-            .into_iter()
-            .enumerate()
-            .map(|(i, point)| {
-                VertexBuilder::default()
-                    .point(point)
-                    .data(i32::try_from(i).unwrap())
-                    .build()
-                    .unwrap()
-            })
-            .collect();
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        assert_relative_eq!(
-            min_coords.as_slice(),
-            [-2.0, -1.0, 1.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_relative_eq!(
-            max_coords.as_slice(),
-            [4.0, 5.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_identical_points() {
-        let points = vec![
-            Point::new([2.0, 3.0, 4.0]),
-            Point::new([2.0, 3.0, 4.0]),
-            Point::new([2.0, 3.0, 4.0]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        // All points are identical, so min and max should be the same
-        assert_relative_eq!(
-            min_coords.as_slice(),
-            [2.0, 3.0, 4.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_relative_eq!(
-            max_coords.as_slice(),
-            [2.0, 3.0, 4.0].as_slice(),
-            epsilon = 1e-9
-        );
-    }
-
-    #[test]
-    fn predicates_find_extreme_coordinates_large_numbers() {
-        let points = vec![
-            Point::new([1e6, -1e6, 1e12]),
-            Point::new([-1e9, 1e3, -1e15]),
-            Point::new([1e15, 1e9, 1e6]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
-        assert_relative_eq!(
-            min_coords.as_slice(),
-            [-1e9, -1e6, -1e15].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_relative_eq!(
-            max_coords.as_slice(),
-            [1e15, 1e9, 1e12].as_slice(),
-            epsilon = 1e-9
-        );
+        let far_point = Point::new([100.0, 100.0]);
+        assert!(insphere_distance(&simplex_points, far_point).is_ok());
     }
 
     #[test]
@@ -2035,32 +1503,16 @@ mod tests {
     fn debug_circumsphere_properties() {
         println!("=== 3D Unit Tetrahedron Analysis ===");
 
-        // Unit tetrahedron: vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        // Unit tetrahedron: points at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
-        let points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
-        let center = circumcenter(&points).unwrap();
-        let radius = circumradius(&points).unwrap();
+        let center = circumcenter(&simplex_points).unwrap();
+        let radius = circumradius(&simplex_points).unwrap();
 
         println!("Circumcenter: {:?}", center.coordinates());
         println!("Circumradius: {radius}");
@@ -2074,50 +1526,27 @@ mod tests {
             distance_to_center < radius
         );
 
-        let test_vertex: crate::delaunay_core::vertex::Vertex<f64, i32, 3> =
-            VertexBuilder::default()
-                .point(Point::new([0.9, 0.9, 0.9]))
-                .data(4)
-                .build()
-                .unwrap();
+        let test_point = Point::new([0.9, 0.9, 0.9]);
 
-        let points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
-        let standard_result = insphere_distance(&points, *test_vertex.point()).unwrap();
-        let matrix_result = insphere_lifted(&points, *test_vertex.point()).unwrap();
+        let standard_result = insphere_distance(&simplex_points, test_point).unwrap();
+        let matrix_result = insphere_lifted(&simplex_points, test_point).unwrap();
 
         println!("Standard method result: {standard_result}");
         println!("Matrix method result: {matrix_result}");
 
         println!("\n=== 4D Symmetric Simplex Analysis ===");
 
-        // Regular 4D simplex with vertices forming a specific pattern
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
-            VertexBuilder::default()
-                .point(Point::new([1.0, 1.0, 1.0, 1.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, -1.0, -1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([-1.0, 1.0, -1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([-1.0, -1.0, 1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([-1.0, -1.0, -1.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices_4d = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        // Regular 4D simplex with points forming a specific pattern
+        let simplex_points_4d = vec![
+            Point::new([1.0, 1.0, 1.0, 1.0]),
+            Point::new([1.0, -1.0, -1.0, -1.0]),
+            Point::new([-1.0, 1.0, -1.0, -1.0]),
+            Point::new([-1.0, -1.0, 1.0, -1.0]),
+            Point::new([-1.0, -1.0, -1.0, 1.0]),
+        ];
 
-        let points_4d: Vec<Point<f64, 4>> =
-            simplex_vertices_4d.iter().map(|v| *v.point()).collect();
-        let center_4d = circumcenter(&points_4d).unwrap();
-        let radius_4d = circumradius(&points_4d).unwrap();
+        let center_4d = circumcenter(&simplex_points_4d).unwrap();
+        let radius_4d = circumradius(&simplex_points_4d).unwrap();
 
         println!("4D Circumcenter: {:?}", center_4d.coordinates());
         println!("4D Circumradius: {radius_4d}");
@@ -2131,14 +1560,10 @@ mod tests {
             distance_to_center_4d < radius_4d
         );
 
-        let origin_vertex: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-                .build()
-                .unwrap();
+        let origin_point = Point::new([0.0, 0.0, 0.0, 0.0]);
 
-        let standard_result_4d = insphere_distance(&points_4d, *origin_vertex.point()).unwrap();
-        let matrix_result_4d = insphere_lifted(&points_4d, *origin_vertex.point()).unwrap();
+        let standard_result_4d = insphere_distance(&simplex_points_4d, origin_point).unwrap();
+        let matrix_result_4d = insphere_lifted(&simplex_points_4d, origin_point).unwrap();
 
         println!("Standard method result for origin: {standard_result_4d}");
         println!("Matrix method result for origin: {matrix_result_4d}");
@@ -2149,20 +1574,11 @@ mod tests {
     #[test]
     fn compare_circumsphere_methods() {
         // Compare results between standard and matrix methods
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = [vertex1, vertex2, vertex3];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([1.0, 0.0]),
+            Point::new([0.0, 1.0]),
+        ];
 
         // Test various points
         let test_points = [
@@ -2174,12 +1590,8 @@ mod tests {
         ];
 
         for (i, point) in test_points.iter().enumerate() {
-            let test_vertex: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-                VertexBuilder::default().point(*point).build().unwrap();
-
-            let points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(|v| *v.point()).collect();
-            let standard_result = insphere_distance(&points, *test_vertex.point()).unwrap();
-            let matrix_result = insphere_lifted(&points, *test_vertex.point()).unwrap();
+            let standard_result = insphere_distance(&simplex_points, *point).unwrap();
+            let matrix_result = insphere_lifted(&simplex_points, *point).unwrap();
 
             println!(
                 "Point {}: {:?} -> Standard: {:?}, Matrix: {}",
