@@ -8,7 +8,8 @@ use super::{
     facet::Facet,
     vertex::Vertex,
 };
-use crate::geometry::predicates::{InSphere, find_extreme_coordinates, insphere};
+use crate::delaunay_core::utilities::find_extreme_coordinates;
+use crate::geometry::predicates::{InSphere, insphere};
 use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
@@ -984,7 +985,9 @@ where
         // Find cells whose circumsphere contains the vertex
         for (cell_id, cell) in &self.cells {
             // Re-use the existing slice, no allocation
-            let contains = insphere(cell.vertices(), *vertex)?;
+            let vertex_points: Vec<Point<T, D>> =
+                cell.vertices().iter().map(|v| *v.point()).collect();
+            let contains = insphere(&vertex_points, *vertex.point())?;
             if matches!(contains, InSphere::INSIDE) {
                 bad_cells.push(*cell_id);
             }
