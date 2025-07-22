@@ -2,6 +2,7 @@
 
 use crate::delaunay_core::vertex::Vertex;
 use crate::geometry::OrderedEq;
+use anyhow::Error;
 use num_traits::Float;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::Ordering;
@@ -78,7 +79,7 @@ pub fn make_uuid() -> Uuid {
 pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHasher>(
     vertices: &HashMap<Uuid, Vertex<T, U, D>, S>,
     ordering: Ordering,
-) -> Result<[T; D], anyhow::Error>
+) -> Result<[T; D], Error>
 where
     T: Default + OrderedEq + Float,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
@@ -114,7 +115,6 @@ where
                 }
                 Ordering::Equal => {
                     // For Equal ordering, return the first vertex's coordinates
-                    // This behavior maintains backward compatibility
                 }
             }
         }

@@ -96,7 +96,11 @@ jobs:
 
       # Upload each SARIF file separately
       - name: Upload SARIF files
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # Don't iterate literal patterns when no files exist
+          shopt -s nullglob
           upload_count=0
           for sarif_file in sarif_*.sarif; do
             if [ -f "$sarif_file" ]; then
@@ -110,7 +114,7 @@ jobs:
               if command -v gh >/dev/null 2>&1; then
                 gh api repos/${{ github.repository }}/code-scanning/sarifs \
                   --method POST \
-                  --field sarif="$(base64 -i "$sarif_file")" \
+                  --field sarif="$(base64 -w 0 < "$sarif_file")" \
                   --field commit_sha="${{ github.sha }}" \
                   --field ref="${{ github.ref }}" \
                   --field category="codacy-$tool_name" || echo "Failed to upload $sarif_file via gh"
@@ -123,7 +127,7 @@ jobs:
                   -H "X-GitHub-Api-Version: 2022-11-28" \
                   "https://api.github.com/repos/${{ github.repository }}/code-scanning/sarifs" \
                   -d "$(jq -n \
-                    --arg sarif "$(base64 -i "$sarif_file")" \
+                    --arg sarif "$(base64 -w 0 < "$sarif_file")" \
                     --arg commit "${{ github.sha }}" \
                     --arg ref "${{ github.ref }}" \
                     --arg category "codacy-$tool_name" \
@@ -135,5 +139,4 @@ jobs:
           done
           echo "Attempted to upload $upload_count SARIF files"
         continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+
