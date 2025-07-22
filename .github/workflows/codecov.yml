@@ -1,18 +1,22 @@
+---
 name: Codecov
 
-on:
+"on":
   push:
     branches: ["main"]
-  # pull_request:
-  #   # Run on merged pull requests
-  #   types: [ closed ]
+    # pull_request:
+    #   # Run on merged pull requests
+    #   types: [ closed ]
+
 # Least-privilege permissions — no write-all anywhere
 permissions:
-  contents: read           # allow reading your code
-  checks: write            # if you report a status check
-  pull-requests: write     # if you post PR comments
-# (omit any other keys; defaults are “none”)
-
+  # allow reading your code
+  contents: read
+  # if you report a status check
+  checks: write
+  # if you post PR comments
+  pull-requests: write
+# (omit any other keys; defaults are "none")
 
 jobs:
   check:
@@ -47,7 +51,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-      
+
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
 
@@ -55,7 +59,7 @@ jobs:
         run: |
           # export VAR=var
           cargo tarpaulin --out Xml -- --test-threads=1
-      
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         env:

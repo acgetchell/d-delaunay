@@ -1,5 +1,6 @@
+---
 name: "Audit dependencies"
-on:
+"on":
   push:
     paths:
       # Run if workflow changes

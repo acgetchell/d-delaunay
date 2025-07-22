@@ -1,3 +1,4 @@
+---
 language: en-US
 tone_instructions: ''
 early_access: false
@@ -57,7 +58,6 @@ reviews:
     # Rust linter
     clippy:
       enabled: true
-      level: default
 
     # Rust AST grep
     ast-grep:
@@ -95,11 +95,11 @@ reviews:
 
     # GitHub Actions workflow linter
     actionlint:
-      enabled: true  
+      enabled: true
 
     # YAML linter
     yamllint:
-      enabled: true  
+      enabled: true
 
     # Semantic code analysis
     semgrep:
