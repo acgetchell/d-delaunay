@@ -10,7 +10,7 @@
 
 name: rust-clippy analyze
 
-"on":
+on:
   push:
   pull_request:
   # Run on merged pull requests

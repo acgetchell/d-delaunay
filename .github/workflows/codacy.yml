@@ -14,7 +14,7 @@
 
 name: Codacy Security Scan
 
-"on":
+on:
   push:
     branches: ["main"]
   pull_request:
@@ -65,6 +65,8 @@ jobs:
       # Process SARIF file to split by tool
       - name: Split SARIF by tool
         run: |
+          # Fail fast and surface errors clearly
+          set -euo pipefail
           if [ -f "results.sarif" ] && [ -s "results.sarif" ]; then
             echo "Processing SARIF file with multiple tools..."
             # Extract each run and create separate SARIF files
@@ -108,11 +110,9 @@ jobs:
               # Extract tool name for category
               tool_name=$(basename "$sarif_file" .sarif | sed 's/^sarif_//')
               # Upload using the action (we'll call it via environment variables)
-              export SARIF_FILE="$sarif_file"
-              export CATEGORY="codacy-$tool_name"
               # Use GitHub CLI to upload if available, otherwise use curl
               if command -v gh >/dev/null 2>&1; then
-                gh api repos/${{ github.repository }}/code-scanning/sarifs \
+                gh api "repos/${{ github.repository }}/code-scanning/sarifs" \
                   --method POST \
                   --field sarif="$(base64 -w 0 < "$sarif_file")" \
                   --field commit_sha="${{ github.sha }}" \
