@@ -1588,7 +1588,8 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        let circumradius = circumradius(&cell.vertices).unwrap();
+        let circumradius =
+            circumradius(&cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>()).unwrap();
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
@@ -1732,22 +1733,24 @@ mod tests {
             .unwrap();
 
         // Test vertex clearly outside circumsphere
-        let vertex_far_outside = VertexBuilder::default()
+        let vertex_far_outside: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([10.0, 10.0, 10.0]))
             .data(4)
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let result = insphere(&cell.vertices, vertex_far_outside);
+        let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let result = insphere(&vertex_points, *vertex_far_outside.point());
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
-        let origin = VertexBuilder::default()
+        let origin: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .data(3)
             .build()
             .unwrap();
-        let result_origin = insphere(&cell.vertices, origin);
+        let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let result_origin = insphere(&vertex_points, *origin.point());
         assert!(result_origin.is_ok());
     }
 
@@ -1773,19 +1776,21 @@ mod tests {
             .unwrap();
 
         // Test vertex far outside circumcircle
-        let vertex_far_outside = VertexBuilder::default()
+        let vertex_far_outside: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
             .point(Point::new([10.0, 10.0]))
             .build()
             .unwrap();
-        let result = insphere(&cell.vertices, vertex_far_outside);
+        let vertex_points: Vec<Point<f64, 2>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let result = insphere(&vertex_points, *vertex_far_outside.point());
         assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
-        let center = VertexBuilder::default()
+        let center: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
             .point(Point::new([0.33, 0.33]))
             .build()
             .unwrap();
-        let result_center = insphere(&cell.vertices, center);
+        let vertex_points: Vec<Point<f64, 2>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let result_center = insphere(&vertex_points, *center.point());
         assert!(result_center.is_ok());
     }
 
@@ -1814,9 +1819,14 @@ mod tests {
             .build()
             .unwrap();
 
-        let circumcenter = circumcenter(&cell.vertices).unwrap();
-        let radius_with_center = circumradius_with_center(&cell.vertices, &circumcenter);
-        let radius_direct = circumradius(&cell.vertices).unwrap();
+        let circumcenter =
+            circumcenter(&cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>()).unwrap();
+        let radius_with_center = circumradius_with_center(
+            &cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>(),
+            &circumcenter,
+        );
+        let radius_direct =
+            circumradius(&cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>()).unwrap();
 
         assert_relative_eq!(radius_with_center.unwrap(), radius_direct, epsilon = 1e-10);
     }
@@ -2065,25 +2075,33 @@ mod tests {
             .unwrap();
 
         // Test that the methods run without error
-        let test_point = VertexBuilder::default()
-            .point(Point::new([0.25, 0.25]))
+        let test_point: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
+            .point(Point::new([0.5, 0.5]))
             .build()
             .unwrap();
 
-        let circumsphere_result = insphere_distance(&cell.vertices, test_point);
+        let circumsphere_result = insphere_distance(
+            &cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>(),
+            *test_point.point(),
+        );
         assert!(circumsphere_result.is_ok());
 
-        let determinant_result = insphere(&cell.vertices, test_point);
+        let vertex_points: Vec<Point<f64, 2>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let determinant_result = insphere(&vertex_points, *test_point.point());
         assert!(determinant_result.is_ok());
 
         // At minimum, both methods should give the same result for the same input
-        let far_point = VertexBuilder::default()
+        let far_point: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
             .point(Point::new([100.0, 100.0]))
             .build()
             .unwrap();
 
-        let circumsphere_far = insphere_distance(&cell.vertices, far_point);
-        let determinant_far = insphere(&cell.vertices, far_point);
+        let circumsphere_far = insphere_distance(
+            &cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>(),
+            *far_point.point(),
+        );
+        let vertex_points: Vec<Point<f64, 2>> = cell.vertices.iter().map(|v| *v.point()).collect();
+        let determinant_far = insphere(&vertex_points, *far_point.point());
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());

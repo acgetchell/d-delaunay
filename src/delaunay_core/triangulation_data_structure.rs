@@ -984,7 +984,9 @@ where
         // Find cells whose circumsphere contains the vertex
         for (cell_id, cell) in &self.cells {
             // Re-use the existing slice, no allocation
-            let contains = insphere(cell.vertices(), *vertex)?;
+            let vertex_points: Vec<Point<T, D>> =
+                cell.vertices().iter().map(|v| *v.point()).collect();
+            let contains = insphere(&vertex_points, *vertex.point())?;
             if matches!(contains, InSphere::INSIDE) {
                 bad_cells.push(*cell_id);
             }

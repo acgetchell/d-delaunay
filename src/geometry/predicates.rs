@@ -20,10 +20,10 @@ const DEFAULT_TOLERANCE: f64 = 1e-10;
 /// Tolerance for distance comparisons
 const DISTANCE_TOLERANCE: f64 = 1e-9;
 
-/// Calculate the circumcenter of a set of vertices forming a simplex.
+/// Calculate the circumcenter of a set of points forming a simplex.
 ///
-/// The circumcenter is the unique point equidistant from all vertices of
-/// the simplex. Returns an error if the vertices do not form a valid simplex or
+/// The circumcenter is the unique point equidistant from all points of
+/// the simplex. Returns an error if the points do not form a valid simplex or
 /// if the computation fails due to degeneracy or numerical issues.
 ///
 /// Using the approach from:
@@ -33,7 +33,7 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
 /// <https://doi.org/10.1145/1778765.1778856>.
 ///
-/// The circumcenter C of a simplex with vertices `x_0`, `x_1`, ..., `x_n` is the
+/// The circumcenter C of a simplex with points `x_0`, `x_1`, ..., `x_n` is the
 /// solution to the system:
 ///
 /// C = 1/2 (A^-1*B)
@@ -58,7 +58,7 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 ///
 /// # Arguments
 ///
-/// * `vertices` - A slice of vertices that form the simplex
+/// * `points` - A slice of points that form the simplex
 ///
 /// # Returns
 /// The circumcenter as a Point<f64, D> if successful, or an error if the
@@ -67,26 +67,25 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// # Errors
 ///
 /// Returns an error if:
-/// - The vertices do not form a valid simplex
+/// - The points do not form a valid simplex
 /// - The matrix inversion fails due to degeneracy
 /// - Vector to array conversion fails
 ///
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::circumcenter;
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let vertices = vec![vertex1, vertex2, vertex3, vertex4];
-/// let center = circumcenter(&vertices).unwrap();
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let points = vec![point1, point2, point3, point4];
+/// let center = circumcenter(&points).unwrap();
 /// assert_eq!(center, Point::new([0.5, 0.5, 0.5]));
 /// ```
-pub fn circumcenter<T, U, const D: usize>(
-    vertices: &[Vertex<T, U, D>],
+pub fn circumcenter<T, const D: usize>(
+    points: &[Point<T, D>],
 ) -> Result<Point<f64, D>, anyhow::Error>
 where
     T: Clone
@@ -98,17 +97,16 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
 {
-    if vertices.is_empty() {
-        return Err(anyhow::Error::msg("Empty vertex set"));
+    if points.is_empty() {
+        return Err(anyhow::Error::msg("Empty point set"));
     }
 
-    let dim = vertices.len() - 1;
-    if vertices[0].dim() != dim {
+    let dim = points.len() - 1;
+    if points[0].dim() != dim {
         return Err(anyhow::Error::msg("Not a simplex!"));
     }
 
@@ -116,22 +114,22 @@ where
     let mut matrix = zeros(dim, dim);
     let mut b = zeros(dim, 1);
     let coords_0_f64: [f64; D] = {
-        let coords_0: [T; D] = (&vertices[0]).into();
+        let coords_0: [T; D] = (&points[0]).into();
         coords_0.map(std::convert::Into::into)
     };
 
     for i in 0..dim {
-        let coords_vertex: [T; D] = (&vertices[i + 1]).into();
-        let coords_vertex_f64: [f64; D] = coords_vertex.map(std::convert::Into::into);
+        let coords_point: [T; D] = (&points[i + 1]).into();
+        let coords_point_f64: [f64; D] = coords_point.map(std::convert::Into::into);
 
         // Fill matrix row
         for j in 0..dim {
-            matrix[(i, j)] = coords_vertex_f64[j] - coords_0_f64[j];
+            matrix[(i, j)] = coords_point_f64[j] - coords_0_f64[j];
         }
 
         // Fill vector element
         b[(i, 0)] = na::distance_squared(
-            &na::Point::from(coords_vertex_f64),
+            &na::Point::from(coords_point_f64),
             &na::Point::from(coords_0_f64),
         );
     }
@@ -144,13 +142,13 @@ where
     Ok(Point::<f64, D>::from(solution_array))
 }
 
-/// Calculate the circumradius of a set of vertices forming a simplex.
+/// Calculate the circumradius of a set of points forming a simplex.
 ///
-/// The circumradius is the distance from the circumcenter to any vertex of the simplex.
+/// The circumradius is the distance from the circumcenter to any point of the simplex.
 ///
 /// # Arguments
 ///
-/// * `vertices` - A slice of vertices that form the simplex
+/// * `points` - A slice of points that form the simplex
 ///
 /// # Returns
 /// The circumradius as a value of type T if successful, or an error if the
@@ -163,20 +161,19 @@ where
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::circumradius;
 /// use approx::assert_relative_eq;
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let vertices = vec![vertex1, vertex2, vertex3, vertex4];
-/// let radius = circumradius(&vertices).unwrap();
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let points = vec![point1, point2, point3, point4];
+/// let radius = circumradius(&points).unwrap();
 /// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
 /// ```
-pub fn circumradius<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Result<T, anyhow::Error>
+pub fn circumradius<T, const D: usize>(points: &[Point<T, D>]) -> Result<T, anyhow::Error>
 where
     T: Clone
         + ComplexField<RealField = T>
@@ -187,14 +184,13 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
-    let circumcenter = circumcenter(vertices)?;
-    circumradius_with_center(vertices, &circumcenter)
+    let circumcenter = circumcenter(points)?;
+    circumradius_with_center(points, &circumcenter)
 }
 
 /// Calculate the circumradius given a precomputed circumcenter.
@@ -204,7 +200,7 @@ where
 ///
 /// # Arguments
 ///
-/// * `vertices` - A slice of vertices that form the simplex
+/// * `points` - A slice of points that form the simplex
 /// * `circumcenter` - The precomputed circumcenter
 ///
 /// # Returns
@@ -214,29 +210,28 @@ where
 /// # Errors
 ///
 /// Returns an error if:
-/// - The vertices slice is empty
+/// - The points slice is empty
 /// - Coordinate conversion fails
 /// - Distance calculation fails
 ///
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::{circumcenter, circumradius_with_center};
 /// use approx::assert_relative_eq;
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let vertices = vec![vertex1, vertex2, vertex3, vertex4];
-/// let center = circumcenter(&vertices).unwrap();
-/// let radius = circumradius_with_center(&vertices, &center).unwrap();
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let points = vec![point1, point2, point3, point4];
+/// let center = circumcenter(&points).unwrap();
+/// let radius = circumradius_with_center(&points, &center).unwrap();
 /// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
 /// ```
-pub fn circumradius_with_center<T, U, const D: usize>(
-    vertices: &[Vertex<T, U, D>],
+pub fn circumradius_with_center<T, const D: usize>(
+    points: &[Point<T, D>],
     circumcenter: &Point<f64, D>,
 ) -> Result<T, anyhow::Error>
 where
@@ -249,21 +244,20 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
-    if vertices.is_empty() {
-        return Err(anyhow::Error::msg("Empty vertex set"));
+    if points.is_empty() {
+        return Err(anyhow::Error::msg("Empty point set"));
     }
 
-    let vertex_coords: [T; D] = (&vertices[0]).into();
-    let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+    let point_coords: [T; D] = (&points[0]).into();
+    let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
     Ok(na::distance(
         &na::Point::<T, D>::from(circumcenter.coordinates()),
-        &na::Point::<T, D>::from(vertex_coords_f64),
+        &na::Point::<T, D>::from(point_coords_f64),
     ))
 }
 
@@ -312,11 +306,11 @@ impl std::fmt::Display for Orientation {
 /// Determine the orientation of a simplex using the determinant of its coordinate matrix.
 ///
 /// This function computes the orientation of a d-dimensional simplex by calculating
-/// the determinant of a matrix formed by the coordinates of its vertices.
+/// the determinant of a matrix formed by the coordinates of its points.
 ///
 /// # Arguments
 ///
-/// * `simplex_vertices` - A slice of vertices that form the simplex (must have exactly D+1 vertices)
+/// * `simplex_points` - A slice of points that form the simplex (must have exactly D+1 points)
 ///
 /// # Returns
 ///
@@ -325,11 +319,11 @@ impl std::fmt::Display for Orientation {
 ///
 /// # Errors
 ///
-/// Returns an error if the number of simplex vertices is not exactly D+1.
+/// Returns an error if the number of simplex points is not exactly D+1.
 ///
 /// # Algorithm
 ///
-/// For a d-dimensional simplex with vertices `v₁, v₂, ..., vₐ₊₁`, the orientation
+/// For a d-dimensional simplex with points `p₁, p₂, ..., pₐ₊₁`, the orientation
 /// is determined by the sign of the determinant of the matrix:
 ///
 /// ```text
@@ -340,25 +334,24 @@ impl std::fmt::Display for Orientation {
 /// |  xₐ₊₁ yₐ₊₁ zₐ₊₁ ... 1  |
 /// ```
 ///
-/// Where each row contains the d coordinates of a vertex and a constant 1.
+/// Where each row contains the d coordinates of a point and a constant 1.
 ///
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::Orientation;
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::simplex_orientation;
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
-/// let oriented = simplex_orientation(&simplex_vertices).unwrap();
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let simplex_points = vec![point1, point2, point3, point4];
+/// let oriented = simplex_orientation(&simplex_points).unwrap();
 /// assert_eq!(oriented, Orientation::NEGATIVE);
 /// ```
-pub fn simplex_orientation<T, U, const D: usize>(
-    simplex_vertices: &[Vertex<T, U, D>],
+pub fn simplex_orientation<T, const D: usize>(
+    simplex_points: &[Point<T, D>],
 ) -> Result<Orientation, anyhow::Error>
 where
     T: Clone
@@ -370,14 +363,13 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
 {
-    if simplex_vertices.len() != D + 1 {
+    if simplex_points.len() != D + 1 {
         return Err(anyhow::Error::msg(
-            "Invalid simplex: wrong number of vertices",
+            "Invalid simplex: wrong number of points",
         ));
     }
 
@@ -385,15 +377,15 @@ where
     // Matrix has D+1 columns: D coordinates + 1
     let mut matrix = zeros(D + 1, D + 1);
 
-    // Populate rows with the coordinates of the vertices of the simplex
-    for (i, v) in simplex_vertices.iter().enumerate() {
-        // Use implicit conversion from vertex to coordinates
-        let vertex_coords: [T; D] = v.into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+    // Populate rows with the coordinates of the points of the simplex
+    for (i, p) in simplex_points.iter().enumerate() {
+        // Use implicit conversion from point to coordinates
+        let point_coords: [T; D] = p.into();
+        let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
 
         // Add coordinates
         for j in 0..D {
-            matrix[(i, j)] = vertex_coords_f64[j];
+            matrix[(i, j)] = point_coords_f64[j];
         }
 
         // Add one to the last column
@@ -415,10 +407,10 @@ where
     }
 }
 
-/// Check if a vertex is contained within the circumsphere of a simplex using distance calculations.
+/// Check if a point is contained within the circumsphere of a simplex using distance calculations.
 ///
-/// This function uses explicit distance calculations to determine if a vertex lies within
-/// the circumsphere formed by the given vertices. It computes the circumcenter and circumradius
+/// This function uses explicit distance calculations to determine if a point lies within
+/// the circumsphere formed by the given points. It computes the circumcenter and circumradius
 /// of the simplex, then calculates the distance from the test point to the circumcenter
 /// and compares it with the circumradius.
 ///
@@ -427,7 +419,7 @@ where
 /// The algorithm follows these steps:
 /// 1. Calculate the circumcenter of the simplex using [`circumcenter`]
 /// 2. Calculate the circumradius using [`circumradius_with_center`]
-/// 3. Compute the Euclidean distance from the test vertex to the circumcenter
+/// 3. Compute the Euclidean distance from the test point to the circumcenter
 /// 4. Compare the distance with the circumradius to determine containment
 ///
 /// # Numerical Stability
@@ -442,12 +434,12 @@ where
 ///
 /// # Arguments
 ///
-/// * `simplex_vertices` - A slice of vertices that form the simplex
-/// * `test_vertex` - The vertex to test for containment
+/// * `simplex_points` - A slice of points that form the simplex
+/// * `test_point` - The point to test for containment
 ///
 /// # Returns
 ///
-/// Returns an `InSphere` enum indicating whether the vertex is `INSIDE`, `OUTSIDE`,
+/// Returns an `InSphere` enum indicating whether the point is `INSIDE`, `OUTSIDE`,
 /// or on the `BOUNDARY` of the circumsphere.
 ///
 /// # Errors
@@ -457,20 +449,19 @@ where
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::{insphere_distance, InSphere};
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
-/// let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.5, 0.5, 0.5])).data(3).build().unwrap();
-/// assert_eq!(insphere_distance(&simplex_vertices, test_vertex).unwrap(), InSphere::INSIDE);
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let simplex_points = vec![point1, point2, point3, point4];
+/// let test_point = Point::new([0.5, 0.5, 0.5]);
+/// assert_eq!(insphere_distance(&simplex_points, test_point).unwrap(), InSphere::INSIDE);
 /// ```
-pub fn insphere_distance<T, U, const D: usize>(
-    simplex_vertices: &[Vertex<T, U, D>],
-    test_vertex: Vertex<T, U, D>,
+pub fn insphere_distance<T, const D: usize>(
+    simplex_points: &[Point<T, D>],
+    test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
     T: Clone
@@ -482,20 +473,19 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
-    let circumcenter = circumcenter(simplex_vertices)?;
-    let circumradius = circumradius_with_center(simplex_vertices, &circumcenter)?;
-    // Use implicit conversion from vertex to coordinates, then convert to f64
-    let vertex_coords: [T; D] = (&test_vertex).into();
-    let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+    let circumcenter = circumcenter(simplex_points)?;
+    let circumradius = circumradius_with_center(simplex_points, &circumcenter)?;
+    // Use conversion from point to coordinates, then convert to f64
+    let point_coords: [T; D] = (&test_point).into();
+    let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
     let radius = na::distance(
         &na::Point::<T, D>::from(circumcenter.coordinates()),
-        &na::Point::<T, D>::from(vertex_coords_f64),
+        &na::Point::<T, D>::from(point_coords_f64),
     );
 
     let tolerance =
@@ -509,7 +499,7 @@ where
     }
 }
 
-/// Check if a vertex is contained within the circumsphere of a simplex using matrix determinant.
+/// Check if a point is contained within the circumsphere of a simplex using matrix determinant.
 ///
 /// This is the `InSphere` predicate test, which determines whether a test point lies inside,
 /// outside, or on the boundary of the circumsphere of a given simplex. This method is preferred
@@ -525,7 +515,7 @@ where
 /// DOI: [10.1007/PL00009321](https://doi.org/10.1007/PL00009321)
 ///
 /// The in-sphere test uses the determinant of a specially constructed matrix. For a
-/// d-dimensional simplex with vertices `v₁, v₂, ..., vₐ₊₁` and test point `p`, the
+/// d-dimensional simplex with points `p₁, p₂, ..., pₐ₊₁` and test point `p`, the
 /// matrix has the structure:
 ///
 /// ```text
@@ -537,8 +527,8 @@ where
 /// ```
 ///
 /// Where each row contains:
-/// - The d coordinates of a vertex
-/// - The squared norm (sum of squares) of the vertex coordinates
+/// - The d coordinates of a point
+/// - The squared norm (sum of squares) of the point coordinates
 /// - A constant 1
 ///
 /// The test point `p` is inside the circumsphere if and only if the determinant
@@ -562,18 +552,18 @@ where
 ///
 /// # Arguments
 ///
-/// * `simplex_vertices` - A slice of vertices that form the simplex (must have exactly D+1 vertices)
-/// * `test_vertex` - The vertex to test for containment
+/// * `simplex_points` - A slice of points that form the simplex (must have exactly D+1 points)
+/// * `test_point` - The point to test for containment
 ///
 /// # Returns
 ///
-/// Returns [`InSphere::INSIDE`] if the given vertex is inside the circumsphere,
+/// Returns [`InSphere::INSIDE`] if the given point is inside the circumsphere,
 /// [`InSphere::BOUNDARY`] if it's on the boundary, or [`InSphere::OUTSIDE`] if it's outside.
 ///
 /// # Errors
 ///
 /// Returns an error if:
-/// - The number of simplex vertices is not exactly D+1
+/// - The number of simplex points is not exactly D+1
 /// - Matrix operations fail
 /// - Coordinate conversion fails
 ///
@@ -587,27 +577,26 @@ where
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::insphere;
 /// use d_delaunay::geometry::InSphere;
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let simplex_points = vec![point1, point2, point3, point4];
 ///
 /// // Test with a point clearly outside the circumsphere
-/// let outside_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([2.0, 2.0, 2.0])).data(3).build().unwrap();
-/// assert_eq!(insphere(&simplex_vertices, outside_vertex).unwrap(), InSphere::OUTSIDE);
+/// let outside_point = Point::new([2.0, 2.0, 2.0]);
+/// assert_eq!(insphere(&simplex_points, outside_point).unwrap(), InSphere::OUTSIDE);
 ///
 /// // Test with a point clearly inside the circumsphere
-/// let inside_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.25, 0.25, 0.25])).data(4).build().unwrap();
-/// assert_eq!(insphere(&simplex_vertices, inside_vertex).unwrap(), InSphere::INSIDE);
+/// let inside_point = Point::new([0.25, 0.25, 0.25]);
+/// assert_eq!(insphere(&simplex_points, inside_point).unwrap(), InSphere::INSIDE);
 /// ```
-pub fn insphere<T, U, const D: usize>(
-    simplex_vertices: &[Vertex<T, U, D>],
-    test_vertex: Vertex<T, U, D>,
+pub fn insphere<T, const D: usize>(
+    simplex_points: &[Point<T, D>],
+    test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
     T: Clone
@@ -619,53 +608,52 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
 {
-    if simplex_vertices.len() != D + 1 {
+    if simplex_points.len() != D + 1 {
         return Err(anyhow::Error::msg(
-            "Invalid simplex: wrong number of vertices",
+            "Invalid simplex: wrong number of points",
         ));
     }
 
     // Create matrix for in-sphere test
     // Matrix dimensions: (D+2) x (D+2)
-    //   rows = D+1 simplex vertices + 1 test point
+    //   rows = D+1 simplex points + 1 test point
     //   cols = D coordinates + squared norm + 1
     let mut matrix = zeros(D + 2, D + 2);
 
-    // Populate rows with the coordinates of the vertices of the simplex
-    for (i, v) in simplex_vertices.iter().enumerate() {
-        // Use implicit conversion from vertex to coordinates
-        let vertex_coords: [T; D] = v.into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+    // Populate rows with the coordinates of the points of the simplex
+    for (i, p) in simplex_points.iter().enumerate() {
+        // Use implicit conversion from point to coordinates
+        let point_coords: [T; D] = p.into();
+        let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
 
         // Add coordinates
         for j in 0..D {
-            matrix[(i, j)] = vertex_coords_f64[j];
+            matrix[(i, j)] = point_coords_f64[j];
         }
 
         // Add squared norm (sum of squares of coordinates)
-        let squared_norm: f64 = vertex_coords_f64.iter().map(|&x| x * x).sum();
+        let squared_norm: f64 = point_coords_f64.iter().map(|&x| x * x).sum();
         matrix[(i, D)] = squared_norm;
 
         // Add one to the last column
         matrix[(i, D + 1)] = 1.0;
     }
 
-    // Add the test vertex to the last row of the matrix
-    let test_vertex_coords: [T; D] = (&test_vertex).into();
-    let test_vertex_coords_f64: [f64; D] = test_vertex_coords.map(std::convert::Into::into);
+    // Add the test point to the last row of the matrix
+    let test_point_coords: [T; D] = (&test_point).into();
+    let test_point_coords_f64: [f64; D] = test_point_coords.map(std::convert::Into::into);
 
     // Add coordinates
     for j in 0..D {
-        matrix[(D + 1, j)] = test_vertex_coords_f64[j];
+        matrix[(D + 1, j)] = test_point_coords_f64[j];
     }
 
     // Add squared norm
-    let test_squared_norm: f64 = test_vertex_coords_f64.iter().map(|&x| x * x).sum();
+    let test_squared_norm: f64 = test_point_coords_f64.iter().map(|&x| x * x).sum();
     matrix[(D + 1, D)] = test_squared_norm;
 
     // Add one to the last column
@@ -679,7 +667,7 @@ where
     // is inside the circumsphere. For a negatively oriented simplex, the determinant
     // is negative when the test point is inside the circumsphere.
     // We need to check the orientation of the simplex to interpret the determinant correctly.
-    let orientation = simplex_orientation(simplex_vertices)?;
+    let orientation = simplex_orientation(simplex_points)?;
 
     // Use a tolerance for boundary detection
     let tolerance = DEFAULT_TOLERANCE;
@@ -714,7 +702,7 @@ where
     }
 }
 
-/// Check if a vertex is contained within the circumsphere of a simplex using the lifted paraboloid determinant method.
+/// Check if a point is contained within the circumsphere of a simplex using the lifted paraboloid determinant method.
 ///
 /// This is an alternative implementation of the circumsphere containment test using
 /// a numerically stable matrix determinant approach based on the "lifted paraboloid" technique.
@@ -733,18 +721,18 @@ where
 /// by adding their squared distance as an additional coordinate. The in-sphere test then
 /// reduces to computing the determinant of a matrix formed from these lifted coordinates.
 ///
-/// For a d-dimensional simplex with vertices `v₀, v₁, ..., vₐ` and test point `p`,
+/// For a d-dimensional simplex with points `p₀, p₁, ..., pₐ` and test point `p`,
 /// the matrix has the structure:
 ///
 /// ```text
-/// | v₁-v₀  ||v₁-v₀||² |
-/// | v₂-v₀  ||v₂-v₀||² |
+/// | p₁-p₀  ||p₁-p₀||² |
+/// | p₂-p₀  ||p₂-p₀||² |
 /// | ...    ...       |
-/// | vₐ-v₀  ||vₐ-v₀||² |
-/// | p-v₀   ||p-v₀||²  |
+/// | pₐ-p₀  ||pₐ-p₀||² |
+/// | p-p₀   ||p-p₀||²  |
 /// ```
 ///
-/// This formulation centers coordinates around the first vertex (v₀), which improves
+/// This formulation centers coordinates around the first point (p₀), which improves
 /// numerical stability by reducing the magnitude of matrix elements compared to using
 /// absolute coordinates.
 ///
@@ -757,18 +745,18 @@ where
 ///
 /// # Arguments
 ///
-/// * `simplex_vertices` - A slice of vertices that form the simplex (must have exactly D+1 vertices)
-/// * `test_vertex` - The vertex to test for containment
+/// * `simplex_points` - A slice of points that form the simplex (must have exactly D+1 points)
+/// * `test_point` - The point to test for containment
 ///
 /// # Returns
 ///
-/// Returns an `InSphere` enum indicating whether the vertex is `INSIDE`, `OUTSIDE`,
+/// Returns an `InSphere` enum indicating whether the point is `INSIDE`, `OUTSIDE`,
 /// or on the `BOUNDARY` of the circumsphere.
 ///
 /// # Errors
 ///
 /// Returns an error if:
-/// - The number of simplex vertices is not exactly D+1
+/// - The number of simplex points is not exactly D+1
 /// - Matrix operations fail
 /// - Coordinate conversion fails
 ///
@@ -782,23 +770,22 @@ where
 /// # Example
 ///
 /// ```
-/// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::predicates::insphere_lifted;
-/// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-/// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-/// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(2).build().unwrap();
-/// let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+/// let point1 = Point::new([0.0, 0.0, 0.0]);
+/// let point2 = Point::new([1.0, 0.0, 0.0]);
+/// let point3 = Point::new([0.0, 1.0, 0.0]);
+/// let point4 = Point::new([0.0, 0.0, 1.0]);
+/// let simplex_points = vec![point1, point2, point3, point4];
 ///
 /// // Test with a point that should be inside according to the lifted paraboloid method
-/// let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.1, 0.1, 0.1])).data(3).build().unwrap();
-/// let result = insphere_lifted(&simplex_vertices, test_vertex);
+/// let test_point = Point::new([0.1, 0.1, 0.1]);
+/// let result = insphere_lifted(&simplex_points, test_point);
 /// assert!(result.is_ok()); // Should execute without error
 /// ```
-pub fn insphere_lifted<T, U, const D: usize>(
-    simplex_vertices: &[Vertex<T, U, D>],
-    test_vertex: Vertex<T, U, D>,
+pub fn insphere_lifted<T, const D: usize>(
+    simplex_points: &[Point<T, D>],
+    test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
     T: Clone
@@ -810,37 +797,36 @@ where
         + OrderedEq
         + Sum
         + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
 {
-    if simplex_vertices.len() != D + 1 {
+    if simplex_points.len() != D + 1 {
         return Err(anyhow::Error::msg(
-            "Invalid simplex: wrong number of vertices",
+            "Invalid simplex: wrong number of points",
         ));
     }
 
-    // Get the reference vertex (first vertex of the simplex)
-    let ref_vertex_coords: [T; D] = (&simplex_vertices[0]).into();
-    let ref_vertex_coords_f64: [f64; D] = ref_vertex_coords.map(std::convert::Into::into);
+    // Get the reference point (first point of the simplex)
+    let ref_point_coords: [T; D] = (&simplex_points[0]).into();
+    let ref_point_coords_f64: [f64; D] = ref_point_coords.map(std::convert::Into::into);
 
     // Create matrix for in-sphere test
     // Matrix dimensions: (D+1) x (D+1)
-    //   rows = D simplex vertices (relative to first) + 1 test point
+    //   rows = D simplex points (relative to first) + 1 test point
     //   cols = D coordinates + 1 squared norm
     let mut matrix = zeros(D + 1, D + 1);
 
-    // Populate rows with the coordinates relative to the reference vertex
+    // Populate rows with the coordinates relative to the reference point
     for i in 1..=D {
-        let vertex_coords: [T; D] = (&simplex_vertices[i]).into();
-        let vertex_coords_f64: [f64; D] = vertex_coords.map(std::convert::Into::into);
+        let point_coords: [T; D] = (&simplex_points[i]).into();
+        let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
 
         let mut squared_norm = 0.0_f64;
 
         // Calculate relative coordinates and squared norm
         for j in 0..D {
-            let relative_coord = vertex_coords_f64[j] - ref_vertex_coords_f64[j];
+            let relative_coord = point_coords_f64[j] - ref_point_coords_f64[j];
             matrix[(i - 1, j)] = relative_coord;
             squared_norm += relative_coord * relative_coord;
         }
@@ -849,15 +835,15 @@ where
         matrix[(i - 1, D)] = squared_norm;
     }
 
-    // Add the test vertex to the last row
-    let test_vertex_coords: [T; D] = (&test_vertex).into();
-    let test_vertex_coords_f64: [f64; D] = test_vertex_coords.map(std::convert::Into::into);
+    // Add the test point to the last row
+    let test_point_coords: [T; D] = (&test_point).into();
+    let test_point_coords_f64: [f64; D] = test_point_coords.map(std::convert::Into::into);
 
     let mut test_squared_norm = 0.0_f64;
 
-    // Calculate relative coordinates and squared norm for test vertex
+    // Calculate relative coordinates and squared norm for test point
     for j in 0..D {
-        let relative_coord = test_vertex_coords_f64[j] - ref_vertex_coords_f64[j];
+        let relative_coord = test_point_coords_f64[j] - ref_point_coords_f64[j];
         matrix[(D, j)] = relative_coord;
         test_squared_norm += relative_coord * relative_coord;
     }
@@ -870,7 +856,7 @@ where
 
     // For this matrix formulation using relative coordinates, we need to check
     // the simplex orientation to correctly interpret the determinant sign.
-    let orientation = simplex_orientation(simplex_vertices)?;
+    let orientation = simplex_orientation(simplex_points)?;
 
     // Use a tolerance for boundary detection
     let tolerance = DEFAULT_TOLERANCE;
@@ -1014,9 +1000,7 @@ mod tests {
             Point::new([0.0, 1.0, 0.0]),
             Point::new([0.0, 0.0, 1.0]),
         ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let center = circumcenter(&vertices).unwrap();
+        let center = circumcenter(&points).unwrap();
 
         assert_eq!(center, Point::new([0.5, 0.5, 0.5]));
     }
@@ -1038,8 +1022,11 @@ mod tests {
             .data(1)
             .build()
             .unwrap();
-        let vertices = vec![vertex1, vertex2, vertex3];
-        let center = circumcenter(&vertices);
+        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3]
+            .iter()
+            .map(|v| *v.point())
+            .collect();
+        let center = circumcenter(&points);
 
         assert!(center.is_err());
     }
@@ -1066,8 +1053,11 @@ mod tests {
             .data(2)
             .build()
             .unwrap();
-        let vertices = vec![vertex1, vertex2, vertex3, vertex4];
-        let radius = circumradius(&vertices).unwrap();
+        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3, vertex4]
+            .iter()
+            .map(|v| *v.point())
+            .collect();
+        let radius = circumradius(&points).unwrap();
         let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 
         assert_relative_eq!(radius, expected_radius, epsilon = DISTANCE_TOLERANCE);
@@ -1075,35 +1065,16 @@ mod tests {
 
     #[test]
     fn predicates_circumsphere_contains() {
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
-        let test_vertex = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(3)
-            .build()
-            .unwrap();
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+        let test_point = Point::new([1.0, 1.0, 1.0]);
 
         assert_eq!(
-            insphere_distance(&simplex_vertices, test_vertex).unwrap(),
+            insphere_distance(&points, test_point).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1131,14 +1102,16 @@ mod tests {
             .build()
             .unwrap();
         let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
-        let test_vertex = VertexBuilder::default()
+        let test_vertex: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([2.0, 2.0, 2.0]))
             .data(3)
             .build()
             .unwrap();
 
+        let vertex_points: Vec<Point<f64, 3>> =
+            simplex_vertices.iter().map(|v| *v.point()).collect();
         assert_eq!(
-            insphere(&simplex_vertices, test_vertex).unwrap(),
+            insphere(&vertex_points, *test_vertex.point()).unwrap(),
             InSphere::OUTSIDE
         );
     }
@@ -1150,16 +1123,21 @@ mod tests {
                 .point(Point::new([0.0, 0.0]))
                 .build()
                 .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([2.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0]))
-            .build()
-            .unwrap();
-        let vertices = vec![vertex1, vertex2, vertex3];
-        let center = circumcenter(&vertices).unwrap();
+        let vertex2: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
+            VertexBuilder::default()
+                .point(Point::new([2.0, 0.0]))
+                .build()
+                .unwrap();
+        let vertex3: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
+            VertexBuilder::default()
+                .point(Point::new([1.0, 2.0]))
+                .build()
+                .unwrap();
+        let points: Vec<Point<f64, 2>> = [vertex1, vertex2, vertex3]
+            .iter()
+            .map(|v| *v.point())
+            .collect();
+        let center = circumcenter(&points).unwrap();
 
         // For this triangle, circumcenter should be at (1.0, 0.75)
         assert_relative_eq!(center.coordinates()[0], 1.0, epsilon = 1e-10);
@@ -1173,16 +1151,21 @@ mod tests {
                 .point(Point::new([0.0, 0.0]))
                 .build()
                 .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertices = vec![vertex1, vertex2, vertex3];
-        let radius = circumradius(&vertices).unwrap();
+        let vertex2: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
+            VertexBuilder::default()
+                .point(Point::new([1.0, 0.0]))
+                .build()
+                .unwrap();
+        let vertex3: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
+            VertexBuilder::default()
+                .point(Point::new([0.0, 1.0]))
+                .build()
+                .unwrap();
+        let points: Vec<Point<f64, 2>> = [vertex1, vertex2, vertex3]
+            .iter()
+            .map(|v| *v.point())
+            .collect();
+        let radius = circumradius(&points).unwrap();
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
@@ -1198,17 +1181,17 @@ mod tests {
             .data(1)
             .build()
             .unwrap();
-        let vertex2 = VertexBuilder::default()
+        let vertex2: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
-        let vertex3 = VertexBuilder::default()
+        let vertex3: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
-        let vertex4 = VertexBuilder::default()
+        let vertex4: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(2)
             .build()
@@ -1216,22 +1199,26 @@ mod tests {
         let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
         // Test vertex clearly outside circumsphere
-        let vertex_far_outside = VertexBuilder::default()
+        let vertex_far_outside: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([10.0, 10.0, 10.0]))
             .data(4)
             .build()
             .unwrap();
         // Just check that the method runs without error for now
-        let result = insphere(&simplex_vertices, vertex_far_outside);
+        let vertex_points: Vec<Point<f64, 3>> =
+            simplex_vertices.iter().map(|v| *v.point()).collect();
+        let result = insphere(&vertex_points, *vertex_far_outside.point());
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
-        let origin = VertexBuilder::default()
+        let origin: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .data(3)
             .build()
             .unwrap();
-        let result_origin = insphere(&simplex_vertices, origin);
+        let vertex_points: Vec<Point<f64, 3>> =
+            simplex_vertices.iter().map(|v| *v.point()).collect();
+        let result_origin = insphere(&vertex_points, *origin.point());
         assert!(result_origin.is_ok());
     }
 
@@ -1244,17 +1231,17 @@ mod tests {
             .data(1)
             .build()
             .unwrap();
-        let vertex2 = VertexBuilder::default()
+        let vertex2: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 0.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
-        let vertex3 = VertexBuilder::default()
+        let vertex3: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 1.0, 0.0]))
             .data(1)
             .build()
             .unwrap();
-        let vertex4 = VertexBuilder::default()
+        let vertex4: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 1.0]))
             .data(2)
             .build()
@@ -1276,14 +1263,16 @@ mod tests {
         // );
 
         // Test with origin (should be inside or on boundary)
-        let origin = VertexBuilder::default()
+        let origin: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([0.0, 0.0, 0.0]))
             .data(3)
             .build()
             .unwrap();
         // Test with origin, which is a vertex of the simplex (on boundary of circumsphere)
+        let vertex_points: Vec<Point<f64, 3>> =
+            simplex_vertices.iter().map(|v| *v.point()).collect();
         assert_eq!(
-            insphere_lifted(&simplex_vertices, origin).unwrap(),
+            insphere_lifted(&vertex_points, *origin.point()).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1291,38 +1280,23 @@ mod tests {
     #[test]
     fn predicates_circumsphere_contains_vertex_matrix_2d() {
         // Test the optimized matrix method for 2D circumcircle containment
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([1.0, 0.0]),
+            Point::new([0.0, 1.0]),
+        ];
 
         // Test vertex far outside circumcircle - should be outside
-        let vertex_far_outside = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0]))
-            .build()
-            .unwrap();
+        let point_far_outside = Point::new([10.0, 10.0]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, vertex_far_outside).unwrap(),
+            insphere_lifted(&simplex_points, point_far_outside).unwrap(),
             InSphere::OUTSIDE
         );
 
         // Test with point inside the triangle - should be inside
-        let inside_point = VertexBuilder::default()
-            .point(Point::new([0.1, 0.1]))
-            .build()
-            .unwrap();
+        let inside_point = Point::new([0.1, 0.1]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, inside_point).unwrap(),
+            insphere_lifted(&simplex_points, inside_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1330,46 +1304,25 @@ mod tests {
     #[test]
     fn predicates_circumsphere_contains_vertex_matrix_4d() {
         // Test the optimized matrix method for 4D circumsphere containment
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 0.0, 1.0]),
+        ];
 
         // Test vertex clearly outside circumsphere
-        let vertex_far_outside = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0, 10.0, 10.0]))
-            .build()
-            .unwrap();
+        let point_far_outside = Point::new([10.0, 10.0, 10.0, 10.0]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, vertex_far_outside).unwrap(),
+            insphere_lifted(&simplex_points, point_far_outside).unwrap(),
             InSphere::OUTSIDE
         );
 
         // Test with point inside the simplex's circumsphere
-        let inside_point = VertexBuilder::default()
-            .point(Point::new([0.1, 0.1, 0.1, 0.1]))
-            .build()
-            .unwrap();
+        let inside_point = Point::new([0.1, 0.1, 0.1, 0.1]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, inside_point).unwrap(),
+            insphere_lifted(&simplex_points, inside_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1378,82 +1331,48 @@ mod tests {
     fn predicates_circumsphere_contains_vertex_matrix_4d_edge_cases() {
         // Test with known geometric cases for 4D circumsphere containment
         // Unit 4-simplex: vertices at origin and unit vectors along each axis
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 4> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 0.0, 1.0]),
+        ];
 
         // The circumcenter of this 4D simplex should be at (0.5, 0.5, 0.5, 0.5)
-        let circumcenter_point = VertexBuilder::default()
-            .point(Point::new([0.5, 0.5, 0.5, 0.5]))
-            .data(3)
-            .build()
-            .unwrap();
+        let circumcenter_point = Point::new([0.5, 0.5, 0.5, 0.5]);
 
         // Point at circumcenter should be inside the circumsphere
         assert_eq!(
-            insphere_lifted(&simplex_vertices, circumcenter_point).unwrap(),
+            insphere_lifted(&simplex_points, circumcenter_point).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with point that is actually inside circumsphere (distance 0.8 < radius 1.0)
-        let actually_inside = VertexBuilder::default()
-            .point(Point::new([0.9, 0.9, 0.9, 0.9]))
-            .data(4)
-            .build()
-            .unwrap();
+        let actually_inside = Point::new([0.9, 0.9, 0.9, 0.9]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, actually_inside).unwrap(),
+            insphere_lifted(&simplex_points, actually_inside).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with one of the simplex vertices (on boundary of circumsphere)
+        let vertex1 = Point::new([0.0, 0.0, 0.0, 0.0]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, vertex1).unwrap(),
+            insphere_lifted(&simplex_points, vertex1).unwrap(),
             InSphere::BOUNDARY
         );
 
         // Test with a point on one of the coordinate axes but closer to origin
-        let axis_point = VertexBuilder::default()
-            .point(Point::new([0.25, 0.0, 0.0, 0.0]))
-            .data(5)
-            .build()
-            .unwrap();
+        let axis_point = Point::new([0.25, 0.0, 0.0, 0.0]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, axis_point).unwrap(),
+            insphere_lifted(&simplex_points, axis_point).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with point equidistant from multiple vertices
-        let equidistant_point = VertexBuilder::default()
-            .point(Point::new([0.5, 0.5, 0.0, 0.0]))
-            .data(6)
-            .build()
-            .unwrap();
+        let equidistant_point = Point::new([0.5, 0.5, 0.0, 0.0]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, equidistant_point).unwrap(),
+            insphere_lifted(&simplex_points, equidistant_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1462,79 +1381,41 @@ mod tests {
     fn predicates_circumsphere_contains_vertex_matrix_4d_degenerate_cases() {
         // Test with 4D simplex that has some special properties
         // Regular 4D simplex with vertices forming a specific pattern
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
-            VertexBuilder::default()
-                .point(Point::new([1.0, 1.0, 1.0, 1.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, -1.0, -1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([-1.0, 1.0, -1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([-1.0, -1.0, 1.0, -1.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([-1.0, -1.0, -1.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        let simplex_points = vec![
+            Point::new([1.0, 1.0, 1.0, 1.0]),
+            Point::new([1.0, -1.0, -1.0, -1.0]),
+            Point::new([-1.0, 1.0, -1.0, -1.0]),
+            Point::new([-1.0, -1.0, 1.0, -1.0]),
+            Point::new([-1.0, -1.0, -1.0, 1.0]),
+        ];
 
         // Test with origin (should be inside this symmetric simplex)
-        let origin = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let origin = Point::new([0.0, 0.0, 0.0, 0.0]);
         // TODO: Fix matrix method - it disagrees with standard method on this case
-        let _result = insphere_lifted(&simplex_vertices, origin).unwrap();
+        let _result = insphere_lifted(&simplex_points, origin).unwrap();
         // Don't assert specific result until matrix method is fixed
 
         // Test with point far outside
-        let far_point = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0, 10.0, 10.0]))
-            .build()
-            .unwrap();
+        let far_point = Point::new([10.0, 10.0, 10.0, 10.0]);
         // TODO: Fix matrix method - it may give incorrect results for far points in 4D cases
-        let _far_result = insphere_lifted(&simplex_vertices, far_point).unwrap();
+        let _far_result = insphere_lifted(&simplex_points, far_point).unwrap();
         // Don't assert specific result until matrix method is fixed
 
         // Test with point on the surface of the circumsphere (approximately)
         // This is challenging to compute exactly, so we test a point that should be close
-        let surface_point = VertexBuilder::default()
-            .point(Point::new([1.5, 1.5, 1.5, 1.5]))
-            .build()
-            .unwrap();
-        let result = insphere_lifted(&simplex_vertices, surface_point);
+        let surface_point = Point::new([1.5, 1.5, 1.5, 1.5]);
+        let result = insphere_lifted(&simplex_points, surface_point);
         assert!(result.is_ok()); // Should not error, result depends on exact circumsphere
     }
 
     #[test]
     fn predicates_circumsphere_contains_vertex_matrix_error_cases() {
         // Test with wrong number of vertices (should error)
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let incomplete_simplex = vec![vertex1, vertex2]; // Only 2 vertices for 3D
+        let incomplete_simplex = vec![Point::new([0.0, 0.0, 0.0]), Point::new([1.0, 0.0, 0.0])]; // Only 2 vertices for 3D
 
-        let test_vertex = VertexBuilder::default()
-            .point(Point::new([0.5, 0.5, 0.5]))
-            .data(3)
-            .build()
-            .unwrap();
+        let test_point = Point::new([0.5, 0.5, 0.5]);
 
-        let result = insphere_lifted(&incomplete_simplex, test_vertex);
+        let result = insphere_lifted(&incomplete_simplex, test_point);
         assert!(result.is_err(), "Should error with insufficient vertices");
     }
 
@@ -1542,60 +1423,36 @@ mod tests {
     fn predicates_circumsphere_contains_vertex_matrix_edge_cases() {
         // Test with known geometric cases
         // Unit tetrahedron: vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
         // The circumcenter of this tetrahedron is at (0.5, 0.5, 0.5)
-        let _circumcenter_point: crate::delaunay_core::vertex::Vertex<f64, i32, 3> =
-            VertexBuilder::default()
-                .point(Point::new([0.5, 0.5, 0.5]))
-                .data(3)
-                .build()
-                .unwrap();
+        let _circumcenter_point = Point::new([0.5, 0.5, 0.5]);
 
         // TODO: Point at circumcenter should be inside the circumsphere, but matrix method fails
         // This is why we use circumsphere_contains_vertex in bowyer_watson instead
         // assert_eq!(
-        //     circumsphere_contains_vertex_matrix(&simplex_vertices, _circumcenter_point).unwrap(),
+        //     insphere_lifted(&simplex_points, _circumcenter_point).unwrap(),
         //     InSphere::INSIDE
         // );
 
         // Test with point that is actually inside circumsphere (distance 0.693 < radius 0.866)
-        let _actually_inside: crate::delaunay_core::vertex::Vertex<f64, i32, 3> =
-            VertexBuilder::default()
-                .point(Point::new([0.9, 0.9, 0.9]))
-                .data(4)
-                .build()
-                .unwrap();
+        let _actually_inside = Point::new([0.9, 0.9, 0.9]);
         // TODO: Matrix method should correctly identify this point as inside, but currently fails
         // This is why we use circumsphere_contains_vertex in bowyer_watson instead
         // assert_eq!(
-        //     circumsphere_contains_vertex_matrix(&simplex_vertices, _actually_inside).unwrap(),
+        //     insphere_lifted(&simplex_points, _actually_inside).unwrap(),
         //     InSphere::INSIDE
         // );
 
         // Test with one of the simplex vertices (on boundary, but matrix method returns BOUNDARY)
+        let vertex1 = Point::new([0.0, 0.0, 0.0]);
         assert_eq!(
-            insphere_lifted(&simplex_vertices, vertex1).unwrap(),
+            insphere_lifted(&simplex_points, vertex1).unwrap(),
             InSphere::BOUNDARY
         );
     }
@@ -1603,77 +1460,41 @@ mod tests {
     #[test]
     fn predicates_circumsphere_contains_vertex_matrix_1d() {
         // Test with 1D case (line segment)
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1> =
-            VertexBuilder::default()
-                .point(Point::new([0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([2.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2];
+        let simplex_points = vec![Point::new([0.0]), Point::new([2.0])];
 
         // Test point at the midpoint (should be on the "circumcircle" - the perpendicular bisector)
-        let midpoint = VertexBuilder::default()
-            .point(Point::new([1.0]))
-            .build()
-            .unwrap();
-        let result = insphere_lifted(&simplex_vertices, midpoint);
+        let midpoint = Point::new([1.0]);
+        let result = insphere_lifted(&simplex_points, midpoint);
         assert!(result.is_ok()); // Should not error
 
         // Test point far from the line segment
-        let far_point = VertexBuilder::default()
-            .point(Point::new([10.0]))
-            .build()
-            .unwrap();
-        let result_far = insphere_lifted(&simplex_vertices, far_point);
+        let far_point = Point::new([10.0]);
+        let result_far = insphere_lifted(&simplex_points, far_point);
         assert!(result_far.is_ok()); // Should not error
     }
 
     #[test]
     fn predicates_circumsphere_contains_vertex_4d() {
         // Test the standard determinant method for 4D circumsphere containment
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 0.0, 1.0]),
+        ];
 
         // Test vertex clearly outside circumsphere
-        let vertex_far_outside = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0, 10.0, 10.0]))
-            .build()
-            .unwrap();
+        let point_far_outside = Point::new([10.0, 10.0, 10.0, 10.0]);
         assert_eq!(
-            insphere(&simplex_vertices, vertex_far_outside).unwrap(),
+            insphere(&simplex_points, point_far_outside).unwrap(),
             InSphere::OUTSIDE
         );
 
         // Test with point inside the simplex's circumsphere
-        let inside_point = VertexBuilder::default()
-            .point(Point::new([0.1, 0.1, 0.1, 0.1]))
-            .build()
-            .unwrap();
+        let inside_point = Point::new([0.1, 0.1, 0.1, 0.1]);
         assert_eq!(
-            insphere(&simplex_vertices, inside_point).unwrap(),
+            insphere(&simplex_points, inside_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1682,83 +1503,49 @@ mod tests {
     fn predicates_circumsphere_contains_vertex_4d_edge_cases() {
         // Test with known geometric cases for 4D circumsphere containment
         // Unit 4-simplex: vertices at origin and unit vectors along each axis
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 4> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 0.0, 1.0]),
+        ];
 
         // The circumcenter of this 4D simplex should be at (0.5, 0.5, 0.5, 0.5)
-        let circumcenter_point = VertexBuilder::default()
-            .point(Point::new([0.5, 0.5, 0.5, 0.5]))
-            .data(3)
-            .build()
-            .unwrap();
+        let circumcenter_point = Point::new([0.5, 0.5, 0.5, 0.5]);
 
         // Point at circumcenter should be inside the circumsphere
         assert_eq!(
-            insphere(&simplex_vertices, circumcenter_point).unwrap(),
+            insphere(&simplex_points, circumcenter_point).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with point that is actually inside circumsphere (distance 0.8 < radius 1.0)
-        let actually_inside = VertexBuilder::default()
-            .point(Point::new([0.9, 0.9, 0.9, 0.9]))
-            .data(4)
-            .build()
-            .unwrap();
+        let actually_inside = Point::new([0.9, 0.9, 0.9, 0.9]);
         assert_eq!(
-            insphere(&simplex_vertices, actually_inside).unwrap(),
+            insphere(&simplex_points, actually_inside).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with one of the simplex vertices (should be on the boundary)
         // Due to floating-point precision, this might be exactly on the boundary
-        let result = insphere(&simplex_vertices, vertex1).unwrap();
+        let vertex1 = Point::new([0.0, 0.0, 0.0, 0.0]);
+        let result = insphere(&simplex_points, vertex1).unwrap();
         // For vertices of the simplex, they should be on the boundary, but floating-point precision
         // might cause slight variations, so we just verify the method runs without error
         let _ = result; // We don't assert a specific result here due to numerical precision
 
         // Test with a point on one of the coordinate axes but closer to origin
-        let axis_point = VertexBuilder::default()
-            .point(Point::new([0.25, 0.0, 0.0, 0.0]))
-            .data(5)
-            .build()
-            .unwrap();
+        let axis_point = Point::new([0.25, 0.0, 0.0, 0.0]);
         assert_eq!(
-            insphere(&simplex_vertices, axis_point).unwrap(),
+            insphere(&simplex_points, axis_point).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with point equidistant from multiple vertices
-        let equidistant_point = VertexBuilder::default()
-            .point(Point::new([0.5, 0.5, 0.0, 0.0]))
-            .data(6)
-            .build()
-            .unwrap();
+        let equidistant_point = Point::new([0.5, 0.5, 0.0, 0.0]);
         assert_eq!(
-            insphere(&simplex_vertices, equidistant_point).unwrap(),
+            insphere(&simplex_points, equidistant_point).unwrap(),
             InSphere::INSIDE
         );
     }
@@ -1791,67 +1578,44 @@ mod tests {
         let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
 
         // Test with origin (should be inside this symmetric simplex)
-        let origin = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let origin_point = Point::new([0.0, 0.0, 0.0, 0.0]);
+        let points: Vec<Point<f64, 4>> = simplex_vertices.iter().map(|v| *v.point()).collect();
         assert_eq!(
-            insphere_distance(&simplex_vertices, origin).unwrap(),
+            insphere_distance(&points, origin_point).unwrap(),
             InSphere::INSIDE
         );
 
         // Test with point far outside
-        let far_point = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0, 10.0, 10.0]))
-            .build()
-            .unwrap();
+        let far_point = Point::new([10.0, 10.0, 10.0, 10.0]);
         assert_eq!(
-            insphere_distance(&simplex_vertices, far_point).unwrap(),
+            insphere_distance(&points, far_point).unwrap(),
             InSphere::OUTSIDE
         );
 
         // Test with point on the surface of the circumsphere (approximately)
         // This is challenging to compute exactly, so we test a point that should be close
-        let surface_point = VertexBuilder::default()
-            .point(Point::new([1.5, 1.5, 1.5, 1.5]))
-            .build()
-            .unwrap();
-        let result = insphere_distance(&simplex_vertices, surface_point);
+        let surface_point = Point::new([1.5, 1.5, 1.5, 1.5]);
+        let result = insphere_distance(&points, surface_point);
         assert!(result.is_ok()); // Should not error, result depends on exact circumsphere
     }
 
     #[test]
     fn predicates_circumsphere_contains_vertex_2d() {
         // Test 2D case for circumsphere containment using determinant method
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([1.0, 0.0]),
+            Point::new([0.0, 1.0]),
+        ];
 
         // Test vertex far outside circumcircle
-        let vertex_far_outside = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0]))
-            .build()
-            .unwrap();
-        let result = insphere(&simplex_vertices, vertex_far_outside);
+        let point_far_outside = Point::new([10.0, 10.0]);
+        let result = insphere(&simplex_points, point_far_outside);
         assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
-        let center = VertexBuilder::default()
-            .point(Point::new([0.33, 0.33]))
-            .build()
-            .unwrap();
-        let result_center = insphere(&simplex_vertices, center);
+        let center = Point::new([0.33, 0.33]);
+        let result_center = insphere(&simplex_points, center);
         assert!(result_center.is_ok());
     }
 
@@ -1867,10 +1631,10 @@ mod tests {
             .point(Point::new([1.0, 0.0]))
             .build()
             .unwrap();
-        let vertices = vec![vertex1, vertex2];
+        let points: Vec<Point<f64, 2>> = [vertex1, vertex2].iter().map(|v| *v.point()).collect();
 
         // Test with insufficient vertices for proper simplex (2 vertices in 2D space)
-        let center_result = circumcenter(&vertices);
+        let center_result = circumcenter(&points);
         assert!(center_result.is_err());
     }
 
@@ -1894,10 +1658,13 @@ mod tests {
             .point(Point::new([3.0, 0.0, 0.0]))
             .build()
             .unwrap();
-        let vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3, vertex4]
+            .iter()
+            .map(|v| *v.point())
+            .collect();
 
         // This should fail because points are collinear
-        let center_result = circumcenter(&vertices);
+        let center_result = circumcenter(&points);
         assert!(center_result.is_err());
     }
 
@@ -1921,11 +1688,14 @@ mod tests {
             .point(Point::new([0.0, 0.0, 1.0]))
             .build()
             .unwrap();
-        let vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let points: Vec<Point<f64, 3>> = vec![vertex1, vertex2, vertex3, vertex4]
+            .iter()
+            .map(|v| *v.point())
+            .collect();
 
-        let center = circumcenter(&vertices).unwrap();
-        let radius_with_center = circumradius_with_center(&vertices, &center);
-        let radius_direct = circumradius(&vertices).unwrap();
+        let center = circumcenter(&points).unwrap();
+        let radius_with_center = circumradius_with_center(&points, &center);
+        let radius_direct = circumradius(&points).unwrap();
 
         assert_relative_eq!(radius_with_center.unwrap(), radius_direct, epsilon = 1e-10);
     }
@@ -1946,28 +1716,22 @@ mod tests {
             .point(Point::new([0.0, 1.0]))
             .build()
             .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3];
+        let simplex_vertices = [vertex1, vertex2, vertex3];
 
         // Test that the methods run without error
-        let test_point = VertexBuilder::default()
-            .point(Point::new([0.25, 0.25]))
-            .build()
-            .unwrap();
-
-        let circumsphere_result = insphere_distance(&simplex_vertices, test_point);
+        let test_point_coords = Point::new([0.25, 0.25]);
+        let points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+        let circumsphere_result = insphere_distance(&points, test_point_coords);
         assert!(circumsphere_result.is_ok());
 
-        let determinant_result = insphere_distance(&simplex_vertices, test_point);
+        let determinant_result = insphere_distance(&points, test_point_coords);
         assert!(determinant_result.is_ok());
 
         // At minimum, both methods should give the same result for the same input
-        let far_point = VertexBuilder::default()
-            .point(Point::new([100.0, 100.0]))
-            .build()
-            .unwrap();
+        let far_point_coords = Point::new([100.0, 100.0]);
 
-        let circumsphere_far = insphere_distance(&simplex_vertices, far_point);
-        let determinant_far = insphere_distance(&simplex_vertices, far_point);
+        let circumsphere_far = insphere_distance(&points, far_point_coords);
+        let determinant_far = insphere_distance(&points, far_point_coords);
 
         assert!(circumsphere_far.is_ok());
         assert!(determinant_far.is_ok());
@@ -2204,29 +1968,14 @@ mod tests {
     fn predicates_simplex_orientation_positive() {
         // Test a positively oriented simplex
         // Using vertices that create a positive determinant
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
-        let orientation = simplex_orientation(&simplex_vertices).unwrap();
+        let orientation = simplex_orientation(&simplex_points).unwrap();
         assert_eq!(
             orientation,
             Orientation::POSITIVE,
@@ -2238,29 +1987,14 @@ mod tests {
     fn predicates_simplex_orientation_negative() {
         // Test a negatively oriented simplex
         // Using vertices that create a negative determinant
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
 
-        let orientation = simplex_orientation(&simplex_vertices).unwrap();
+        let orientation = simplex_orientation(&simplex_points).unwrap();
         assert_eq!(
             orientation,
             Orientation::NEGATIVE,
@@ -2271,22 +2005,13 @@ mod tests {
     #[test]
     fn predicates_simplex_orientation_2d() {
         // Test 2D orientation
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3];
+        let simplex_points = vec![
+            Point::new([0.0, 0.0]),
+            Point::new([1.0, 0.0]),
+            Point::new([0.0, 1.0]),
+        ];
 
-        let orientation = simplex_orientation(&simplex_vertices).unwrap();
+        let orientation = simplex_orientation(&simplex_points).unwrap();
         assert_eq!(
             orientation,
             Orientation::POSITIVE,
@@ -2297,19 +2022,9 @@ mod tests {
     #[test]
     fn predicates_simplex_orientation_error_wrong_vertex_count() {
         // Test with wrong number of vertices
-        let vertex1: crate::delaunay_core::vertex::Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2]; // Only 2 vertices for 3D
+        let simplex_points = vec![Point::new([0.0, 0.0, 0.0]), Point::new([1.0, 0.0, 0.0])]; // Only 2 vertices for 3D
 
-        let result = simplex_orientation(&simplex_vertices);
+        let result = simplex_orientation(&simplex_points);
         assert!(
             result.is_err(),
             "Should error with wrong number of vertices"
@@ -2343,8 +2058,9 @@ mod tests {
             .unwrap();
         let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
-        let center = circumcenter(&simplex_vertices).unwrap();
-        let radius = circumradius(&simplex_vertices).unwrap();
+        let points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+        let center = circumcenter(&points).unwrap();
+        let radius = circumradius(&points).unwrap();
 
         println!("Circumcenter: {:?}", center.coordinates());
         println!("Circumradius: {radius}");
@@ -2358,14 +2074,16 @@ mod tests {
             distance_to_center < radius
         );
 
-        let test_vertex = VertexBuilder::default()
-            .point(Point::new([0.9, 0.9, 0.9]))
-            .data(4)
-            .build()
-            .unwrap();
+        let test_vertex: crate::delaunay_core::vertex::Vertex<f64, i32, 3> =
+            VertexBuilder::default()
+                .point(Point::new([0.9, 0.9, 0.9]))
+                .data(4)
+                .build()
+                .unwrap();
 
-        let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
-        let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
+        let points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+        let standard_result = insphere_distance(&points, *test_vertex.point()).unwrap();
+        let matrix_result = insphere_lifted(&points, *test_vertex.point()).unwrap();
 
         println!("Standard method result: {standard_result}");
         println!("Matrix method result: {matrix_result}");
@@ -2396,8 +2114,10 @@ mod tests {
             .unwrap();
         let simplex_vertices_4d = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
 
-        let center_4d = circumcenter(&simplex_vertices_4d).unwrap();
-        let radius_4d = circumradius(&simplex_vertices_4d).unwrap();
+        let points_4d: Vec<Point<f64, 4>> =
+            simplex_vertices_4d.iter().map(|v| *v.point()).collect();
+        let center_4d = circumcenter(&points_4d).unwrap();
+        let radius_4d = circumradius(&points_4d).unwrap();
 
         println!("4D Circumcenter: {:?}", center_4d.coordinates());
         println!("4D Circumradius: {radius_4d}");
@@ -2411,13 +2131,14 @@ mod tests {
             distance_to_center_4d < radius_4d
         );
 
-        let origin_vertex = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let origin_vertex: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 4> =
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0, 0.0, 0.0]))
+                .build()
+                .unwrap();
 
-        let standard_result_4d = insphere_distance(&simplex_vertices_4d, origin_vertex).unwrap();
-        let matrix_result_4d = insphere_lifted(&simplex_vertices_4d, origin_vertex).unwrap();
+        let standard_result_4d = insphere_distance(&points_4d, *origin_vertex.point()).unwrap();
+        let matrix_result_4d = insphere_lifted(&points_4d, *origin_vertex.point()).unwrap();
 
         println!("Standard method result for origin: {standard_result_4d}");
         println!("Matrix method result for origin: {matrix_result_4d}");
@@ -2441,7 +2162,7 @@ mod tests {
             .point(Point::new([0.0, 1.0]))
             .build()
             .unwrap();
-        let simplex_vertices = vec![vertex1, vertex2, vertex3];
+        let simplex_vertices = [vertex1, vertex2, vertex3];
 
         // Test various points
         let test_points = [
@@ -2453,10 +2174,12 @@ mod tests {
         ];
 
         for (i, point) in test_points.iter().enumerate() {
-            let test_vertex = VertexBuilder::default().point(*point).build().unwrap();
+            let test_vertex: crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2> =
+                VertexBuilder::default().point(*point).build().unwrap();
 
-            let standard_result = insphere_distance(&simplex_vertices, test_vertex).unwrap();
-            let matrix_result = insphere_lifted(&simplex_vertices, test_vertex).unwrap();
+            let points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(|v| *v.point()).collect();
+            let standard_result = insphere_distance(&points, *test_vertex.point()).unwrap();
+            let matrix_result = insphere_lifted(&points, *test_vertex.point()).unwrap();
 
             println!(
                 "Point {}: {:?} -> Standard: {:?}, Matrix: {}",
