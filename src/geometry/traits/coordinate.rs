@@ -6,43 +6,43 @@
 //! coordinates, enabling flexibility between arrays, vectors, or other storage types.
 //!
 //! # Overview
-//! 
+//!
 //! The `Coordinate` trait was created to address the need for abstracting coordinate
 //! functionality that was previously spread across individual trait requirements
 //! in `Point`, `Vertex`, `Cell`, `Facet`, and `TriangulationDataStructure`. It consolidates
 //! all the trait bounds that these structures need:
-//! 
+//!
 //! - `Float` for floating-point arithmetic operations
-//! - `Hash` for use in hash-based collections like HashMap and HashSet
+//! - `Hash` for use in hash-based collections like `HashMap` and `HashSet`
 //! - `PartialEq` and `Eq` for equality comparisons
 //! - `OrderedEq` for NaN-aware equality that treats NaN values as equal to themselves
 //! - `FiniteCheck` for validation of coordinate values
 //! - `HashCoordinate` for consistent hashing of floating-point values
 //! - Serialization traits (`Serialize`, `Deserialize`)
-//! 
+//!
 //! # Benefits
-//! 
+//!
 //! 1. **Abstraction**: The storage mechanism (arrays, vectors, hash maps, etc.) is
 //!    abstracted away, allowing future flexibility in how coordinates are stored.
-//! 
+//!
 //! 2. **Trait Consolidation**: All coordinate-related trait bounds are consolidated
 //!    into a single trait, simplifying the trait bounds on geometric structures.
-//! 
+//!
 //! 3. **Consistent Interface**: All coordinate implementations provide the same
 //!    interface regardless of underlying storage mechanism.
-//! 
+//!
 //! 4. **Future Extensibility**: New coordinate storage types can be added easily
 //!    by implementing the `Coordinate` trait.
 //!
 //! # Usage with Existing Code
-//! 
+//!
 //! The current `Point` structure uses arrays directly. The `Coordinate` trait provides
 //! a path for future refactoring where `Point` could be parameterized over different
 //! coordinate storage types while maintaining the same API.
 
 use super::{FiniteCheck, HashCoordinate, OrderedEq};
 use num_traits::{Float, Zero};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -78,39 +78,39 @@ use std::{
 /// // This trait will be implemented for different storage types
 /// // For example, with array storage:
 /// use d_delaunay::geometry::{ArrayCoordinate, Coordinate};
-/// 
+///
 /// // Create coordinates using array storage
 /// let coord1: ArrayCoordinate<f64, 3> = ArrayCoordinate::from_array([1.0, 2.0, 3.0]);
 /// let coord2: ArrayCoordinate<f64, 3> = ArrayCoordinate::from_array([1.0, 2.0, 3.0]);
-/// 
+///
 /// // All coordinate types implement the same trait
 /// assert_eq!(coord1.dim(), 3);
 /// assert_eq!(coord1.to_array(), [1.0, 2.0, 3.0]);
 /// assert_eq!(coord1, coord2);
-/// 
+///
 /// // Validate coordinates
 /// assert!(coord1.validate().is_ok());
-/// 
+///
 /// // Create origin coordinate
 /// let origin: ArrayCoordinate<f64, 3> = ArrayCoordinate::origin();
 /// assert_eq!(origin.to_array(), [0.0, 0.0, 0.0]);
 /// ```
-/// 
+///
 /// # Future Storage Implementations
-/// 
+///
 /// The trait is designed to support various storage mechanisms:
-/// 
+///
 /// ```ignore
 /// // Future vector-based coordinate (not yet implemented)
 /// struct VectorCoordinate<T> {
 ///     coords: Vec<T>,
 /// }
-/// 
-/// // Future hash-based coordinate for sparse dimensions (not yet implemented) 
+///
+/// // Future hash-based coordinate for sparse dimensions (not yet implemented)
 /// struct SparseCoordinate<T, const D: usize> {
 ///     coords: HashMap<usize, T>,
 /// }
-/// 
+///
 /// // All would implement the same Coordinate trait
 /// ```
 pub trait Coordinate<T, const D: usize>
@@ -193,6 +193,7 @@ where
     /// let origin = SomeCoordinate::origin();
     /// assert_eq!(origin.to_array(), [0.0, 0.0, 0.0]);
     /// ```
+    #[must_use]
     fn origin() -> Self
     where
         T: Zero,
@@ -206,6 +207,12 @@ where
     ///
     /// Returns `Ok(())` if all coordinates are finite (not NaN or infinite),
     /// otherwise returns an error describing which coordinate is invalid.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CoordinateValidationError::InvalidCoordinate` if any coordinate
+    /// is NaN, infinite, or otherwise not finite. The error includes details about
+    /// which coordinate index is invalid, its value, and the coordinate dimension.
     ///
     /// # Examples
     ///
@@ -507,7 +514,7 @@ mod tests {
 
         let mut map: HashMap<ArrayCoordinate<f64, 3>, &str> = HashMap::new();
         map.insert(coord1, "first");
-        
+
         assert!(map.contains_key(&coord2));
         assert!(!map.contains_key(&coord3));
     }
@@ -515,11 +522,11 @@ mod tests {
     #[test]
     fn array_coordinate_in_collections() {
         let mut set: HashSet<ArrayCoordinate<f64, 2>> = HashSet::new();
-        
+
         set.insert(ArrayCoordinate::new([1.0, 2.0]));
         set.insert(ArrayCoordinate::new([1.0, 2.0])); // Duplicate
         set.insert(ArrayCoordinate::new([3.0, 4.0]));
-        
+
         assert_eq!(set.len(), 2);
         assert!(set.contains(&ArrayCoordinate::new([1.0, 2.0])));
         assert!(set.contains(&ArrayCoordinate::new([3.0, 4.0])));
@@ -545,7 +552,7 @@ mod tests {
     fn array_coordinate_conversions() {
         let coords = [1.0, 2.0, 3.0];
         let coord = ArrayCoordinate::from(coords);
-        
+
         // Test conversion back to array
         let back_to_array: [f64; 3] = coord.into();
         assert_relative_eq!(back_to_array.as_slice(), coords.as_slice());
@@ -558,10 +565,10 @@ mod tests {
     #[test]
     fn array_coordinate_serialization() {
         let coord = ArrayCoordinate::new([1.0, 2.0, 3.0]);
-        
+
         let serialized = serde_json::to_string(&coord).unwrap();
         let deserialized: ArrayCoordinate<f64, 3> = serde_json::from_str(&serialized).unwrap();
-        
+
         assert_eq!(coord, deserialized);
     }
 
@@ -584,7 +591,7 @@ mod tests {
     fn validation_error_details() {
         let invalid = ArrayCoordinate::new([1.0, f64::NAN, 3.0]);
         let result = invalid.validate();
-        
+
         if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
             coordinate_value,
@@ -613,7 +620,7 @@ mod tests {
         // Test origins
         let origin_1d: ArrayCoordinate<f64, 1> = ArrayCoordinate::origin();
         let origin_2d: ArrayCoordinate<f64, 2> = ArrayCoordinate::origin();
-        
+
         assert_relative_eq!(origin_1d.to_array().as_slice(), [0.0].as_slice());
         assert_relative_eq!(origin_2d.to_array().as_slice(), [0.0, 0.0].as_slice());
     }
