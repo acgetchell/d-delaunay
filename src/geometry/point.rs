@@ -17,31 +17,14 @@
 
 #![allow(clippy::similar_names)]
 
+use crate::geometry::traits::coordinate::{Coordinate, CoordinateValidationError};
 use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq};
-use num_traits::{Float, Zero};
+use num_traits::Float;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
-use thiserror::Error;
 
-/// Enum representing validation errors for a [`Point`].
-#[derive(Error, Debug, PartialEq, Clone)]
-pub enum PointValidationError {
-    /// A coordinate is invalid (NaN or infinite).
-    #[error(
-        "Invalid coordinate at index {coordinate_index} in dimension {dimension}: {coordinate_value}"
-    )]
-    InvalidCoordinate {
-        /// Index of the invalid coordinate in the point.
-        coordinate_index: usize,
-        /// Value of the invalid coordinate, presented as a string.
-        coordinate_value: String,
-        /// The dimensionality (number of coordinates) of the point.
-        dimension: usize,
-    },
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialOrd)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of type `T`.
 ///
@@ -56,7 +39,15 @@ pub enum PointValidationError {
 /// private to prevent modification after instantiation.
 pub struct Point<T, const D: usize>
 where
-    T: Default + Float + OrderedEq,
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
@@ -65,34 +56,34 @@ where
 
 impl<T, const D: usize> Point<T, D>
 where
-    T: Default + Float + OrderedEq,
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Coordinate<T, D>,
 {
-    /// The function `new` creates a new instance of a [Point] with the given
-    /// coordinates.
-    ///
-    /// # Arguments
-    ///
-    /// * `coords`: The `coords` parameter is an array of type `T` with a
-    ///   length of `D`.
-    ///
-    /// # Returns
-    ///
-    /// The `new` function returns an instance of the [Point].
+    /// Create a new Point from an array of coordinates.
     ///
     /// # Example
     ///
     /// ```rust
     /// use d_delaunay::geometry::point::Point;
-    /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
-    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
+    /// let point = Point::new([1.0, 2.0, 3.0]);
+    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
-    pub const fn new(coords: [T; D]) -> Self {
-        Self { coords }
+    pub fn new(coords: [T; D]) -> Self {
+        Self::from_array(coords)
     }
 
     /// The `dim` function returns the dimensionality of the [Point].
+    /// This is a convenience method that delegates to the Coordinate trait.
     ///
     /// # Returns
     ///
@@ -113,6 +104,7 @@ where
     }
 
     /// Returns a copy of the coordinates of the point.
+    /// This is a convenience method that delegates to the Coordinate trait.
     ///
     /// # Returns
     ///
@@ -126,69 +118,178 @@ where
     /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0, 4.0]);
     /// ```
     #[inline]
-    pub const fn coordinates(&self) -> [T; D] {
-        self.coords
-    }
-
-    /// The `origin` function returns the origin [Point].
-    ///
-    /// # Returns
-    ///
-    /// The `origin()` function returns a D-dimensional origin point
-    /// in Cartesian coordinates.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use d_delaunay::geometry::point::Point;
-    /// let point: Point<f64, 4> = Point::origin();
-    /// assert_eq!(point.coordinates(), [0.0, 0.0, 0.0, 0.0]);
-    /// ```
-    #[must_use]
-    pub fn origin() -> Self
-    where
-        T: Zero + Copy,
-    {
-        Self::new([T::zero(); D])
+    pub fn coordinates(&self) -> [T; D] {
+        self.to_array()
     }
 
     /// Check if all coordinates are finite (no NaN or infinite values).
-    /// The Rust type system guarantees that the number of coordinates
-    /// matches the dimensionality `D`.
+    /// This is a convenience method that delegates to the Coordinate trait.
     ///
     /// # Returns
     ///
     /// Returns `Ok(())` if all coordinates are finite, otherwise returns a
-    /// `PointValidationError` indicating which coordinate is invalid and why.
+    /// `CoordinateValidationError` indicating which coordinate is invalid and why.
     ///
     /// # Errors
     ///
-    /// Returns `PointValidationError::InvalidCoordinate` if any coordinate
+    /// Returns `CoordinateValidationError::InvalidCoordinate` if any coordinate
     /// is NaN, infinite, or otherwise invalid.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use d_delaunay::geometry::point::{Point, PointValidationError};
-    /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// assert!(point.is_valid().is_ok());
-    ///
-    /// let invalid_point = Point::new([1.0, f64::NAN, 3.0]);
-    /// match invalid_point.is_valid() {
-    ///     Err(PointValidationError::InvalidCoordinate { coordinate_index, .. }) => {
-    ///         assert_eq!(coordinate_index, 1);
-    ///     }
-    ///     Ok(_) => panic!("Expected validation error"),
-    /// }
-    /// ```
-    pub fn is_valid(&self) -> Result<(), PointValidationError>
+    pub fn is_valid(&self) -> Result<(), CoordinateValidationError> {
+        self.validate()
+    }
+}
+
+// Implement Hash using the Coordinate trait
+impl<T, const D: usize> Hash for Point<T, D>
+where
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Coordinate<T, D>,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_coordinate(state);
+    }
+}
+
+// Implement PartialEq using the Coordinate trait
+impl<T, const D: usize> PartialEq for Point<T, D>
+where
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Coordinate<T, D>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ordered_equals(other)
+    }
+}
+
+// Implement Eq using the Coordinate trait
+impl<T, const D: usize> Eq for Point<T, D>
+where
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Coordinate<T, D>,
+{
+}
+
+/// Manual implementation of Serialize for Point
+impl<T, const D: usize> Serialize for Point<T, D>
+where
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        T: FiniteCheck + Copy + Debug,
+        S: serde::Serializer,
     {
+        self.coords.serialize(serializer)
+    }
+}
+
+/// Manual implementation of Deserialize for Point
+impl<'de, T, const D: usize> Deserialize<'de> for Point<T, D>
+where
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        let coords = <[T; D]>::deserialize(deserializer)?;
+        Ok(Point { coords })
+    }
+}
+
+/// Implementation of the `Coordinate` trait for Point
+/// This allows Point to be used as a coordinate type directly
+impl<T, const D: usize> Coordinate<T, D> for Point<T, D>
+where
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    /// Create a new Point from an array of coordinates
+    #[inline]
+    fn from_array(coords: [T; D]) -> Self {
+        Self { coords }
+    }
+
+    /// Extract the coordinates as an array
+    #[inline]
+    fn to_array(&self) -> [T; D] {
+        self.coords
+    }
+
+    /// Get the coordinate at the specified index
+    #[inline]
+    fn get(&self, index: usize) -> Option<T> {
+        self.coords.get(index).copied()
+    }
+
+    /// Create an origin point (all coordinates are zero)
+    #[inline]
+    fn origin() -> Self
+    where
+        T: num_traits::Zero,
+    {
+        Self::from_array([T::zero(); D])
+    }
+
+    /// Validate that all coordinates are finite (no NaN or infinite values)
+    fn validate(&self) -> Result<(), CoordinateValidationError> {
         // Verify all coordinates are finite
         for (index, &coord) in self.coords.iter().enumerate() {
             if !coord.is_finite_generic() {
-                return Err(PointValidationError::InvalidCoordinate {
+                return Err(CoordinateValidationError::InvalidCoordinate {
                     coordinate_index: index,
                     coordinate_value: format!("{coord:?}"),
                     dimension: D,
@@ -197,28 +298,16 @@ where
         }
         Ok(())
     }
-}
 
-impl<T, const D: usize> Hash for Point<T, D>
-where
-    T: HashCoordinate + Default + Float + OrderedEq,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    /// Hash the coordinate values
+    fn hash_coordinate<H: Hasher>(&self, state: &mut H) {
         for &coord in &self.coords {
             coord.hash_coord(state);
         }
     }
-}
 
-// Custom PartialEq implementation using OrderedFloat for consistent NaN handling
-impl<T, const D: usize> PartialEq for Point<T, D>
-where
-    T: Default + Float + OrderedEq,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    fn eq(&self, other: &Self) -> bool {
+    /// Check if two coordinates are equal using `OrderedEq`
+    fn ordered_equals(&self, other: &Self) -> bool {
         self.coords
             .iter()
             .zip(other.coords.iter())
@@ -226,56 +315,46 @@ where
     }
 }
 
-// Manual implementation of Eq for Point using OrderedFloat for proper NaN handling
-impl<T, const D: usize> Eq for Point<T, D>
-where
-    T: Default + Float + OrderedEq,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-}
-
-/// From trait implementations for Point conversions
+/// From trait implementations for Point conversions - using Coordinate trait
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
     T: Default + Float + Into<U>,
-    U: Default + Float + OrderedEq,
+    U: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<U, D>: Coordinate<U, D>,
 {
     /// Create a new [Point] from an array of coordinates of type `T`.
-    ///
-    /// # Arguments
-    ///
-    /// * `coords`: An array of type `T` with a length of `D`, representing the
-    ///   coordinates of the point.
-    ///
-    /// # Returns
-    ///
-    /// The function returns a new instance of the [Point] struct with the
-    /// coordinates converted to type `U`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use d_delaunay::geometry::point::Point;
-    /// let coords = [1.0, 2.0, 3.0];
-    /// let point: Point<f64, 3> = Point::from(coords);
-    /// assert_eq!(point.coordinates(), [1.0, 2.0, 3.0]);
-    /// ```
     #[inline]
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
         let coords_u: [U; D] = coords.map(std::convert::Into::into);
-        Self { coords: coords_u }
+        Point::from_array(coords_u)
     }
 }
 
-/// Enable conversions from Point to coordinate arrays
-/// This allows `point` and `&point` to be implicitly converted to `[T; D]`
+/// Enable conversions from Point to coordinate arrays - using Coordinate trait
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
-    T: Default + Float + OrderedEq,
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Coordinate<T, D>,
 {
     /// # Example
     ///
@@ -287,14 +366,23 @@ where
     /// ```
     #[inline]
     fn from(point: Point<T, D>) -> [T; D] {
-        point.coordinates()
+        point.to_array()
     }
 }
 
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
-    T: Default + Float + OrderedEq,
+    T: Default
+        + Float
+        + OrderedEq
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    Point<T, D>: Coordinate<T, D>,
 {
     /// # Example
     ///
@@ -306,7 +394,7 @@ where
     /// ```
     #[inline]
     fn from(point: &Point<T, D>) -> [T; D] {
-        point.coordinates()
+        point.to_array()
     }
 }
 
@@ -331,7 +419,14 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Debug + Default + OrderedEq + Float,
+        T: Debug
+            + Default
+            + OrderedEq
+            + Float
+            + FiniteCheck
+            + HashCoordinate
+            + Serialize
+            + DeserializeOwned,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         assert_eq!(point.coordinates(), expected_coords);
@@ -344,8 +439,16 @@ mod tests {
         point2: Point<T, D>,
         should_be_equal: bool,
     ) where
-        T: HashCoordinate + Default + OrderedEq + Debug + Float,
+        T: HashCoordinate
+            + Default
+            + OrderedEq
+            + Debug
+            + Float
+            + FiniteCheck
+            + Serialize
+            + DeserializeOwned,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+        Point<T, D>: Hash,
     {
         if should_be_equal {
             assert_eq!(point1, point2);
@@ -435,17 +538,11 @@ mod tests {
         assert_tokens(
             &point,
             &[
-                Token::Struct {
-                    name: "Point",
-                    len: 1,
-                },
-                Token::Str("coords"),
                 Token::Tuple { len: 3 },
                 Token::F64(1.0),
                 Token::F64(2.0),
                 Token::F64(3.0),
                 Token::TupleEnd,
-                Token::StructEnd,
             ],
         );
     }
@@ -455,7 +552,7 @@ mod tests {
         let point: Point<f64, 4> = Point::default();
         let serialized = serde_json::to_string(&point).unwrap();
 
-        assert_eq!(serialized, "{\"coords\":[0.0,0.0,0.0,0.0]}");
+        assert_eq!(serialized, "[0.0,0.0,0.0,0.0]");
 
         let deserialized: Point<f64, 4> = serde_json::from_str(&serialized).unwrap();
 
@@ -1756,14 +1853,14 @@ mod tests {
 
     #[test]
     fn point_validation_error_details() {
-        // Test PointValidationError with specific error details
+        // Test CoordinateValidationError with specific error details
 
         // Test invalid coordinate at specific index
         let invalid_point = Point::new([1.0, f64::NAN, 3.0]);
         let result = invalid_point.is_valid();
         assert!(result.is_err());
 
-        if let Err(PointValidationError::InvalidCoordinate {
+        if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
             coordinate_value,
             dimension,
@@ -1779,7 +1876,7 @@ mod tests {
         // Test with infinity at different positions
         let inf_point = Point::new([f64::INFINITY, 2.0, 3.0, 4.0]);
         let result = inf_point.is_valid();
-        if let Err(PointValidationError::InvalidCoordinate {
+        if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
             coordinate_value,
             dimension,
@@ -1795,7 +1892,7 @@ mod tests {
         // Test with negative infinity at last position
         let neg_inf_point = Point::new([1.0, 2.0, f64::NEG_INFINITY]);
         let result = neg_inf_point.is_valid();
-        if let Err(PointValidationError::InvalidCoordinate {
+        if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
             coordinate_value,
             dimension,
@@ -1809,7 +1906,7 @@ mod tests {
         // Test f32 validation errors
         let invalid_f32_point = Point::new([1.0f32, f32::NAN, 3.0f32]);
         let result = invalid_f32_point.is_valid();
-        if let Err(PointValidationError::InvalidCoordinate {
+        if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
             coordinate_value,
             dimension,
@@ -1850,7 +1947,7 @@ mod tests {
 
     #[test]
     fn point_validation_error_clone_and_eq() {
-        // Test that PointValidationError can be cloned and compared
+        // Test that CoordinateValidationError can be cloned and compared
         let invalid_point = Point::new([f64::NAN, 2.0]);
         let result1 = invalid_point.is_valid();
         let result2 = invalid_point.is_valid();
@@ -1892,7 +1989,7 @@ mod tests {
         let multi_invalid = Point::new([1.0, f64::NAN, f64::INFINITY, f64::NAN]);
         let result = multi_invalid.is_valid();
 
-        if let Err(PointValidationError::InvalidCoordinate {
+        if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index, ..
         }) = result
         {
@@ -1906,7 +2003,7 @@ mod tests {
         let first_invalid = Point::new([f64::INFINITY, f64::NAN, 3.0]);
         let result = first_invalid.is_valid();
 
-        if let Err(PointValidationError::InvalidCoordinate {
+        if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index, ..
         }) = result
         {

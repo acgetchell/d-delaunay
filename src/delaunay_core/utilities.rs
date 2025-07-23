@@ -81,8 +81,16 @@ pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHashe
     ordering: Ordering,
 ) -> Result<[T; D], Error>
 where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: Default
+        + OrderedEq
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + Copy
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     if vertices.is_empty() {

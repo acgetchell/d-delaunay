@@ -14,7 +14,7 @@ use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, NumCast};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -69,9 +69,17 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Default + OrderedEq + Debug + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: Default
+        + OrderedEq
+        + Debug
+        + Float
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Serialize
+        + DeserializeOwned,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     // Two facets are adjacent if they have the same vertices
@@ -93,8 +101,16 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: Default
+        + OrderedEq
+        + Float
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     let mut combinations = Vec::new();
@@ -141,7 +157,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
 ///
@@ -171,9 +187,17 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: Default
+        + OrderedEq
+        + Float
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// A [`HashMap`] that stores [Vertex] objects with their corresponding [Uuid]s as
@@ -198,9 +222,15 @@ where
         + SubAssign<f64>
         + Sum
         + OrderedEq
-        + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        + Float
+        + FiniteCheck
+        + HashCoordinate
+        + Copy
+        + Debug
+        + Serialize
+        + DeserializeOwned,
+    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     f64: From<T>,
     for<'a> &'a T: Div<f64>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,

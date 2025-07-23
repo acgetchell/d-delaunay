@@ -30,15 +30,22 @@ pub mod delaunay_core {
     pub use vertex::*;
 }
 
-/// Contains the `Point` struct and geometry predicates.
+/// Contains geometric types including the `Point` struct and geometry predicates.
+///
+/// The geometry module provides a coordinate abstraction through the `Coordinate` trait
+/// that unifies coordinate operations across different storage mechanisms. The `Point`
+/// type implements this abstraction, providing floating-point coordinate support with
+/// proper NaN handling, validation, and hashing.
 pub mod geometry {
     pub mod matrix;
     pub mod point;
     pub mod predicates;
-    /// Traits module containing reusable trait definitions.
+    /// Traits module containing coordinate abstractions and reusable trait definitions.
     ///
-    /// This module contains common traits used throughout the geometry system,
-    /// providing interfaces for validation and computation on geometric types.
+    /// This module contains the core `Coordinate` trait that abstracts coordinate
+    /// operations, along with supporting traits for validation (`FiniteCheck`),
+    /// equality comparison (`OrderedEq`), and hashing (`HashCoordinate`) of
+    /// floating-point coordinate values.
     pub mod traits {
         pub mod coordinate;
         pub mod finitecheck;

@@ -94,7 +94,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -186,7 +191,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -246,7 +256,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -365,7 +380,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -475,7 +495,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -610,7 +635,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -799,7 +829,12 @@ where
         + PartialOrd
         + OrderedEq
         + Sum
-        + Float,
+        + Float
+        + crate::geometry::traits::finitecheck::FiniteCheck
+        + crate::geometry::traits::hashcoordinate::HashCoordinate
+        + std::fmt::Debug
+        + Serialize
+        + DeserializeOwned,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
