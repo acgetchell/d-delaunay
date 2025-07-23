@@ -40,9 +40,11 @@ pub mod geometry {
     /// This module contains common traits used throughout the geometry system,
     /// providing interfaces for validation and computation on geometric types.
     pub mod traits {
+        pub mod coordinate;
         pub mod finitecheck;
         pub mod hashcoordinate;
         pub mod orderedeq;
+        pub use coordinate::*;
         pub use finitecheck::*;
         pub use hashcoordinate::*;
         pub use orderedeq::*;
