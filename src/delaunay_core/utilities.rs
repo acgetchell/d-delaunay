@@ -1,9 +1,8 @@
 //! Utility functions
 
 use crate::delaunay_core::vertex::Vertex;
-use crate::geometry::OrderedEq;
+use crate::geometry::traits::coordinate::CoordinateScalar;
 use anyhow::Error;
-use num_traits::Float;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -81,15 +80,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHashe
     ordering: Ordering,
 ) -> Result<[T; D], Error>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + Copy
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {

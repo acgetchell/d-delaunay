@@ -7,10 +7,9 @@ use super::{
     utilities::make_uuid,
     vertex::{Vertex, VertexValidationError},
 };
-use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
+use crate::geometry::{point::Point, traits::coordinate::CoordinateScalar};
 use na::ComplexField;
 use nalgebra as na;
-use num_traits::Float;
 use peroxide::fuga::anyhow;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
@@ -69,15 +68,7 @@ pub enum CellValidationError {
 ///   the data must implement [Eq], [Hash], [Ord], [`PartialEq`], and [`PartialOrd`].
 pub struct Cell<T, U, V, const D: usize>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -97,15 +88,7 @@ where
 
 impl<T, U, V, const D: usize> CellBuilder<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -131,15 +114,7 @@ where
 // Basic implementation block with minimal trait bounds for common methods
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -412,10 +387,7 @@ where
     /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
     /// assert!(cell.is_valid().is_ok());
     /// ```
-    pub fn is_valid(&self) -> Result<(), CellValidationError>
-    where
-        T: FiniteCheck + HashCoordinate + Copy,
-    {
+    pub fn is_valid(&self) -> Result<(), CellValidationError> {
         // Check if all vertices are valid
         for vertex in &self.vertices {
             vertex.is_valid()?;
@@ -451,20 +423,7 @@ where
 // Advanced implementation block for methods requiring ComplexField
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
-    T: Clone
-        + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
-        + Sum
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     f64: From<T>,
@@ -503,15 +462,7 @@ where
 /// Helper function to sort vertices for comparison and hashing
 fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -523,15 +474,7 @@ where
 /// Equality of cells is based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -545,15 +488,7 @@ where
 /// Eq implementation for Cell based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -563,15 +498,7 @@ where
 /// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -586,15 +513,7 @@ where
 /// Custom Hash implementation for Cell
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,

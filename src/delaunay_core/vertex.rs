@@ -2,10 +2,9 @@
 
 use super::utilities::make_uuid;
 use crate::geometry::{
-    FiniteCheck, HashCoordinate, OrderedEq, point::Point,
-    traits::coordinate::CoordinateValidationError,
+    point::Point,
+    traits::coordinate::{Coordinate, CoordinateScalar, CoordinateValidationError},
 };
-use num_traits::Float;
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
     cmp::Ordering,
@@ -58,15 +57,7 @@ pub enum VertexValidationError {
 /// implements Eq, Hash, Ord, `PartialEq`, and `PartialOrd`.
 pub struct Vertex<T, U, const D: usize>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -85,15 +76,7 @@ where
 
 impl<T, U, const D: usize> Vertex<T, U, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -121,10 +104,11 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let points = vec![Point::new([1.0, 2.0, 3.0])];
     /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points.clone());
     /// assert_eq!(vertices.len(), 1);
-    /// assert_eq!(vertices[0].point().coordinates(), [1.0, 2.0, 3.0]);
+    /// assert_eq!(vertices[0].point().to_array(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
     #[must_use]
@@ -153,6 +137,7 @@ where
     /// use std::collections::HashMap;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
     /// let vertices = Vertex::<f64, Option<()>, 2>::from_points(points.clone());
     /// let map: HashMap<_, _> = Vertex::into_hashmap(vertices);
@@ -176,10 +161,11 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();
     /// let retrieved_point = vertex.point();
-    /// assert_eq!(retrieved_point.coordinates(), [1.0, 2.0, 3.0]);
+    /// assert_eq!(retrieved_point.to_array(), [1.0, 2.0, 3.0]);
     /// ```
     #[inline]
     pub const fn point(&self) -> &Point<T, D> {
@@ -224,6 +210,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let point = Point::new([1.0, 2.0, 3.0, 4.0]);
     /// let vertex: Vertex<f64, Option<()>, 4> = VertexBuilder::default().point(point).build().unwrap();
     /// assert_eq!(vertex.dim(), 4);
@@ -253,6 +240,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder, VertexValidationError};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
     ///     .point(Point::new([1.0, 2.0, 3.0]))
     ///     .build()
@@ -270,10 +258,12 @@ where
     /// ```
     pub fn is_valid(self) -> Result<(), VertexValidationError>
     where
-        T: crate::geometry::FiniteCheck + Copy + Debug,
+        Point<T, D>: Coordinate<T, D>,
     {
-        // Check if the point is valid (all coordinates are finite)
-        self.point.is_valid()?;
+        // Check if the point is valid using the Coordinate trait validation
+        self.point
+            .validate()
+            .map_err(|source| VertexValidationError::InvalidPoint { source })?;
 
         // Check if UUID is not nil
         if self.uuid.is_nil() {
@@ -291,22 +281,14 @@ where
 // Group 1: PartialEq, PartialOrd, and From trait implementations
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// Equality of vertices is based on equality of elements in vector of coords.
+    /// Equality of vertices is based on ordered equality of coordinates using the Coordinate trait.
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.point == other.point
+        self.point.ordered_equals(&other.point)
         // && self.uuid == other.uuid
         // && self.incident_cell == other.incident_cell
         // && self.data == other.data
@@ -315,22 +297,14 @@ where
 
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// Order of vertices is based on lexicographic order of elements in vector of coords.
+    /// Order of vertices is based on lexicographic order of coordinate arrays.
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.point.partial_cmp(&other.point)
+        self.point.to_array().partial_cmp(&other.point.to_array())
     }
 }
 
@@ -338,21 +312,13 @@ where
 /// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
 impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
     fn from(vertex: Vertex<T, U, D>) -> [T; D] {
-        vertex.point().coordinates()
+        vertex.point().to_array()
     }
 }
 
@@ -360,21 +326,13 @@ where
 /// This allows `&vertex` to be implicitly converted to `[T; D]` for coordinate access
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
     fn from(vertex: &Vertex<T, U, D>) -> [T; D] {
-        vertex.point().coordinates()
+        vertex.point().to_array()
     }
 }
 
@@ -382,15 +340,7 @@ where
 /// This allows `&vertex` to be implicitly converted to `Point<T, D>`
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -403,15 +353,7 @@ where
 // Group 2: Eq implementation with additional Hash requirement
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Self: Hash,
@@ -421,22 +363,14 @@ where
 
 impl<T, U, const D: usize> Hash for Vertex<T, U, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
 {
-    /// Generic Hash implementation for Vertex with any type T where Point<T, D> implements Hash
+    /// Generic Hash implementation for Vertex using Coordinate trait for point hashing
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.point.hash(state);
+        self.point.hash_coordinate(state);
         self.uuid.hash(state);
         self.incident_cell.hash(state);
         self.data.hash(state);
@@ -453,14 +387,7 @@ mod tests {
     // Helper function to create a basic vertex with given coordinates
     fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
     where
-        T: Default
-            + OrderedEq
-            + Float
-            + crate::geometry::traits::finitecheck::FiniteCheck
-            + crate::geometry::traits::hashcoordinate::HashCoordinate
-            + std::fmt::Debug
-            + serde::Serialize
-            + serde::de::DeserializeOwned,
+        T: CoordinateScalar,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -473,14 +400,7 @@ mod tests {
     // Helper function to create a vertex with data
     fn create_vertex_with_data<T, U, const D: usize>(coords: [T; D], data: U) -> Vertex<T, U, D>
     where
-        T: Default
-            + OrderedEq
-            + Float
-            + crate::geometry::traits::finitecheck::FiniteCheck
-            + crate::geometry::traits::hashcoordinate::HashCoordinate
-            + std::fmt::Debug
-            + serde::Serialize
-            + serde::de::DeserializeOwned,
+        T: CoordinateScalar,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
@@ -497,18 +417,11 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Default
-            + OrderedEq
-            + Debug
-            + Float
-            + crate::geometry::traits::finitecheck::FiniteCheck
-            + crate::geometry::traits::hashcoordinate::HashCoordinate
-            + serde::Serialize
-            + serde::de::DeserializeOwned,
+        T: CoordinateScalar,
         U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
-        assert_eq!(vertex.point().coordinates(), expected_coords);
+        assert_eq!(vertex.point().to_array(), expected_coords);
         assert_eq!(vertex.dim(), expected_dim);
         assert!(!vertex.uuid().is_nil());
         assert!(vertex.incident_cell.is_none());
@@ -519,7 +432,7 @@ mod tests {
         let vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [0.0, 0.0, 0.0].as_slice(),
             epsilon = 1e-9
         );
@@ -540,7 +453,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -566,7 +479,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -590,7 +503,7 @@ mod tests {
 
         assert_eq!(vertex, vertex_copy);
         assert_relative_eq!(
-            vertex_copy.point().coordinates().as_slice(),
+            vertex_copy.point().to_array().as_slice(),
             [1.0, 2.0, 3.0, 4.0].as_slice(),
             epsilon = 1e-9
         );
@@ -606,19 +519,19 @@ mod tests {
         let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
 
         assert_relative_eq!(
-            vertices[0].point().coordinates().as_slice(),
+            vertices[0].point().to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
         assert_eq!(vertices[0].dim(), 3);
         assert_relative_eq!(
-            vertices[1].point().coordinates().as_slice(),
+            vertices[1].point().to_array().as_slice(),
             [4.0, 5.0, 6.0].as_slice(),
             epsilon = 1e-9
         );
         assert_eq!(vertices[1].dim(), 3);
         assert_relative_eq!(
-            vertices[2].point().coordinates().as_slice(),
+            vertices[2].point().to_array().as_slice(),
             [7.0, 8.0, 9.0].as_slice(),
             epsilon = 1e-9
         );
@@ -831,7 +744,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [1.5, 2.5].as_slice(),
             epsilon = 1e-9
         );
@@ -973,7 +886,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [-1.0, -2.0, -3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1003,7 +916,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [1_000_000.0, 2_000_000.0, 3_000_000.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1018,7 +931,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [0.000_001, 0.000_002, 0.000_003].as_slice(),
             epsilon = 1e-9
         );
@@ -1040,7 +953,7 @@ mod tests {
 
         assert_eq!(vertices.len(), 1);
         assert_relative_eq!(
-            vertices[0].point().coordinates().as_slice(),
+            vertices[0].point().to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1069,7 +982,7 @@ mod tests {
         assert_eq!(hashmap.len(), 1);
         assert!(hashmap.contains_key(&uuid));
         assert_relative_eq!(
-            hashmap.get(&uuid).unwrap().point().coordinates().as_slice(),
+            hashmap.get(&uuid).unwrap().point().to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1131,7 +1044,7 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [1.0, -2.0, 3.0, -4.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1169,7 +1082,7 @@ mod tests {
 
         // Verify the original vertex is still available after reference conversion
         assert_relative_eq!(
-            vertex_ref.point().coordinates().as_slice(),
+            vertex_ref.point().to_array().as_slice(),
             [4.0, 5.0, 6.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1185,7 +1098,7 @@ mod tests {
         // Test implicit conversion from vertex reference to Point
         let point_from_vertex: Point<f64, 3> = (&vertex).into();
         assert_relative_eq!(
-            point_from_vertex.coordinates().as_slice(),
+            point_from_vertex.to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1195,7 +1108,7 @@ mod tests {
 
         // Verify the original vertex is still available after conversion
         assert_relative_eq!(
-            vertex.point().coordinates().as_slice(),
+            vertex.point().to_array().as_slice(),
             [1.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
@@ -1208,7 +1121,7 @@ mod tests {
 
         let point_2d: Point<f64, 2> = (&vertex_2d).into();
         assert_relative_eq!(
-            point_2d.coordinates().as_slice(),
+            point_2d.to_array().as_slice(),
             [10.5, -5.3].as_slice(),
             epsilon = 1e-9
         );

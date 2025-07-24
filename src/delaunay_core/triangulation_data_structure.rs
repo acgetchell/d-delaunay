@@ -10,10 +10,10 @@ use super::{
 };
 use crate::delaunay_core::utilities::find_extreme_coordinates;
 use crate::geometry::predicates::{InSphere, insphere};
-use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
+use crate::geometry::{point::Point, traits::coordinate::CoordinateScalar};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use num_traits::{Float, NumCast};
+use num_traits::NumCast;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
@@ -69,15 +69,7 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Default
-        + OrderedEq
-        + Debug
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -101,15 +93,7 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -187,15 +171,7 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -216,19 +192,7 @@ where
 
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
-    T: AddAssign<f64>
-        + ComplexField<RealField = T>
-        + Default
-        + SubAssign<f64>
-        + Sum
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar + AddAssign<f64> + ComplexField<RealField = T> + SubAssign<f64> + Sum,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     f64: From<T>,
@@ -1404,7 +1368,6 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), TriangulationValidationError>
     where
-        T: FiniteCheck + HashCoordinate + Copy + Debug,
         [T; D]: DeserializeOwned + Serialize + Sized,
     {
         // First, validate cell uniqueness (quick check for duplicate cells)

@@ -5,6 +5,7 @@
 //! calculations.
 
 use crate::geometry::matrix::invert;
+use crate::geometry::traits::coordinate::DEFAULT_TOLERANCE_F64;
 use crate::geometry::{OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
@@ -13,8 +14,6 @@ use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
 use serde::{Serialize, de::DeserializeOwned};
 use std::iter::Sum;
 
-/// Default tolerance for geometric predicates and degeneracy detection
-const DEFAULT_TOLERANCE: f64 = 1e-10;
 /// Tolerance for distance comparisons
 const DISTANCE_TOLERANCE: f64 = 1e-9;
 
@@ -419,7 +418,7 @@ where
     let det = matrix.det();
 
     // Use a tolerance for degenerate case detection
-    let tolerance = DEFAULT_TOLERANCE;
+    let tolerance = DEFAULT_TOLERANCE_F64;
 
     if det > tolerance {
         Ok(Orientation::POSITIVE)
@@ -703,7 +702,7 @@ where
     let orientation = simplex_orientation(simplex_points)?;
 
     // Use a tolerance for boundary detection
-    let tolerance = DEFAULT_TOLERANCE;
+    let tolerance = DEFAULT_TOLERANCE_F64;
 
     match orientation {
         Orientation::DEGENERATE => {
@@ -897,7 +896,7 @@ where
     let orientation = simplex_orientation(simplex_points)?;
 
     // Use a tolerance for boundary detection
-    let tolerance = DEFAULT_TOLERANCE;
+    let tolerance = DEFAULT_TOLERANCE_F64;
 
     match orientation {
         Orientation::DEGENERATE => {
@@ -1031,7 +1030,7 @@ mod tests {
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
-        assert_relative_eq!(radius, expected_radius, epsilon = DEFAULT_TOLERANCE);
+        assert_relative_eq!(radius, expected_radius, epsilon = DEFAULT_TOLERANCE_F64);
     }
 
     #[test]

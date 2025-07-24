@@ -17,11 +17,10 @@
 
 #![allow(clippy::similar_names)]
 
-use crate::geometry::traits::coordinate::{Coordinate, CoordinateValidationError};
-use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq};
-use num_traits::Float;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::fmt::Debug;
+use crate::geometry::traits::coordinate::{
+    Coordinate, CoordinateScalar, CoordinateValidationError,
+};
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, Default, PartialOrd)]
@@ -39,16 +38,8 @@ use std::hash::{Hash, Hasher};
 /// private to prevent modification after instantiation.
 pub struct Point<T, const D: usize>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the point.
     coords: [T; D],
@@ -56,17 +47,8 @@ where
 
 impl<T, const D: usize> Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Coordinate<T, D>,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     /// Create a new Point from an array of coordinates.
     ///
@@ -79,7 +61,7 @@ where
     /// ```
     #[inline]
     pub fn new(coords: [T; D]) -> Self {
-        Self::from_array(coords)
+        Self { coords }
     }
 
     /// The `dim` function returns the dimensionality of the [Point].
@@ -142,17 +124,8 @@ where
 // Implement Hash using the Coordinate trait
 impl<T, const D: usize> Hash for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Coordinate<T, D>,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -163,17 +136,8 @@ where
 // Implement PartialEq using the Coordinate trait
 impl<T, const D: usize> PartialEq for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Coordinate<T, D>,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     fn eq(&self, other: &Self) -> bool {
         self.ordered_equals(other)
@@ -183,33 +147,16 @@ where
 // Implement Eq using the Coordinate trait
 impl<T, const D: usize> Eq for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Coordinate<T, D>,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
 }
 
 /// Manual implementation of Serialize for Point
 impl<T, const D: usize> Serialize for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -222,16 +169,8 @@ where
 /// Manual implementation of Deserialize for Point
 impl<'de, T, const D: usize> Deserialize<'de> for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
     where
@@ -246,20 +185,12 @@ where
 /// This allows Point to be used as a coordinate type directly
 impl<T, const D: usize> Coordinate<T, D> for Point<T, D>
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     /// Create a new Point from an array of coordinates
     #[inline]
-    fn from_array(coords: [T; D]) -> Self {
+    fn new(coords: [T; D]) -> Self {
         Self { coords }
     }
 
@@ -281,7 +212,7 @@ where
     where
         T: num_traits::Zero,
     {
-        Self::from_array([T::zero(); D])
+        Self::new([T::zero(); D])
     }
 
     /// Validate that all coordinates are finite (no NaN or infinite values)
@@ -318,43 +249,24 @@ where
 /// From trait implementations for Point conversions - using Coordinate trait
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
-    T: Default + Float + Into<U>,
-    U: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [U; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<U, D>: Coordinate<U, D>,
+    T: Into<U>,
+    U: CoordinateScalar,
+    [U; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     /// Create a new [Point] from an array of coordinates of type `T`.
     #[inline]
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
         let coords_u: [U; D] = coords.map(std::convert::Into::into);
-        Point::from_array(coords_u)
+        Point::new(coords_u)
     }
 }
 
 /// Enable conversions from Point to coordinate arrays - using Coordinate trait
 impl<T, const D: usize> From<Point<T, D>> for [T; D]
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Coordinate<T, D>,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     /// # Example
     ///
@@ -372,17 +284,8 @@ where
 
 impl<T, const D: usize> From<&Point<T, D>> for [T; D]
 where
-    T: Default
-        + Float
-        + OrderedEq
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    Point<T, D>: Coordinate<T, D>,
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
 {
     /// # Example
     ///
@@ -419,14 +322,7 @@ mod tests {
         expected_coords: [T; D],
         expected_dim: usize,
     ) where
-        T: Debug
-            + Default
-            + OrderedEq
-            + Float
-            + FiniteCheck
-            + HashCoordinate
-            + Serialize
-            + DeserializeOwned,
+        T: CoordinateScalar,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         assert_eq!(point.coordinates(), expected_coords);
@@ -439,14 +335,7 @@ mod tests {
         point2: Point<T, D>,
         should_be_equal: bool,
     ) where
-        T: HashCoordinate
-            + Default
-            + OrderedEq
-            + Debug
-            + Float
-            + FiniteCheck
-            + Serialize
-            + DeserializeOwned,
+        T: CoordinateScalar,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
         Point<T, D>: Hash,
     {

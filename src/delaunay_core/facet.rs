@@ -7,11 +7,7 @@
 //! directly, but created on the fly when needed.
 
 use super::{cell::Cell, vertex::Vertex};
-use crate::geometry::{
-    OrderedEq,
-    traits::{finitecheck::FiniteCheck, hashcoordinate::HashCoordinate},
-};
-use num_traits::Float;
+use crate::geometry::traits::coordinate::CoordinateScalar;
 use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -31,15 +27,7 @@ use thiserror::Error;
 /// the [Facet] is one dimension less than the [Cell] (co-dimension 1).
 pub struct Facet<T, U, V, const D: usize>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -53,15 +41,7 @@ where
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -274,15 +254,7 @@ where
 // Consolidated trait implementations for Facet
 impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
@@ -293,15 +265,7 @@ where
 
 impl<T, U, V, const D: usize> Hash for Facet<T, U, V, D>
 where
-    T: Default
-        + OrderedEq
-        + Float
-        + FiniteCheck
-        + HashCoordinate
-        + Copy
-        + Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar,
     U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
