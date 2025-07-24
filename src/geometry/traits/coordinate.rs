@@ -964,7 +964,7 @@ mod tests {
         assert_eq!(point, point_direct);
         assert_relative_eq!(
             point.to_array().as_slice(),
-            point_direct.coordinates().as_slice(),
+            point_direct.to_array().as_slice(),
             epsilon = DEFAULT_TOLERANCE_F64
         );
 
@@ -982,7 +982,7 @@ mod tests {
         // Test f32 array consistency
         assert_relative_eq!(
             point_f32.to_array().as_slice(),
-            point_f32_direct.coordinates().as_slice(),
+            point_f32_direct.to_array().as_slice(),
             epsilon = DEFAULT_TOLERANCE_F32
         );
     }

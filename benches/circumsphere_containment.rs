@@ -19,6 +19,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use d_delaunay::geometry::point::Point;
 use d_delaunay::geometry::predicates::{insphere, insphere_distance, insphere_lifted};
+use d_delaunay::geometry::traits::coordinate::Coordinate;
 use rand::Rng;
 use std::hint::black_box;
 
@@ -26,9 +27,9 @@ use std::hint::black_box;
 fn generate_random_simplex_3d(rng: &mut impl Rng) -> Vec<Point<f64, 3>> {
     (0..4)
         .map(|_| {
-            let x = rng.random_range(-10.0..10.0);
-            let y = rng.random_range(-10.0..10.0);
-            let z = rng.random_range(-10.0..10.0);
+            let x = rng.random::<f64>() * 20.0 - 10.0; // Range -10.0..10.0
+            let y = rng.random::<f64>() * 20.0 - 10.0;
+            let z = rng.random::<f64>() * 20.0 - 10.0;
             Point::new([x, y, z])
         })
         .collect()
@@ -36,9 +37,9 @@ fn generate_random_simplex_3d(rng: &mut impl Rng) -> Vec<Point<f64, 3>> {
 
 /// Generate a random test point
 fn generate_random_test_point_3d(rng: &mut impl Rng) -> Point<f64, 3> {
-    let x = rng.random_range(-5.0..5.0);
-    let y = rng.random_range(-5.0..5.0);
-    let z = rng.random_range(-5.0..5.0);
+    let x = rng.random::<f64>() * 10.0 - 5.0; // Range -5.0..5.0
+    let y = rng.random::<f64>() * 10.0 - 5.0;
+    let z = rng.random::<f64>() * 10.0 - 5.0;
     Point::new([x, y, z])
 }
 
@@ -290,13 +291,10 @@ fn numerical_consistency_test() {
                 r2,
                 r3
             );
-            println!("    Test point: {:?}", test.coordinates());
+            println!("    Test point: {:?}", test.to_array());
             println!(
                 "    Simplex: {:?}",
-                simplex
-                    .iter()
-                    .map(d_delaunay::geometry::Point::coordinates)
-                    .collect::<Vec<_>>()
+                simplex.iter().map(Coordinate::to_array).collect::<Vec<_>>()
             );
         }
     }

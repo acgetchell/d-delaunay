@@ -1471,6 +1471,7 @@ where
 #[allow(clippy::uninlined_format_args, clippy::similar_names)]
 mod tests {
     use crate::delaunay_core::vertex::VertexBuilder;
+    use crate::geometry::traits::coordinate::Coordinate;
 
     use super::*;
 
@@ -1551,7 +1552,7 @@ mod tests {
         let point5 = Point::new([13.0, 14.0, 15.0]);
         let vertex5 = VertexBuilder::default().point(point5).build().unwrap();
         tds.add(vertex5).unwrap();
-        assert_eq!(tds.dim(), 3);
+        assert_eq!(tds.is_valid(), Ok(()));
     }
 
     #[test]
@@ -1583,7 +1584,7 @@ mod tests {
         assert_eq!(supercell.vertices().len(), 4);
         for vertex in supercell.vertices() {
             // Ensure supercell vertex coordinates are far away
-            let coords: [f64; 3] = vertex.point().coordinates();
+            let coords: [f64; 3] = vertex.point().to_array();
             for &coord in &coords {
                 assert!(coord.abs() > 50.0);
             }
@@ -1819,7 +1820,7 @@ mod tests {
         // Debug: Print actual supercell coordinates
         println!("Actual supercell vertices:");
         for (i, vertex) in unwrapped_supercell.vertices().iter().enumerate() {
-            println!("  Vertex {}: {:?}", i, vertex.point().coordinates());
+            println!("  Vertex {}: {:?}", i, vertex.point().to_array());
         }
 
         // The supercell should contain all input points
@@ -2375,7 +2376,7 @@ mod tests {
 
         // Verify supercell is even larger
         for vertex in supercell.vertices() {
-            let coords: [f64; 3] = vertex.point().coordinates();
+            let coords: [f64; 3] = vertex.point().to_array();
             for &coord in &coords {
                 assert!(
                     coord.abs() > 1000.0,
@@ -2471,7 +2472,7 @@ mod tests {
 
         // Verify that all supercell vertices are outside the input range
         for vertex in supercell.vertices() {
-            let coords: [f64; 3] = vertex.point().coordinates();
+            let coords: [f64; 3] = vertex.point().to_array();
             // Check that supercell vertices are well outside the input range
             // The center is roughly at [5.0, 3.75, 2.5] and the input range is roughly 10 units wide
             // With padding, supercell vertices should be well outside this range

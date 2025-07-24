@@ -309,7 +309,7 @@ where
 }
 
 /// Enable implicit conversion from Vertex to coordinate array
-/// This allows `vertex.point.coordinates()` to be implicitly converted to `[T; D]`
+/// This allows `vertex.point.to_array()` to be implicitly converted to `[T; D]`
 impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
 where
     T: CoordinateScalar,
@@ -1257,7 +1257,7 @@ mod tests {
             other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(default_vertex.uuid().is_nil());
-        assert!(default_vertex.point().is_valid().is_ok()); // Point itself is valid (zeros)
+        assert!(default_vertex.point().validate().is_ok());
 
         // Create a vertex with valid point but manually set nil UUID to test UUID validation
         let invalid_uuid_vertex: Vertex<f64, Option<()>, 3> = Vertex {
@@ -1270,7 +1270,7 @@ mod tests {
             Err(VertexValidationError::InvalidUuid) => (), // Expected
             other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
-        assert!(invalid_uuid_vertex.point().is_valid().is_ok()); // Point is valid
+        assert!(invalid_uuid_vertex.point().validate().is_ok());
         assert!(invalid_uuid_vertex.uuid().is_nil()); // UUID is nil
 
         // Test vertex with both invalid point and nil UUID (should return point error first)
@@ -1284,7 +1284,7 @@ mod tests {
             Err(VertexValidationError::InvalidPoint { .. }) => (), // Expected - point checked first
             other => panic!("Expected InvalidPoint error, got: {other:?}"),
         }
-        assert!(invalid_both.point().is_valid().is_err()); // Point is invalid
+        assert!(invalid_both.point().validate().is_err());
         assert!(invalid_both.uuid().is_nil()); // UUID is nil
     }
 }

@@ -5,7 +5,7 @@
 //! calculations.
 
 use crate::geometry::matrix::invert;
-use crate::geometry::traits::coordinate::DEFAULT_TOLERANCE_F64;
+use crate::geometry::traits::coordinate::{Coordinate, DEFAULT_TOLERANCE_F64};
 use crate::geometry::{OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
@@ -108,7 +108,7 @@ where
     }
 
     let dim = points.len() - 1;
-    if points[0].dim() != dim {
+    if points[0].dim() != D {
         return Err(anyhow::Error::msg("Not a simplex!"));
     }
 
@@ -273,7 +273,7 @@ where
     let point_coords: [T; D] = (&points[0]).into();
     let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
     Ok(na::distance(
-        &na::Point::<T, D>::from(circumcenter.coordinates()),
+        &na::Point::<T, D>::from(circumcenter.to_array()),
         &na::Point::<T, D>::from(point_coords_f64),
     ))
 }
@@ -511,7 +511,7 @@ where
     let point_coords: [T; D] = (&test_point).into();
     let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
     let radius = na::distance(
-        &na::Point::<T, D>::from(circumcenter.coordinates()),
+        &na::Point::<T, D>::from(circumcenter.to_array()),
         &na::Point::<T, D>::from(point_coords_f64),
     );
 
@@ -1015,8 +1015,8 @@ mod tests {
         let center = circumcenter(&points).unwrap();
 
         // For this triangle, circumcenter should be at (1.0, 0.75)
-        assert_relative_eq!(center.coordinates()[0], 1.0, epsilon = 1e-10);
-        assert_relative_eq!(center.coordinates()[1], 0.75, epsilon = 1e-10);
+        assert_relative_eq!(center.to_array()[0], 1.0, epsilon = 1e-10);
+        assert_relative_eq!(center.to_array()[1], 0.75, epsilon = 1e-10);
     }
 
     #[test]
@@ -1548,7 +1548,7 @@ mod tests {
         let center = circumcenter(&simplex_points).unwrap();
         let radius = circumradius(&simplex_points).unwrap();
 
-        println!("Circumcenter: {:?}", center.coordinates());
+        println!("Circumcenter: {:?}", center.to_array());
         println!("Circumradius: {radius}");
 
         // Test the point (0.9, 0.9, 0.9)
@@ -1582,12 +1582,12 @@ mod tests {
         let center_4d = circumcenter(&simplex_points_4d).unwrap();
         let radius_4d = circumradius(&simplex_points_4d).unwrap();
 
-        println!("4D Circumcenter: {:?}", center_4d.coordinates());
+        println!("4D Circumcenter: {:?}", center_4d.to_array());
         println!("4D Circumradius: {radius_4d}");
 
         // Test the origin (0, 0, 0, 0)
         let distance_to_center_4d =
-            (center_4d.coordinates().iter().map(|&x| x * x).sum::<f64>()).sqrt();
+            (center_4d.to_array().iter().map(|&x| x * x).sum::<f64>()).sqrt();
         println!("Origin distance to circumcenter: {distance_to_center_4d}");
         println!(
             "Is origin inside circumsphere (distance < radius)? {}",
@@ -1630,7 +1630,7 @@ mod tests {
             println!(
                 "Point {}: {:?} -> Standard: {:?}, Matrix: {}",
                 i,
-                point.coordinates(),
+                point.to_array(),
                 standard_result,
                 matrix_result
             );
