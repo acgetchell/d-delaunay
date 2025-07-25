@@ -47,7 +47,7 @@ where
 /// Lévy, Bruno, and Yang Liu.
 /// "Lp Centroidal Voronoi Tessellation and Its Applications."
 /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
-/// <https://doi.org/10.1145/1778765.1778856>.
+/// <https://doi.org/10.1145/1778765.1778856>.
 ///
 /// The circumcenter C of a simplex with points `x_0`, `x_1`, ..., `x_n` is the
 /// solution to the system:
@@ -138,7 +138,7 @@ where
         let mut squared_distance = T::zero();
         for j in 0..D {
             let diff = coords_point[j] - coords_0[j];
-            squared_distance = squared_distance + diff * diff;
+            squared_distance += diff * diff;
         }
         let squared_distance_f64: f64 = squared_distance.into();
         b[(i, 0)] = squared_distance_f64;
@@ -267,7 +267,7 @@ where
     let mut squared_distance = T::zero();
     for i in 0..D {
         let diff = circumcenter_coords[i] - point_coords[i];
-        squared_distance = squared_distance + diff * diff;
+        squared_distance += diff * diff;
     }
     let distance = Float::sqrt(squared_distance);
     Ok(distance)
@@ -500,7 +500,7 @@ where
     let mut squared_distance = T::zero();
     for i in 0..D {
         let diff = point_coords[i] - circumcenter_coords[i];
-        squared_distance = squared_distance + diff * diff;
+        squared_distance += diff * diff;
     }
     let radius = Float::sqrt(squared_distance);
 
