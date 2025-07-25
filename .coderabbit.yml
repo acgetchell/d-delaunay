@@ -22,7 +22,7 @@ reviews:
   related_issues: true
   related_prs: true
   suggested_labels: true
-  auto_apply_labels: false
+  auto_apply_labels: true
   suggested_reviewers: true
   auto_assign_reviewers: false
   poem: true
@@ -77,7 +77,7 @@ reviews:
     # GitHub Actions linter
     github-checks:
       enabled: true
-      timeout_ms: 90000
+      timeout_ms: 900000
 
     # Language grammar, style, and spell checker
     languagetool:

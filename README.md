@@ -34,7 +34,7 @@ the minimum number of [traits] to do generic computational geometry.
 The library includes comprehensive performance benchmarks for circumsphere containment algorithms. Key findings:
 
 - **insphere_lifted**: Fastest method (~50% better than standard)
-- **insphere**: Best balance of performance and numerical stability  
+- **insphere**: Best balance of performance and numerical stability
 - **insphere_distance**: Slowest but most transparent for educational use
 
 Run benchmarks with:

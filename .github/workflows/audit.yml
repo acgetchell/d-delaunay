@@ -1,4 +1,3 @@
----
 name: "Audit dependencies"
 on:
   push:
@@ -9,9 +8,12 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
   pull_request:
-  # Rerun periodically to pick up new advisories
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  # Rerun periodically to pick up new advisories (weekly instead of daily)
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 6 * * 1'  # Monday at 6 AM UTC
   # Run manually
   workflow_dispatch:
 
@@ -21,9 +23,36 @@ jobs:
     permissions:
       contents: read
       issues: write
+      security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/audit@v1
-        name: Audit Rust dependencies
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          toolchain: stable
+          cache: true
+
+      - name: Cache audit database
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/advisory-db
+          key: advisory-db-${{ github.ref_name }}-v1
+          restore-keys: advisory-db-
+
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+
+      - name: Run cargo audit
+        run: |
+          cargo audit --json > audit-results.json
+          # Show human-readable output as well
+          cargo audit
+        continue-on-error: true
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-results
+          path: audit-results.json

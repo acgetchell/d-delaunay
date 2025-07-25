@@ -15,6 +15,7 @@ use d_delaunay::geometry::predicates::{InSphere, Orientation};
 use d_delaunay::geometry::predicates::{
     circumcenter, circumradius, insphere, insphere_distance, insphere_lifted, simplex_orientation,
 };
+use d_delaunay::geometry::traits::coordinate::Coordinate;
 use nalgebra as na;
 use peroxide::fuga::{LinearAlgebra, zeros};
 use serde::{Serialize, de::DeserializeOwned};
@@ -62,27 +63,21 @@ macro_rules! print_result {
 }
 
 /// Create a test vertex with minimal boilerplate
-fn create_vertex<T, const D: usize>(coords: [f64; D], data: Option<T>) -> Vertex<f64, T, D>
+fn create_vertex<T, U, const D: usize>(coords: [f64; D], data: Option<U>) -> Vertex<T, U, D>
 where
-    [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    T: Clone
-        + Copy
-        + Eq
-        + std::hash::Hash
-        + Ord
-        + PartialEq
-        + PartialOrd
-        + DeserializeOwned
-        + Serialize,
+    T: From<f64> + d_delaunay::geometry::traits::coordinate::CoordinateScalar + Clone,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    U: d_delaunay::delaunay_core::traits::DataType,
 {
+    let converted_coords: [T; D] = coords.map(|x| <T as From<f64>>::from(x));
     match data {
         Some(value) => VertexBuilder::default()
-            .point(Point::new(coords))
+            .point(Point::new(converted_coords))
             .data(value)
             .build()
             .unwrap(),
         None => VertexBuilder::default()
-            .point(Point::new(coords))
+            .point(Point::new(converted_coords))
             .build()
             .unwrap(),
     }
@@ -267,12 +262,12 @@ fn test_circumsphere_generic<const D: usize>(
     let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(Point::from).collect();
     match (circumcenter(&vertex_points), circumradius(&vertex_points)) {
         (Ok(center), Ok(radius)) => {
-            println!("Circumcenter: {:?}", center.coordinates());
+            println!("Circumcenter: {:?}", center.to_array());
             println!("Circumradius: {radius:.6}");
             println!();
 
             for (coords, description) in test_points {
-                test_point_generic(vertices, coords, description, &center.coordinates(), radius);
+                test_point_generic(vertices, coords, description, &center.to_array(), radius);
             }
         }
         (Err(e), _) => println!("Error calculating circumcenter: {e}"),
@@ -426,7 +421,7 @@ fn test_4d_circumsphere_methods() {
     let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     match circumcenter(&vertex_points) {
         Ok(center) => {
-            println!("Circumcenter: {:?}", center.coordinates());
+            println!("Circumcenter: {:?}", center.to_array());
             match circumradius(&vertex_points) {
                 Ok(radius) => {
                     println!("Circumradius: {radius}");
@@ -448,7 +443,7 @@ fn test_4d_circumsphere_methods() {
                             vertices.as_slice(),
                             coords,
                             description,
-                            &center.coordinates(),
+                            &center.to_array(),
                             radius,
                         );
                     }
@@ -512,7 +507,7 @@ fn test_circumsphere_containment() {
     println!("Testing points that should be INSIDE the circumsphere:");
     for point in test_points_inside {
         let coords: [f64; 4] = point.into();
-        test_point_generic(&vertices, coords, "inside", &center.coordinates(), radius);
+        test_point_generic(&vertices, coords, "inside", &center.to_array(), radius);
     }
     println!();
 
@@ -832,7 +827,7 @@ fn print_3d_simplex_info(circumcenter_3d: &Point<f64, 3>, circumradius_3d: f64) 
     println!("  v3: (0, 1, 0)");
     println!("  v4: (0, 0, 1)");
     println!();
-    println!("Circumcenter: {:?}", circumcenter_3d.coordinates());
+    println!("Circumcenter: {:?}", circumcenter_3d.to_array());
     println!("Circumradius: {circumradius_3d:.6}");
     println!();
 }
@@ -847,7 +842,7 @@ fn test_point_against_3d_simplex(
 
     // Calculate distance from circumcenter to test point
     let distance_to_test_3d = na::distance(
-        &na::Point::<f64, 3>::from(circumcenter_3d.coordinates()),
+        &na::Point::<f64, 3>::from(circumcenter_3d.to_array()),
         &na::Point::<f64, 3>::from([0.9, 0.9, 0.9]),
     );
 
@@ -1023,7 +1018,7 @@ fn build_and_analyze_matrix(simplex_vertices: &[Vertex<f64, i32, 3>]) -> (f64, b
             let matrix_result = if is_positive {
                 det < 0.0 // For positive orientation, negative det means inside
             } else {
-                det > 0.0 // For negative orientation, positive det means inside  
+                det > 0.0 // For negative orientation, positive det means inside
             };
 
             println!(
@@ -1054,13 +1049,13 @@ fn compare_methods_with_geometry(
             match circumradius(&simplex_points) {
                 Ok(circumradius) => {
                     let distance_to_test = na::distance(
-                        &na::Point::<f64, 3>::from(circumcenter.coordinates()),
+                        &na::Point::<f64, 3>::from(circumcenter.to_array()),
                         &na::Point::<f64, 3>::from(test_point),
                     );
 
                     println!();
                     println!("Geometric verification:");
-                    println!("  Circumcenter: {:?}", circumcenter.coordinates());
+                    println!("  Circumcenter: {:?}", circumcenter.to_array());
                     println!("  Circumradius: {circumradius:.6}");
                     println!("  Distance to test point: {distance_to_test:.6}");
                     println!(
@@ -1179,12 +1174,12 @@ fn debug_3d_circumsphere_properties() {
     let center = circumcenter(&simplex_points).unwrap();
     let radius = circumradius(&simplex_points).unwrap();
 
-    println!("Circumcenter: {:?}", center.coordinates());
+    println!("Circumcenter: {:?}", center.to_array());
     println!("Circumradius: {radius}");
 
     // Test the point (0.9, 0.9, 0.9)
     let distance_to_center = na::distance(
-        &na::Point::<f64, 3>::from(center.coordinates()),
+        &na::Point::<f64, 3>::from(center.to_array()),
         &na::Point::<f64, 3>::from([0.9, 0.9, 0.9]),
     );
     println!("Point (0.9, 0.9, 0.9) distance to circumcenter: {distance_to_center}");
@@ -1202,7 +1197,7 @@ fn debug_3d_circumsphere_properties() {
     println!("Matrix method result: {matrix_result:?}");
 }
 
-/// Debug 4D circumsphere properties analysis  
+/// Debug 4D circumsphere properties analysis
 fn debug_4d_circumsphere_properties() {
     println!("\n=== 4D Symmetric Simplex Analysis ===");
 
@@ -1219,12 +1214,12 @@ fn debug_4d_circumsphere_properties() {
     let center_4d = circumcenter(&simplex_points_4d).unwrap();
     let radius_4d = circumradius(&simplex_points_4d).unwrap();
 
-    println!("4D Circumcenter: {:?}", center_4d.coordinates());
+    println!("4D Circumcenter: {:?}", center_4d.to_array());
     println!("4D Circumradius: {radius_4d}");
 
     // Test the origin (0, 0, 0, 0)
     let distance_to_center_4d = na::distance(
-        &na::Point::<f64, 4>::from(center_4d.coordinates()),
+        &na::Point::<f64, 4>::from(center_4d.to_array()),
         &na::Point::<f64, 4>::from([0.0, 0.0, 0.0, 0.0]),
     );
     println!("Origin distance to circumcenter: {distance_to_center_4d}");
@@ -1264,7 +1259,7 @@ fn compare_circumsphere_methods() {
     ];
 
     for (i, point) in test_points.iter().enumerate() {
-        let test_vertex: Vertex<f64, Option<()>, 2> = vertex!(point.coordinates(), None);
+        let test_vertex: Vertex<f64, Option<()>, 2> = vertex!(point.to_array(), None);
         let simplex_points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(Point::from).collect();
 
         let standard_result =
@@ -1273,7 +1268,7 @@ fn compare_circumsphere_methods() {
 
         println!(
             "Point {i}: {:?} -> Standard: {:?}, Matrix: {:?}",
-            point.coordinates(),
+            point.to_array(),
             standard_result,
             matrix_result
         );
@@ -1357,7 +1352,7 @@ fn test_single_2d_point() {
                 println!("  v{i}: {coords:?}");
             }
             println!();
-            println!("Circumcenter: {:?}", center.coordinates());
+            println!("Circumcenter: {:?}", center.to_array());
             println!("Circumradius: {radius:.6}");
             println!();
 
@@ -1366,7 +1361,7 @@ fn test_single_2d_point() {
                 &vertices,
                 [0.3, 0.3],
                 "test_point",
-                &center.coordinates(),
+                &center.to_array(),
                 radius,
             );
         }
@@ -1400,7 +1395,7 @@ fn test_single_3d_point() {
                 println!("  v{i}: {coords:?}");
             }
             println!();
-            println!("Circumcenter: {:?}", center.coordinates());
+            println!("Circumcenter: {:?}", center.to_array());
             println!("Circumradius: {radius:.6}");
             println!();
 
@@ -1409,7 +1404,7 @@ fn test_single_3d_point() {
                 &vertices,
                 [0.4, 0.4, 0.4],
                 "test_point",
-                &center.coordinates(),
+                &center.to_array(),
                 radius,
             );
         }
@@ -1444,7 +1439,7 @@ fn test_single_4d_point() {
                 println!("  v{i}: {coords:?}");
             }
             println!();
-            println!("Circumcenter: {:?}", center.coordinates());
+            println!("Circumcenter: {:?}", center.to_array());
             println!("Circumradius: {radius:.6}");
             println!();
 
@@ -1453,7 +1448,7 @@ fn test_single_4d_point() {
                 &vertices,
                 [0.3, 0.3, 0.3, 0.3],
                 "test_point",
-                &center.coordinates(),
+                &center.to_array(),
                 radius,
             );
         }

@@ -15,7 +15,7 @@ cargo bench --bench circumsphere_containment -- --test
 ## Methods Compared
 
 1. **insphere**: Standard determinant-based method (most numerically stable)
-2. **insphere_distance**: Distance-based method using explicit circumcenter calculation  
+2. **insphere_distance**: Distance-based method using explicit circumcenter calculation
 3. **insphere_lifted**: Matrix determinant method with lifted paraboloid approach
 
 ## Performance Results Summary
@@ -59,7 +59,7 @@ cargo bench --bench circumsphere_containment -- --test
 ### Performance Ranking
 
 1. **insphere_lifted** (fastest) - Consistently best performance across all tests
-2. **insphere** (middle) - ~25% slower than lifted, but good performance  
+2. **insphere** (middle) - ~25% slower than lifted, but good performance
 3. **insphere_distance** (slowest) - ~2x slower due to explicit circumcenter calculation
 
 ### Numerical Accuracy Analysis
@@ -104,7 +104,7 @@ Based on 1000 random test cases:
 The disagreements between methods are expected due to:
 
 1. Different numerical approaches and tolerances
-2. Floating-point precision differences in multi-step calculations  
+2. Floating-point precision differences in multi-step calculations
 3. Varying sensitivity to degenerate cases
 
 ## Benchmark Structure

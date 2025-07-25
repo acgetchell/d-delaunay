@@ -17,6 +17,7 @@
 #![allow(clippy::similar_names)]
 
 use d_delaunay::geometry::point::Point;
+use d_delaunay::geometry::traits::coordinate::Coordinate;
 use std::collections::{HashMap, HashSet};
 
 fn main() {
@@ -53,9 +54,9 @@ fn basic_comparison_demo() {
     let point2 = Point::new([1.0, 2.0, 3.0]);
     let point3 = Point::new([1.0, 2.0, 4.0]);
 
-    println!("point1 = {:?}", point1.coordinates());
-    println!("point2 = {:?}", point2.coordinates());
-    println!("point3 = {:?}", point3.coordinates());
+    println!("point1 = {:?}", point1.to_array());
+    println!("point2 = {:?}", point2.to_array());
+    println!("point3 = {:?}", point3.to_array());
 
     println!("point1 == point2: {}", point1 == point2);
     println!("point1 == point3: {}", point1 == point3);
@@ -93,7 +94,7 @@ fn nan_comparison_demo() {
 
     println!(
         "point_nan1 = [{}, 2.0, 3.0]",
-        if point_nan1.coordinates()[0].is_nan() {
+        if point_nan1.to_array()[0].is_nan() {
             "NaN"
         } else {
             "not NaN"
@@ -101,13 +102,13 @@ fn nan_comparison_demo() {
     );
     println!(
         "point_nan2 = [{}, 2.0, 3.0]",
-        if point_nan2.coordinates()[0].is_nan() {
+        if point_nan2.to_array()[0].is_nan() {
             "NaN"
         } else {
             "not NaN"
         }
     );
-    println!("point_normal = {:?}", point_normal.coordinates());
+    println!("point_normal = {:?}", point_normal.to_array());
 
     // Our implementation: NaN points are equal to themselves
     println!("point_nan1 == point_nan2: {}", point_nan1 == point_nan2);
@@ -156,7 +157,7 @@ fn infinity_comparison_demo() {
     println!("point_pos_inf1 = [∞, 2.0]");
     println!("point_pos_inf2 = [∞, 2.0]");
     println!("point_neg_inf = [-∞, 2.0]");
-    println!("point_normal = {:?}", point_normal.coordinates());
+    println!("point_normal = {:?}", point_normal.to_array());
 
     println!("∞ == ∞: {}", point_pos_inf1 == point_pos_inf2);
     println!("∞ == -∞: {}", point_pos_inf1 == point_neg_inf);
@@ -315,7 +316,7 @@ fn numeric_types_demo() {
     println!("🔢 Different Numeric Types");
     println!("--------------------------");
 
-    // f32 points
+    // f32 points - showing the library supports different numeric types
     let point_f32_1 = Point::new([1.5f32, 2.5f32]);
     let point_f32_2 = Point::new([1.5f32, 2.5f32]);
     let point_f32_nan = Point::new([f32::NAN, 2.5f32]);
@@ -323,6 +324,9 @@ fn numeric_types_demo() {
 
     println!("f32 points equal: {}", point_f32_1 == point_f32_2);
     println!("f32 NaN points equal: {}", point_f32_nan == point_f32_nan2);
+
+    // Note: This demonstrates that the library can work with different coordinate types T
+    // beyond just f64, as long as T implements the necessary traits
 
     // Integer-like values using f64
     let point_int_1 = Point::new([10.0, 20.0, 30.0]);

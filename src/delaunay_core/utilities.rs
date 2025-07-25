@@ -1,13 +1,12 @@
 //! Utility functions
 
+use crate::delaunay_core::traits::data::DataType;
 use crate::delaunay_core::vertex::Vertex;
-use crate::geometry::OrderedEq;
+use crate::geometry::traits::coordinate::CoordinateScalar;
 use anyhow::Error;
-use num_traits::Float;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::hash::Hash;
 use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
@@ -63,6 +62,7 @@ pub fn make_uuid() -> Uuid {
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use std::collections::HashMap;
 /// use std::cmp::Ordering;
 /// let points = vec![
@@ -81,8 +81,8 @@ pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHashe
     ordering: Ordering,
 ) -> Result<[T; D], Error>
 where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: CoordinateScalar,
+    U: DataType,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     if vertices.is_empty() {
@@ -128,6 +128,7 @@ mod tests {
 
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
+    use crate::geometry::traits::coordinate::Coordinate;
     use approx::assert_relative_eq;
     use std::collections::HashMap;
 

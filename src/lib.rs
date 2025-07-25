@@ -7,12 +7,12 @@
 //! # Features
 //!
 //! - d-dimensional Delaunay triangulations
+//! - Generic floating-point coordinate types (supports `f32`, `f64`, and other types implementing `CoordinateScalar`)
 //! - Arbitrary data types associated with vertices and cells
 //! - Serialization/Deserialization with [serde](https://serde.rs)
 
 #[macro_use]
 extern crate derive_builder;
-extern crate peroxide;
 
 /// The main module of the library. This module contains the public interface
 /// for the library.
@@ -22,27 +22,43 @@ pub mod delaunay_core {
     pub mod triangulation_data_structure;
     pub mod utilities;
     pub mod vertex;
+    /// Traits for Delaunay triangulation data structures.
+    pub mod traits {
+        pub mod data;
+        pub use data::*;
+    }
     // Re-export the `delaunay_core` modules.
     pub use cell::*;
     pub use facet::*;
+    pub use traits::*;
     pub use triangulation_data_structure::*;
     pub use utilities::*;
     pub use vertex::*;
 }
 
-/// Contains the `Point` struct and geometry predicates.
+/// Contains geometric types including the `Point` struct and geometry predicates.
+///
+/// The geometry module provides a coordinate abstraction through the `Coordinate` trait
+/// that unifies coordinate operations across different storage mechanisms. The `Point`
+/// type implements this abstraction, providing generic floating-point coordinate support
+/// (for `f32`, `f64`, and other types implementing `CoordinateScalar`) with proper NaN
+/// handling, validation, and hashing.
 pub mod geometry {
     pub mod matrix;
     pub mod point;
     pub mod predicates;
-    /// Traits module containing reusable trait definitions.
+    /// Traits module containing coordinate abstractions and reusable trait definitions.
     ///
-    /// This module contains common traits used throughout the geometry system,
-    /// providing interfaces for validation and computation on geometric types.
+    /// This module contains the core `Coordinate` trait that abstracts coordinate
+    /// operations, along with supporting traits for validation (`FiniteCheck`),
+    /// equality comparison (`OrderedEq`), and hashing (`HashCoordinate`) of
+    /// floating-point coordinate values.
     pub mod traits {
+        pub mod coordinate;
         pub mod finitecheck;
         pub mod hashcoordinate;
         pub mod orderedeq;
+        pub use coordinate::*;
         pub use finitecheck::*;
         pub use hashcoordinate::*;
         pub use orderedeq::*;

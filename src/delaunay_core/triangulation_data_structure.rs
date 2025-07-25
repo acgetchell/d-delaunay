@@ -6,19 +6,22 @@
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
+    traits::data::DataType,
     vertex::Vertex,
 };
 use crate::delaunay_core::utilities::find_extreme_coordinates;
 use crate::geometry::predicates::{InSphere, insphere};
-use crate::geometry::{FiniteCheck, HashCoordinate, OrderedEq, point::Point};
+use crate::geometry::{
+    point::Point,
+    traits::coordinate::{Coordinate, CoordinateScalar},
+};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use num_traits::{Float, NumCast};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use num_traits::NumCast;
+use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
 use thiserror::Error;
@@ -69,9 +72,9 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
     facet2: &Facet<T, U, V, D>,
 ) -> bool
 where
-    T: Default + OrderedEq + Debug + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: CoordinateScalar,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     // Two facets are adjacent if they have the same vertices
@@ -93,8 +96,8 @@ fn generate_combinations<T, U, const D: usize>(
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: CoordinateScalar,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     let mut combinations = Vec::new();
@@ -141,7 +144,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
 ///
@@ -171,9 +174,9 @@ where
 /// and so the [Tds] is a finite simplicial complex.
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: Default + OrderedEq + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: CoordinateScalar,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// A [`HashMap`] that stores [Vertex] objects with their corresponding [Uuid]s as
@@ -192,17 +195,11 @@ where
 
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
-    T: AddAssign<f64>
-        + ComplexField<RealField = T>
-        + Default
-        + SubAssign<f64>
-        + Sum
-        + OrderedEq
-        + Float,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+    U: DataType,
+    V: DataType,
     f64: From<T>,
-    for<'a> &'a T: Div<f64>,
+    for<'a> &'a T: Div<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
@@ -234,6 +231,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let vertices = vec![
     ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
@@ -284,6 +282,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let vertices = vec![
     ///     VertexBuilder::default().point(Point::new([0.0, 0.0])).build().unwrap(),
@@ -342,6 +341,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let point = Point::new([1.0, 2.0, 3.0]);
@@ -358,6 +358,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let point = Point::new([1.0, 2.0, 3.0]);
@@ -375,6 +376,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
@@ -426,6 +428,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 0);
@@ -437,6 +440,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// let vertex1 = VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap();
@@ -455,6 +459,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -486,6 +491,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.dim(), -1); // Empty triangulation
@@ -497,6 +503,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
@@ -530,6 +537,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// // 2D triangulation
     /// let points_2d = vec![
@@ -578,6 +586,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -597,6 +606,7 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let points = vec![
     ///     Point::new([0.0, 0.0, 0.0]),
@@ -615,6 +625,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     /// assert_eq!(tds.number_of_cells(), 0); // No cells for empty input
@@ -782,6 +793,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -819,6 +831,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -839,6 +852,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -1283,6 +1297,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// let points = vec![
@@ -1316,6 +1331,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     ///
     /// // 2D triangulation
@@ -1348,6 +1364,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::{Tds, TriangulationValidationError};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
     /// use d_delaunay::delaunay_core::cell::CellBuilder;
     ///
@@ -1374,7 +1391,6 @@ where
     /// ```
     pub fn is_valid(&self) -> Result<(), TriangulationValidationError>
     where
-        T: FiniteCheck + HashCoordinate + Copy + Debug,
         [T; D]: DeserializeOwned + Serialize + Sized,
     {
         // First, validate cell uniqueness (quick check for duplicate cells)
@@ -1478,14 +1494,36 @@ where
 #[allow(clippy::uninlined_format_args, clippy::similar_names)]
 mod tests {
     use crate::delaunay_core::vertex::VertexBuilder;
+    use crate::geometry::traits::coordinate::Coordinate;
 
     use super::*;
 
+    // Type alias for easier test writing - change this to test different coordinate types
+    type TestFloat = f64;
+
     #[test]
     fn test_add_vertex_already_exists() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+        test_add_vertex_already_exists_generic::<TestFloat>();
+    }
 
-        let point = Point::new([1.0, 2.0, 3.0]);
+    fn test_add_vertex_already_exists_generic<T>()
+    where
+        T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+        f64: From<T>,
+        for<'a> &'a T: Div<T>,
+        [T; 3]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        ordered_float::OrderedFloat<f64>: From<T>,
+        OPoint<T, Const<3>>: From<[f64; 3]>,
+        [f64; 3]: Default + DeserializeOwned + Serialize + Sized,
+        T: num_traits::NumCast,
+    {
+        let mut tds: Tds<T, usize, usize, 3> = Tds::new(&[]).unwrap();
+
+        let point = Point::new([
+            num_traits::NumCast::from(1.0f64).unwrap(),
+            num_traits::NumCast::from(2.0f64).unwrap(),
+            num_traits::NumCast::from(3.0f64).unwrap(),
+        ]);
         let vertex = VertexBuilder::default().point(point).build().unwrap();
         tds.add(vertex).unwrap();
 
@@ -1495,15 +1533,37 @@ mod tests {
 
     #[test]
     fn test_add_vertex_uuid_collision() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+        test_add_vertex_uuid_collision_generic::<TestFloat>();
+    }
 
-        let point1 = Point::new([1.0, 2.0, 3.0]);
+    fn test_add_vertex_uuid_collision_generic<T>()
+    where
+        T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+        f64: From<T>,
+        for<'a> &'a T: Div<T>,
+        [T; 3]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        ordered_float::OrderedFloat<f64>: From<T>,
+        OPoint<T, Const<3>>: From<[f64; 3]>,
+        [f64; 3]: Default + DeserializeOwned + Serialize + Sized,
+        T: num_traits::NumCast,
+    {
+        let mut tds: Tds<T, usize, usize, 3> = Tds::new(&[]).unwrap();
+
+        let point1 = Point::new([
+            num_traits::NumCast::from(1.0f64).unwrap(),
+            num_traits::NumCast::from(2.0f64).unwrap(),
+            num_traits::NumCast::from(3.0f64).unwrap(),
+        ]);
         let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
         let uuid1 = vertex1.uuid();
         tds.add(vertex1).unwrap();
 
         // Create a new vertex with different coordinates but same UUID
-        let point2 = Point::new([4.0, 5.0, 6.0]); // Different coordinates
+        let point2 = Point::new([
+            num_traits::NumCast::from(4.0f64).unwrap(),
+            num_traits::NumCast::from(5.0f64).unwrap(),
+            num_traits::NumCast::from(6.0f64).unwrap(),
+        ]); // Different coordinates
         let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
 
         // Manually insert the second vertex with the first vertex's UUID to simulate UUID collision
@@ -1516,11 +1576,14 @@ mod tests {
 
         // The vertex at uuid1 should now be vertex2 (the collision overwrote vertex1)
         let stored_vertex = tds.vertices.get(&uuid1).unwrap();
-        let stored_coords: [f64; 3] = stored_vertex.into();
-        #[allow(clippy::float_cmp)]
-        {
-            assert_eq!(stored_coords, [4.0, 5.0, 6.0]); // Should be vertex2's coordinates
-        }
+        let stored_coords: [T; 3] = stored_vertex.into();
+        // Convert to f64 for comparison
+        let expected_coords = [
+            num_traits::NumCast::from(4.0f64).unwrap(),
+            num_traits::NumCast::from(5.0f64).unwrap(),
+            num_traits::NumCast::from(6.0f64).unwrap(),
+        ];
+        assert_eq!(stored_coords, expected_coords); // Should be vertex2's coordinates
     }
 
     #[test]
@@ -1558,7 +1621,7 @@ mod tests {
         let point5 = Point::new([13.0, 14.0, 15.0]);
         let vertex5 = VertexBuilder::default().point(point5).build().unwrap();
         tds.add(vertex5).unwrap();
-        assert_eq!(tds.dim(), 3);
+        assert_eq!(tds.is_valid(), Ok(()));
     }
 
     #[test]
@@ -1590,7 +1653,7 @@ mod tests {
         assert_eq!(supercell.vertices().len(), 4);
         for vertex in supercell.vertices() {
             // Ensure supercell vertex coordinates are far away
-            let coords: [f64; 3] = vertex.point().coordinates();
+            let coords: [f64; 3] = vertex.point().to_array();
             for &coord in &coords {
                 assert!(coord.abs() > 50.0);
             }
@@ -1826,7 +1889,7 @@ mod tests {
         // Debug: Print actual supercell coordinates
         println!("Actual supercell vertices:");
         for (i, vertex) in unwrapped_supercell.vertices().iter().enumerate() {
-            println!("  Vertex {}: {:?}", i, vertex.point().coordinates());
+            println!("  Vertex {}: {:?}", i, vertex.point().to_array());
         }
 
         // The supercell should contain all input points
@@ -2382,7 +2445,7 @@ mod tests {
 
         // Verify supercell is even larger
         for vertex in supercell.vertices() {
-            let coords: [f64; 3] = vertex.point().coordinates();
+            let coords: [f64; 3] = vertex.point().to_array();
             for &coord in &coords {
                 assert!(
                     coord.abs() > 1000.0,
@@ -2478,7 +2541,7 @@ mod tests {
 
         // Verify that all supercell vertices are outside the input range
         for vertex in supercell.vertices() {
-            let coords: [f64; 3] = vertex.point().coordinates();
+            let coords: [f64; 3] = vertex.point().to_array();
             // Check that supercell vertices are well outside the input range
             // The center is roughly at [5.0, 3.75, 2.5] and the input range is roughly 10 units wide
             // With padding, supercell vertices should be well outside this range
