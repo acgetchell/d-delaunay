@@ -92,19 +92,59 @@ pub const DEFAULT_TOLERANCE_F64: f64 = 1e-15;
 pub trait CoordinateScalar:
     Float + OrderedEq + HashCoordinate + FiniteCheck + Default + Debug + Serialize + DeserializeOwned
 {
+    /// Returns the appropriate default tolerance for this coordinate scalar type.
+    ///
+    /// This method provides type-specific tolerance values that are appropriate
+    /// for floating-point comparisons and geometric computations. The tolerance
+    /// values are chosen to account for the precision limitations of each
+    /// floating-point type.
+    ///
+    /// # Returns
+    ///
+    /// The default tolerance value for this type:
+    /// - For `f32`: `1e-6` (appropriate for single precision)
+    /// - For `f64`: `1e-15` (appropriate for double precision)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::geometry::traits::coordinate::CoordinateScalar;
+    ///
+    /// // Get appropriate tolerance for f32
+    /// let tolerance_f32 = f32::default_tolerance();
+    /// assert_eq!(tolerance_f32, 1e-6_f32);
+    ///
+    /// // Get appropriate tolerance for f64
+    /// let tolerance_f64 = f64::default_tolerance();
+    /// assert_eq!(tolerance_f64, 1e-15_f64);
+    /// ```
+    ///
+    /// # Usage in Generic Functions
+    ///
+    /// This method is particularly useful in generic functions that need
+    /// appropriate tolerance values for the specific type being used:
+    ///
+    /// ```
+    /// use d_delaunay::geometry::traits::coordinate::CoordinateScalar;
+    ///
+    /// fn compare_with_tolerance<T: CoordinateScalar>(a: T, b: T) -> bool {
+    ///     (a - b).abs() < T::default_tolerance()
+    /// }
+    /// ```
+    fn default_tolerance() -> Self;
 }
 
-// Blanket implementation: any type that implements all the required traits automatically implements CoordinateScalar
-impl<T> CoordinateScalar for T where
-    T: Float
-        + OrderedEq
-        + HashCoordinate
-        + FiniteCheck
-        + Default
-        + Debug
-        + Serialize
-        + DeserializeOwned
-{
+// Specific implementations for f32 and f64
+impl CoordinateScalar for f32 {
+    fn default_tolerance() -> Self {
+        DEFAULT_TOLERANCE_F32
+    }
+}
+
+impl CoordinateScalar for f64 {
+    fn default_tolerance() -> Self {
+        DEFAULT_TOLERANCE_F64
+    }
 }
 
 /// A comprehensive trait that encapsulates all coordinate functionality.
@@ -958,6 +998,35 @@ mod tests {
         nan_coord1_f32.hash_coordinate(&mut hasher1);
         nan_coord2_f32.hash_coordinate(&mut hasher2);
         assert_eq!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn coordinate_scalar_default_tolerance() {
+        // Test that default_tolerance returns the expected values
+        assert_eq!(f32::default_tolerance(), DEFAULT_TOLERANCE_F32);
+        assert_eq!(f64::default_tolerance(), DEFAULT_TOLERANCE_F64);
+
+        // Test that the tolerance values are reasonable
+        assert_eq!(f32::default_tolerance(), 1e-6_f32);
+        assert_eq!(f64::default_tolerance(), 1e-15_f64);
+
+        // Test using tolerance in generic function
+        fn test_tolerance<T: CoordinateScalar>(a: T, b: T) -> bool {
+            (a - b).abs() < T::default_tolerance()
+        }
+
+        // Test with f32
+        let a_f32 = 1.0f32;
+        let b_f32 = 1.0f32 + f32::default_tolerance() / 2.0;
+        assert!(test_tolerance(a_f32, b_f32));
+
+        // Test with f64
+        let a_f64 = 1.0f64;
+        let b_f64 = 1.0f64 + f64::default_tolerance() / 2.0;
+        assert!(test_tolerance(a_f64, b_f64));
+
+        // Test that tolerance values are different for different types
+        assert!(f32::default_tolerance() as f64 > f64::default_tolerance());
     }
 
     #[test]

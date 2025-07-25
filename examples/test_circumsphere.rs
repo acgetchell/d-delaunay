@@ -1026,7 +1026,7 @@ fn build_and_analyze_matrix(simplex_vertices: &[Vertex<f64, i32, 3>]) -> (f64, b
             let matrix_result = if is_positive {
                 det < 0.0 // For positive orientation, negative det means inside
             } else {
-                det > 0.0 // For negative orientation, positive det means inside  
+                det > 0.0 // For negative orientation, positive det means inside
             };
 
             println!(
@@ -1205,7 +1205,7 @@ fn debug_3d_circumsphere_properties() {
     println!("Matrix method result: {matrix_result:?}");
 }
 
-/// Debug 4D circumsphere properties analysis  
+/// Debug 4D circumsphere properties analysis
 fn debug_4d_circumsphere_properties() {
     println!("\n=== 4D Symmetric Simplex Analysis ===");
 

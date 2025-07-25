@@ -5,17 +5,16 @@
 //! calculations.
 
 use crate::geometry::matrix::invert;
-use crate::geometry::traits::coordinate::{Coordinate, DEFAULT_TOLERANCE_F64};
-use crate::geometry::{OrderedEq, point::Point};
+use crate::geometry::point::Point;
+use crate::geometry::traits::coordinate::{Coordinate, CoordinateScalar};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, Zero};
 use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
 use serde::{Serialize, de::DeserializeOwned};
+use std::fmt::Debug;
 use std::iter::Sum;
 
-/// Tolerance for distance comparisons
-const DISTANCE_TOLERANCE: f64 = 1e-9;
 
 /// Helper function to compute squared norm using generic arithmetic on T.
 ///
@@ -31,7 +30,7 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// The squared norm (sum of squares) as type T
 fn squared_norm<T, const D: usize>(coords: [T; D]) -> T
 where
-    T: crate::geometry::traits::coordinate::CoordinateScalar + num_traits::Zero,
+    T: CoordinateScalar + num_traits::Zero,
 {
     coords.iter().fold(T::zero(), |acc, &x| acc + x * x)
 }
@@ -102,10 +101,7 @@ where
 /// ```
 pub fn circumcenter<T, const D: usize>(points: &[Point<T, D>]) -> Result<Point<T, D>, anyhow::Error>
 where
-    T: crate::geometry::traits::coordinate::CoordinateScalar
-        + ComplexField<RealField = T>
-        + Sum
-        + Zero,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum + Zero,
     f64: From<T>,
     T: From<f64>,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -192,10 +188,7 @@ where
 /// ```
 pub fn circumradius<T, const D: usize>(points: &[Point<T, D>]) -> Result<T, anyhow::Error>
 where
-    T: crate::geometry::traits::coordinate::CoordinateScalar
-        + ComplexField<RealField = T>
-        + Sum
-        + Zero,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum + Zero,
     f64: From<T>,
     T: From<f64>,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -247,10 +240,7 @@ pub fn circumradius_with_center<T, const D: usize>(
     circumcenter: &Point<T, D>,
 ) -> Result<T, anyhow::Error>
 where
-    T: crate::geometry::traits::coordinate::CoordinateScalar
-        + ComplexField<RealField = T>
-        + Sum
-        + Zero,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum + Zero,
     f64: From<T>,
     T: From<f64>,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -366,20 +356,7 @@ pub fn simplex_orientation<T, const D: usize>(
     simplex_points: &[Point<T, D>],
 ) -> Result<Orientation, anyhow::Error>
 where
-    T: Clone
-        + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
-        + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -413,11 +390,12 @@ where
     let det = matrix.det();
 
     // Use a tolerance for degenerate case detection
-    let tolerance = DEFAULT_TOLERANCE_F64;
+    let tolerance = T::default_tolerance();
+    let tolerance_f64: f64 = tolerance.into();
 
-    if det > tolerance {
+    if det > tolerance_f64 {
         Ok(Orientation::POSITIVE)
-    } else if det < -tolerance {
+    } else if det < -tolerance_f64 {
         Ok(Orientation::NEGATIVE)
     } else {
         Ok(Orientation::DEGENERATE)
@@ -481,10 +459,7 @@ pub fn insphere_distance<T, const D: usize>(
     test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
-    T: crate::geometry::traits::coordinate::CoordinateScalar
-        + ComplexField<RealField = T>
-        + Sum
-        + Zero,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum + Zero,
     f64: From<T>,
     T: From<f64>,
     [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
@@ -504,7 +479,7 @@ where
     }
     let radius = Float::sqrt(squared_distance);
 
-    let tolerance = <T as From<f64>>::from(DISTANCE_TOLERANCE);
+    let tolerance = T::default_tolerance();
     if num_traits::Float::abs(circumradius - radius) < tolerance {
         Ok(InSphere::BOUNDARY)
     } else if circumradius > radius {
@@ -614,20 +589,7 @@ pub fn insphere<T, const D: usize>(
     test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
-    T: Clone
-        + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
-        + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -692,7 +654,8 @@ where
     let orientation = simplex_orientation(simplex_points)?;
 
     // Use a tolerance for boundary detection
-    let tolerance = DEFAULT_TOLERANCE_F64;
+    let tolerance = T::default_tolerance();
+    let tolerance_f64: f64 = tolerance.into();
 
     match orientation {
         Orientation::DEGENERATE => {
@@ -703,9 +666,9 @@ where
         }
         Orientation::POSITIVE => {
             // For positive orientation, positive determinant means inside circumsphere
-            if det > tolerance {
+            if det > tolerance_f64 {
                 Ok(InSphere::INSIDE)
-            } else if det < -tolerance {
+            } else if det < -tolerance_f64 {
                 Ok(InSphere::OUTSIDE)
             } else {
                 Ok(InSphere::BOUNDARY)
@@ -713,9 +676,9 @@ where
         }
         Orientation::NEGATIVE => {
             // For negative orientation, negative determinant means inside circumsphere
-            if det < -tolerance {
+            if det < -tolerance_f64 {
                 Ok(InSphere::INSIDE)
-            } else if det > tolerance {
+            } else if det > tolerance_f64 {
                 Ok(InSphere::OUTSIDE)
             } else {
                 Ok(InSphere::BOUNDARY)
@@ -810,20 +773,7 @@ pub fn insphere_lifted<T, const D: usize>(
     test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
-    T: Clone
-        + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
-        + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+    T: CoordinateScalar + ComplexField<RealField = T> + Sum,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -901,7 +851,8 @@ where
     let orientation = simplex_orientation(simplex_points)?;
 
     // Use a tolerance for boundary detection
-    let tolerance = DEFAULT_TOLERANCE_F64;
+    let tolerance = T::default_tolerance();
+    let tolerance_f64: f64 = tolerance.into();
 
     match orientation {
         Orientation::DEGENERATE => {
@@ -912,9 +863,9 @@ where
         }
         Orientation::POSITIVE => {
             // For positive orientation, negative determinant means inside circumsphere
-            if det < -tolerance {
+            if det < -tolerance_f64 {
                 Ok(InSphere::INSIDE)
-            } else if det > tolerance {
+            } else if det > tolerance_f64 {
                 Ok(InSphere::OUTSIDE)
             } else {
                 Ok(InSphere::BOUNDARY)
@@ -922,9 +873,9 @@ where
         }
         Orientation::NEGATIVE => {
             // For negative orientation, positive determinant means inside circumsphere
-            if det > tolerance {
+            if det > tolerance_f64 {
                 Ok(InSphere::INSIDE)
-            } else if det < -tolerance {
+            } else if det < -tolerance_f64 {
                 Ok(InSphere::OUTSIDE)
             } else {
                 Ok(InSphere::BOUNDARY)
@@ -975,7 +926,7 @@ mod tests {
         let radius = circumradius(&points).unwrap();
         let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
 
-        assert_relative_eq!(radius, expected_radius, epsilon = DISTANCE_TOLERANCE);
+        assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
     }
 
     #[test]
@@ -1035,7 +986,7 @@ mod tests {
 
         // For a right triangle with legs of length 1, circumradius is sqrt(2)/2
         let expected_radius = 2.0_f64.sqrt() / 2.0;
-        assert_relative_eq!(radius, expected_radius, epsilon = DEFAULT_TOLERANCE_F64);
+        assert_relative_eq!(radius, expected_radius, epsilon = 1e-10);
     }
 
     #[test]
