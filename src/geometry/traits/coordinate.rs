@@ -197,6 +197,7 @@ where
     /// let coord: Point<f64, 3> = Coordinate::new([1.0, 2.0, 3.0]);
     /// assert_eq!(coord.dim(), 3);
     /// ```
+    #[must_use]
     fn dim(&self) -> usize {
         D
     }
@@ -217,6 +218,7 @@ where
     /// # Returns
     ///
     /// An array containing the coordinate values.
+    #[must_use]
     fn to_array(&self) -> [T; D];
 
     /// Get a specific coordinate by index.
@@ -238,6 +240,7 @@ where
     /// assert_eq!(coord.get(0), Some(1.0));
     /// assert_eq!(coord.get(3), None);
     /// ```
+    #[must_use]
     fn get(&self, index: usize) -> Option<T>;
 
     /// Create a coordinate at the origin (all zeros).
@@ -311,6 +314,7 @@ where
     /// # Returns
     ///
     /// True if coordinates are equal using ordered comparison.
+    #[must_use]
     fn ordered_equals(&self, other: &Self) -> bool;
 }
 
