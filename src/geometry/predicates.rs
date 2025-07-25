@@ -15,7 +15,6 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::iter::Sum;
 
-
 /// Helper function to compute squared norm using generic arithmetic on T.
 ///
 /// This function computes the sum of squares of coordinates using generic
