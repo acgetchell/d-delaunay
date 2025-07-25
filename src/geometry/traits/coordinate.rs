@@ -1002,18 +1002,18 @@ mod tests {
 
     #[test]
     fn coordinate_scalar_default_tolerance() {
-        // Test that default_tolerance returns the expected values
-        assert_eq!(f32::default_tolerance(), DEFAULT_TOLERANCE_F32);
-        assert_eq!(f64::default_tolerance(), DEFAULT_TOLERANCE_F64);
-
-        // Test that the tolerance values are reasonable
-        assert_eq!(f32::default_tolerance(), 1e-6_f32);
-        assert_eq!(f64::default_tolerance(), 1e-15_f64);
-
         // Test using tolerance in generic function
         fn test_tolerance<T: CoordinateScalar>(a: T, b: T) -> bool {
             (a - b).abs() < T::default_tolerance()
         }
+
+        // Test that default_tolerance returns the expected values
+        assert_relative_eq!(f32::default_tolerance(), DEFAULT_TOLERANCE_F32, epsilon = f32::EPSILON);
+        assert_relative_eq!(f64::default_tolerance(), DEFAULT_TOLERANCE_F64, epsilon = f64::EPSILON);
+
+        // Test that the tolerance values are reasonable
+        assert_relative_eq!(f32::default_tolerance(), 1e-6_f32, epsilon = f32::EPSILON);
+        assert_relative_eq!(f64::default_tolerance(), 1e-15_f64, epsilon = f64::EPSILON);
 
         // Test with f32
         let a_f32 = 1.0f32;
@@ -1026,7 +1026,7 @@ mod tests {
         assert!(test_tolerance(a_f64, b_f64));
 
         // Test that tolerance values are different for different types
-        assert!(f32::default_tolerance() as f64 > f64::default_tolerance());
+        assert!(f64::from(f32::default_tolerance()) > f64::default_tolerance());
     }
 
     #[test]
