@@ -111,7 +111,7 @@ where
     }
 
     let dim = points.len() - 1;
-    if points[0].dim() != D {
+    if dim != D {
         return Err(anyhow::Error::msg("Not a simplex!"));
     }
 

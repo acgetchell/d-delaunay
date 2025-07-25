@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn point_from_array_f32_to_f64() {
         let coords = [1.5f32, 2.5f32, 3.5f32, 4.5f32];
-        let point: Point<f64, 4> = Point::from(coords);
+        let point: Point<f64, 4> = Point::new(coords.map(std::convert::Into::into));
 
         let result_coords = point.to_array();
         assert_relative_eq!(
@@ -395,7 +395,7 @@ mod tests {
     fn point_from_array_same_type() {
         // Test conversion when source and target types are the same
         let coords_f32 = [1.0f32, 2.0f32, 3.0f32];
-        let point_f32: Point<f32, 3> = Point::from(coords_f32);
+        let point_f32: Point<f32, 3> = Point::new(coords_f32);
         let result_f32 = point_f32.to_array();
         assert_relative_eq!(
             result_f32.as_slice(),
@@ -408,7 +408,7 @@ mod tests {
     fn point_from_array_float_to_float() {
         // Test conversion from f32 to f32 (same type)
         let coords_f32 = [1.5f32, 2.5f32];
-        let point_f32: Point<f32, 2> = Point::from(coords_f32);
+        let point_f32: Point<f32, 2> = Point::new(coords_f32);
         let result_f32 = point_f32.to_array();
         assert_relative_eq!(
             result_f32.as_slice(),
@@ -418,7 +418,7 @@ mod tests {
 
         // Test conversion from f32 to f64 (safe upcast)
         let coords_f32 = [1.5f32, 2.5f32];
-        let point_f64: Point<f64, 2> = Point::from(coords_f32);
+        let point_f64: Point<f64, 2> = Point::new(coords_f32.map(std::convert::Into::into));
         let result_f64 = point_f64.to_array();
         assert_relative_eq!(
             result_f64.as_slice(),
@@ -1490,7 +1490,7 @@ mod tests {
 
         // Test conversion with potential precision loss (should still work)
         let precise_coords = [1.000_000_000_000_001_f64, 2.000_000_000_000_002_f64];
-        let point_precise: Point<f64, 2> = Point::from(precise_coords);
+        let point_precise: Point<f64, 2> = Point::new(precise_coords);
         assert_relative_eq!(
             point_precise.to_array().as_slice(),
             precise_coords.as_slice()
@@ -1498,7 +1498,7 @@ mod tests {
 
         // Test conversion from array reference
         let coords_ref = &[1.0f32, 2.0f32, 3.0f32];
-        let point_from_ref: Point<f64, 3> = Point::from(*coords_ref);
+        let point_from_ref: Point<f64, 3> = Point::new(coords_ref.map(std::convert::Into::into));
         assert_relative_eq!(
             point_from_ref.to_array().as_slice(),
             [1.0f64, 2.0f64, 3.0f64].as_slice()
