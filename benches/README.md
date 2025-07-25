@@ -20,39 +20,59 @@ cargo bench --bench circumsphere_containment -- --test
 
 ## Performance Results Summary
 
-### Single Query Performance (3D)
+### Version 0.3.0 Results (2025-07-25)
+
+#### Single Query Performance (3D)
 
 | Test Case | insphere | insphere_distance | insphere_lifted | Winner |
 |-----------|----------|------------------|-----------------|---------|
-| Basic 3D  | 806 ns | 1,524 ns | 651 ns | **insphere_lifted** |
-| Boundary vertex | 830 ns | 1,546 ns | 663 ns | **insphere_lifted** |
-| Far vertex | 833 ns | 1,557 ns | 662 ns | **insphere_lifted** |
+| Basic 3D  | 808 ns | 1,505 ns | 646 ns | **insphere_lifted** |
+| Boundary vertex | 844 ns | 1,521 ns | 649 ns | **insphere_lifted** |
+| Far vertex | 831 ns | 1,543 ns | 658 ns | **insphere_lifted** |
 
-### Batch Query Performance (1000 queries, 3D)
+#### Batch Query Performance (1000 queries, 3D)
 
 | Method | Time | Relative Performance |
 |--------|------|---------------------|
-| insphere_lifted | 668 µs | **1.0x (fastest)** |
-| insphere | 828 µs | 1.24x slower |
-| insphere_distance | 1,559 µs | 2.33x slower |
+| insphere_lifted | 661 µs | **1.0x (fastest)** |
+| insphere | 822 µs | 1.24x slower |
+| insphere_distance | 1,535 µs | 2.32x slower |
 
-### Dimensional Performance
+#### Dimensional Performance
 
-#### 2D Performance
-
-| Method | Time | Relative |
-|--------|------|----------|
-| insphere_lifted | 456 ns | **1.0x** |
-| insphere | 563 ns | 1.24x |
-| insphere_distance | 655 ns | 1.44x |
-
-#### 4D Performance
+##### 2D Performance
 
 | Method | Time | Relative |
 |--------|------|----------|
-| insphere_lifted | 977 ns | **1.0x** |
-| insphere | 1,244 ns | 1.27x |
-| insphere_distance | 1,903 ns | 1.95x |
+| insphere_lifted | 442 ns | **1.0x** |
+| insphere | 555 ns | 1.26x |
+| insphere_distance | 636 ns | 1.44x |
+
+##### 4D Performance
+
+| Method | Time | Relative |
+|--------|------|----------|
+| insphere_lifted | 962 ns | **1.0x** |
+| insphere | 1,242 ns | 1.29x |
+| insphere_distance | 1,859 ns | 1.93x |
+
+### Version Comparison (0.2.0 vs 0.3.0)
+
+Performance improvements in version 0.3.0:
+
+| Test Case | Method | v0.2.0 | v0.3.0 | Improvement |
+|-----------|--------|--------|--------|-------------|
+| Basic 3D | insphere | 806 ns | 808 ns | -0.2% (stable) |
+| Basic 3D | insphere_distance | 1,524 ns | 1,505 ns | +1.2% |
+| Basic 3D | insphere_lifted | 651 ns | 646 ns | +0.8% |
+| 1000 queries | insphere | 828 µs | 822 µs | +0.7% |
+| 1000 queries | insphere_distance | 1,559 µs | 1,535 µs | +1.5% |
+| 1000 queries | insphere_lifted | 668 µs | 661 µs | +1.0% |
+| 2D | insphere_lifted | 456 ns | 442 ns | +3.1% |
+| 4D | insphere_lifted | 977 ns | 962 ns | +1.5% |
+
+**Summary**: Version 0.3.0 shows consistent small performance improvements across all methods,
+with the most notable improvement being 3.1% in 2D insphere_lifted operations.
 
 ## Key Findings
 
