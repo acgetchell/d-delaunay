@@ -650,7 +650,6 @@ where
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
@@ -659,46 +658,80 @@ mod tests {
     };
     use crate::geometry::traits::coordinate::Coordinate;
     use approx::assert_relative_eq;
+    // Type aliases for commonly used types to reduce repetition
+    type TestCell3D = Cell<f64, Option<()>, Option<()>, 3>;
+    type TestCell2D = Cell<f64, Option<()>, Option<()>, 2>;
+    type TestVertex3D = crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>;
+    type TestVertex2D = crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>;
+
+    // Helper functions for creating common test data
+    fn create_test_vertices_3d() -> Vec<TestVertex3D> {
+        vec![
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([1.0, 0.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([0.0, 1.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0, 1.0]))
+                .build()
+                .unwrap(),
+        ]
+    }
+
+    fn create_test_vertices_2d() -> Vec<TestVertex2D> {
+        vec![
+            VertexBuilder::default()
+                .point(Point::new([0.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([1.0, 0.0]))
+                .build()
+                .unwrap(),
+            VertexBuilder::default()
+                .point(Point::new([0.0, 1.0]))
+                .build()
+                .unwrap(),
+        ]
+    }
+
+    fn create_tetrahedron() -> TestCell3D {
+        let vertices = create_test_vertices_3d();
+        CellBuilder::default().vertices(vertices).build().unwrap()
+    }
+
+    fn create_triangle() -> TestCell2D {
+        let vertices = create_test_vertices_2d();
+        CellBuilder::default().vertices(vertices).build().unwrap()
+    }
+
+    // =============================================================================
+    // CONSTRUCTOR AND BUILDER TESTS
+    // =============================================================================
+    // Tests covering basic cell construction, the builder pattern, and various
+    // cell instantiation scenarios including different dimensions and data types.
 
     #[test]
     fn cell_build() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+        let vertices = create_test_vertices_3d();
+        let cell: TestCell3D = CellBuilder::default()
+            .vertices(vertices.clone())
             .build()
             .unwrap();
 
-        assert_eq!(*cell.vertices(), vec![vertex1, vertex2, vertex3, vertex4]);
-        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices()[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices()[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices()[3].data.unwrap(), 2);
+        assert_eq!(*cell.vertices(), vertices);
         assert_eq!(cell.dim(), 3);
         assert_eq!(cell.number_of_vertices(), 4);
         assert!(cell.neighbors.is_none());
         assert!(cell.data.is_none());
-
-        // Human readable output for cargo test -- --nocapture
-        println!("Cell: {cell:?}");
     }
 
     #[test]
@@ -901,46 +934,20 @@ mod tests {
 
     #[test]
     fn cell_number_of_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let triangle = create_triangle();
+        assert_eq!(triangle.number_of_vertices(), 3);
 
-        assert_eq!(cell.number_of_vertices(), 3);
+        let tetrahedron = create_tetrahedron();
+        assert_eq!(tetrahedron.number_of_vertices(), 4);
     }
 
     #[test]
     fn cell_dim() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let triangle = create_triangle();
+        assert_eq!(triangle.dim(), 2);
 
-        assert_eq!(cell.dim(), 2);
+        let tetrahedron = create_tetrahedron();
+        assert_eq!(tetrahedron.dim(), 3);
     }
 
     #[test]
@@ -1541,11 +1548,10 @@ mod tests {
             .vertices(vec![vertex_2d_1, vertex_2d_2, vertex_2d_3])
             .build()
             .unwrap();
-        let _serialized_2d = serde_json::to_string(&cell_2d).unwrap();
-        // TODO: Re-enable deserialization test after fixing serde trait bounds
-        // let deserialized_2d: Cell<f64, Option<()>, Option<()>, 2> =
-        //     serde_json::from_str(&serialized_2d).unwrap();
-        // assert_eq!(cell_2d, deserialized_2d);
+        let serialized_2d = serde_json::to_string(&cell_2d).unwrap();
+        let deserialized_2d: Cell<f64, Option<()>, Option<()>, 2> =
+            serde_json::from_str(&serialized_2d).unwrap();
+        assert_eq!(cell_2d, deserialized_2d);
 
         let vertex_1d_1 = VertexBuilder::default()
             .point(Point::new([42.0]))
@@ -1560,11 +1566,10 @@ mod tests {
             .vertices(vec![vertex_1d_1, vertex_1d_2])
             .build()
             .unwrap();
-        let _serialized_1d = serde_json::to_string(&cell_1d).unwrap();
-        // TODO: Re-enable deserialization test after fixing serde trait bounds
-        // let deserialized_1d: Cell<f64, Option<()>, Option<()>, 1> =
-        //     serde_json::from_str(&serialized_1d).unwrap();
-        // assert_eq!(cell_1d, deserialized_1d);
+        let serialized_1d = serde_json::to_string(&cell_1d).unwrap();
+        let deserialized_1d: Cell<f64, Option<()>, Option<()>, 1> =
+            serde_json::from_str(&serialized_1d).unwrap();
+        assert_eq!(cell_1d, deserialized_1d);
     }
 
     #[test]
