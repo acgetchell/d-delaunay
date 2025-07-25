@@ -1,12 +1,12 @@
 //! Utility functions
 
+use crate::delaunay_core::traits::data::DataType;
 use crate::delaunay_core::vertex::Vertex;
 use crate::geometry::traits::coordinate::CoordinateScalar;
 use anyhow::Error;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::hash::Hash;
 use uuid::Uuid;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
@@ -81,7 +81,7 @@ pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHashe
 ) -> Result<[T; D], Error>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     if vertices.is_empty() {

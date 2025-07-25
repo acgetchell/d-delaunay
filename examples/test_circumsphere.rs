@@ -67,15 +67,7 @@ fn create_vertex<T, U, const D: usize>(coords: [f64; D], data: Option<U>) -> Ver
 where
     T: From<f64> + d_delaunay::geometry::traits::coordinate::CoordinateScalar + Clone,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    U: Clone
-        + Copy
-        + Eq
-        + std::hash::Hash
-        + Ord
-        + PartialEq
-        + PartialOrd
-        + DeserializeOwned
-        + Serialize,
+    U: d_delaunay::delaunay_core::traits::DataType,
 {
     let converted_coords: [T; D] = coords.map(|x| <T as From<f64>>::from(x));
     match data {

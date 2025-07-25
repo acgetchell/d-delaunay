@@ -1,4 +1,3 @@
----
 # Advanced Clippy analysis with SARIF output for security integration
 # Note: Basic clippy checks are also run in the main CI workflow
 

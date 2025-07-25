@@ -12,3 +12,4 @@ rules:
   truthy:
     allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
   comments-indentation: disable
+  document-start: disable

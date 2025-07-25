@@ -4,6 +4,7 @@
 
 use super::{
     facet::Facet,
+    traits::DataType,
     utilities::make_uuid,
     vertex::{Vertex, VertexValidationError},
 };
@@ -11,7 +12,7 @@ use crate::geometry::{point::Point, traits::coordinate::CoordinateScalar};
 use na::ComplexField;
 use nalgebra as na;
 use peroxide::fuga::anyhow;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use thiserror::Error;
 use uuid::Uuid;
@@ -69,8 +70,8 @@ pub enum CellValidationError {
 pub struct Cell<T, U, V, const D: usize>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The vertices of the cell.
@@ -86,11 +87,115 @@ where
     pub data: Option<V>,
 }
 
+/// Manual implementation of Deserialize for Cell
+impl<'de, T, U, V, const D: usize> Deserialize<'de> for Cell<T, U, V, D>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    V: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+
+        struct CellVisitor<T, U, V, const D: usize>
+        where
+            T: CoordinateScalar,
+            U: DataType,
+            V: DataType,
+            [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        {
+            _phantom: std::marker::PhantomData<(T, U, V)>,
+        }
+
+        impl<'de, T, U, V, const D: usize> Visitor<'de> for CellVisitor<T, U, V, D>
+        where
+            T: CoordinateScalar,
+            U: DataType,
+            V: DataType,
+            [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        {
+            type Value = Cell<T, U, V, D>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a Cell struct")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Cell<T, U, V, D>, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut vertices = None;
+                let mut uuid = None;
+                let mut neighbors = None;
+                let mut data = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "vertices" => {
+                            if vertices.is_some() {
+                                return Err(de::Error::duplicate_field("vertices"));
+                            }
+                            vertices = Some(map.next_value()?);
+                        }
+                        "uuid" => {
+                            if uuid.is_some() {
+                                return Err(de::Error::duplicate_field("uuid"));
+                            }
+                            uuid = Some(map.next_value()?);
+                        }
+                        "neighbors" => {
+                            if neighbors.is_some() {
+                                return Err(de::Error::duplicate_field("neighbors"));
+                            }
+                            neighbors = Some(map.next_value()?);
+                        }
+                        "data" => {
+                            if data.is_some() {
+                                return Err(de::Error::duplicate_field("data"));
+                            }
+                            data = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let vertices = vertices.ok_or_else(|| de::Error::missing_field("vertices"))?;
+                let uuid = uuid.ok_or_else(|| de::Error::missing_field("uuid"))?;
+                let neighbors = neighbors.unwrap_or(None);
+                let data = data.unwrap_or(None);
+
+                Ok(Cell {
+                    vertices,
+                    uuid,
+                    neighbors,
+                    data,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["vertices", "uuid", "neighbors", "data"];
+        deserializer.deserialize_struct(
+            "Cell",
+            FIELDS,
+            CellVisitor {
+                _phantom: std::marker::PhantomData,
+            },
+        )
+    }
+}
+
 impl<T, U, V, const D: usize> CellBuilder<T, U, V, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     fn validate(&self) -> Result<(), CellBuilderError> {
@@ -115,8 +220,8 @@ where
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function returns the number of vertices in the [Cell].
@@ -424,8 +529,8 @@ where
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
     T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
@@ -463,7 +568,7 @@ where
 fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     let mut sorted = vertices.to_vec();
@@ -475,8 +580,8 @@ where
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -489,8 +594,8 @@ where
 impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
 }
@@ -499,8 +604,8 @@ where
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -514,8 +619,8 @@ where
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash, // Add this bound to ensure Point implements Hash
 {
@@ -978,10 +1083,28 @@ mod tests {
         assert!(serialized.contains("[1.0,0.0,0.0]"));
         assert!(serialized.contains("[1.0,1.0,1.0]"));
 
-        // TODO: Re-enable deserialization test after fixing serde trait bounds
-        // let deserialized: Cell<f64, Option<()>, Option<()>, 3> =
-        //     serde_json::from_str(&serialized).unwrap();
-        // assert_eq!(deserialized, cell);
+        // Test deserialization with manual Deserialize implementation
+        let deserialized: Cell<f64, Option<()>, Option<()>, 3> =
+            serde_json::from_str(&serialized).unwrap();
+
+        // Check that deserialized cell has same number of vertices and properties
+        assert_eq!(deserialized.vertices().len(), cell.vertices().len());
+        assert_eq!(deserialized.dim(), cell.dim());
+        assert_eq!(deserialized.neighbors, cell.neighbors);
+        assert_eq!(deserialized.data, cell.data);
+        // Note: UUID will be the same as it's loaded from serialized data
+        assert_eq!(deserialized.uuid(), cell.uuid());
+
+        // Check that vertices have the same coordinates
+        for (original_vertex, deserialized_vertex) in
+            cell.vertices().iter().zip(deserialized.vertices().iter())
+        {
+            assert_relative_eq!(
+                original_vertex.point().to_array().as_slice(),
+                deserialized_vertex.point().to_array().as_slice(),
+                epsilon = f64::EPSILON
+            );
+        }
 
         // Human readable output for cargo test -- --nocapture
         println!("Serialized: {serialized:?}");

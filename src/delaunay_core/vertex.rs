@@ -1,11 +1,11 @@
 //! Data and operations on d-dimensional [vertices](https://en.wikipedia.org/wiki/Vertex_(computer_graphics)).
 
-use super::utilities::make_uuid;
+use super::{traits::DataType, utilities::make_uuid};
 use crate::geometry::{
     point::Point,
     traits::coordinate::{Coordinate, CoordinateScalar, CoordinateValidationError},
 };
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -58,7 +58,7 @@ pub enum VertexValidationError {
 pub struct Vertex<T, U, const D: usize>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the vertex as a D-dimensional Point.
@@ -74,10 +74,111 @@ where
     pub data: Option<U>,
 }
 
+/// Manual implementation of Deserialize for Vertex
+impl<'de, T, U, const D: usize> Deserialize<'de> for Vertex<T, U, D>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+
+        struct VertexVisitor<T, U, const D: usize>
+        where
+            T: CoordinateScalar,
+            U: DataType,
+            [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        {
+            _phantom: std::marker::PhantomData<(T, U)>,
+        }
+
+        impl<'de, T, U, const D: usize> Visitor<'de> for VertexVisitor<T, U, D>
+        where
+            T: CoordinateScalar,
+            U: DataType,
+            [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        {
+            type Value = Vertex<T, U, D>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a Vertex struct")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Vertex<T, U, D>, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut point = None;
+                let mut uuid = None;
+                let mut incident_cell = None;
+                let mut data = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "point" => {
+                            if point.is_some() {
+                                return Err(de::Error::duplicate_field("point"));
+                            }
+                            point = Some(map.next_value()?);
+                        }
+                        "uuid" => {
+                            if uuid.is_some() {
+                                return Err(de::Error::duplicate_field("uuid"));
+                            }
+                            uuid = Some(map.next_value()?);
+                        }
+                        "incident_cell" => {
+                            if incident_cell.is_some() {
+                                return Err(de::Error::duplicate_field("incident_cell"));
+                            }
+                            incident_cell = Some(map.next_value()?);
+                        }
+                        "data" => {
+                            if data.is_some() {
+                                return Err(de::Error::duplicate_field("data"));
+                            }
+                            data = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let point = point.ok_or_else(|| de::Error::missing_field("point"))?;
+                let uuid = uuid.ok_or_else(|| de::Error::missing_field("uuid"))?;
+                let incident_cell = incident_cell.unwrap_or(None);
+                let data = data.unwrap_or(None);
+
+                Ok(Vertex {
+                    point,
+                    uuid,
+                    incident_cell,
+                    data,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["point", "uuid", "incident_cell", "data"];
+        deserializer.deserialize_struct(
+            "Vertex",
+            FIELDS,
+            VertexVisitor {
+                _phantom: std::marker::PhantomData,
+            },
+        )
+    }
+}
+
 impl<T, U, const D: usize> Vertex<T, U, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The function `from_points` takes a vector of points and returns a
@@ -282,7 +383,7 @@ where
 impl<T, U, const D: usize> PartialEq for Vertex<T, U, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// Equality of vertices is based on ordered equality of coordinates using the Coordinate trait.
@@ -298,7 +399,7 @@ where
 impl<T, U, const D: usize> PartialOrd for Vertex<T, U, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// Order of vertices is based on lexicographic order of coordinate arrays.
@@ -313,7 +414,7 @@ where
 impl<T, U, const D: usize> From<Vertex<T, U, D>> for [T; D]
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -327,7 +428,7 @@ where
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for [T; D]
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -341,7 +442,7 @@ where
 impl<T, U, const D: usize> From<&Vertex<T, U, D>> for Point<T, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
@@ -354,7 +455,7 @@ where
 impl<T, U, const D: usize> Eq for Vertex<T, U, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Self: Hash,
 {
@@ -364,7 +465,7 @@ where
 impl<T, U, const D: usize> Hash for Vertex<T, U, D>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
 {
@@ -388,7 +489,7 @@ mod tests {
     fn create_vertex<T, U, const D: usize>(coords: [T; D]) -> Vertex<T, U, D>
     where
         T: CoordinateScalar,
-        U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        U: DataType,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         VertexBuilder::default()
@@ -401,7 +502,7 @@ mod tests {
     fn create_vertex_with_data<T, U, const D: usize>(coords: [T; D], data: U) -> Vertex<T, U, D>
     where
         T: CoordinateScalar,
-        U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        U: DataType,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         VertexBuilder::default()
@@ -418,7 +519,7 @@ mod tests {
         expected_dim: usize,
     ) where
         T: CoordinateScalar,
-        U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd,
+        U: DataType,
         [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     {
         assert_eq!(vertex.point().to_array(), expected_coords);
@@ -447,7 +548,7 @@ mod tests {
 
     #[test]
     fn vertex_builder() {
-        let mut vertex: Vertex<f64, &str, 3> = VertexBuilder::default()
+        let mut vertex: Vertex<f64, i32, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
             .unwrap();
@@ -463,8 +564,8 @@ mod tests {
         assert!(vertex.data.is_none());
 
         // Can mutate later
-        vertex.data = Some("3D");
-        assert_eq!(vertex.data.unwrap(), "3D");
+        vertex.data = Some(42);
+        assert_eq!(vertex.data.unwrap(), 42);
 
         // Human readable output for cargo test -- --nocapture
         println!("{vertex:?}");
@@ -494,9 +595,9 @@ mod tests {
 
     #[test]
     fn vertex_copy() {
-        let vertex: Vertex<f64, &str, 4> = VertexBuilder::default()
+        let vertex: Vertex<f64, u8, 4> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0, 4.0]))
-            .data("4D")
+            .data(4u8)
             .build()
             .unwrap();
         let vertex_copy = vertex;
@@ -575,7 +676,6 @@ mod tests {
 
     #[test]
     fn vertex_to_and_from_json() {
-        // let vertex: Vertex<f64, Option<()>, 3> = Vertex::new(Point::new([1.0, 2.0, 3.0]));
         let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default()
             .point(Point::new([1.0, 2.0, 3.0]))
             .build()
@@ -585,10 +685,20 @@ mod tests {
         assert!(serialized.contains("point"));
         assert!(serialized.contains("[1.0,2.0,3.0]"));
 
-        // Note: Deserialization test removed since we use DeserializeOwned trait bound
-        // instead of the derive macro to avoid conflicts with serde trait bounds
-        // let deserialized: Vertex<f64, Option<()>, 3> = serde_json::from_str(&serialized).unwrap();
-        // assert_eq!(deserialized, vertex);
+        // Test deserialization with manual Deserialize implementation
+        let deserialized: Vertex<f64, Option<()>, 3> = serde_json::from_str(&serialized).unwrap();
+
+        // Check that deserialized vertex has same point coordinates using approx equality
+        assert_relative_eq!(
+            deserialized.point().to_array().as_slice(),
+            vertex.point().to_array().as_slice(),
+            epsilon = f64::EPSILON
+        );
+        assert_eq!(deserialized.dim(), vertex.dim());
+        assert_eq!(deserialized.incident_cell, vertex.incident_cell);
+        assert_eq!(deserialized.data, vertex.data);
+        // Note: UUID will be different as it's loaded from serialized data
+        assert_eq!(deserialized.uuid(), vertex.uuid());
 
         // Human readable output for cargo test -- --nocapture
         println!("Serialized: {serialized:?}");
@@ -754,9 +864,9 @@ mod tests {
 
     #[test]
     fn vertex_with_string_data() {
-        let vertex: Vertex<f64, &str, 3> = create_vertex_with_data([1.0, 2.0, 3.0], "test_vertex");
+        let vertex: Vertex<f64, u32, 3> = create_vertex_with_data([1.0, 2.0, 3.0], 123u32);
         test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0], 3);
-        assert_eq!(vertex.data.unwrap(), "test_vertex");
+        assert_eq!(vertex.data.unwrap(), 123u32);
     }
 
     #[test]
@@ -1286,5 +1396,107 @@ mod tests {
         }
         assert!(invalid_both.point().validate().is_err());
         assert!(invalid_both.uuid().is_nil()); // UUID is nil
+    }
+
+    #[test]
+    fn vertex_with_str_data() {
+        // Test that Vertex works with simple Copy data
+        let vertex: Vertex<f64, i16, 3> = create_vertex_with_data([1.0, 2.0, 3.0], 999i16);
+        test_basic_vertex_properties(&vertex, [1.0, 2.0, 3.0], 3);
+        assert_eq!(vertex.data.unwrap(), 999i16);
+    }
+
+    #[test]
+    fn vertex_with_i32_data() {
+        // Test that Vertex works with i32 data (Copy type)
+        let vertex: Vertex<f64, i32, 2> = create_vertex_with_data([5.0, 10.0], 42);
+        test_basic_vertex_properties(&vertex, [5.0, 10.0], 2);
+        assert_eq!(vertex.data.unwrap(), 42);
+    }
+
+    #[test]
+    fn vertex_from_points_with_str_data() {
+        // Test creating vertices from points and then adding Copy data
+        let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
+        let mut vertices: Vec<Vertex<f64, u8, 2>> = Vertex::from_points(points);
+
+        // Add Copy u8 data to each vertex
+        vertices[0].data = Some(1u8);
+        vertices[1].data = Some(2u8);
+
+        assert_eq!(vertices[0].data.unwrap(), 1u8);
+        assert_eq!(vertices[1].data.unwrap(), 2u8);
+        assert_eq!(vertices.len(), 2);
+    }
+
+    #[test]
+    fn vertex_clone_with_copy_data() {
+        // Test that vertices with Copy data can be cloned
+        let vertex: Vertex<f64, u64, 3> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0, 3.0]))
+            .data(123_456_u64)
+            .build()
+            .unwrap();
+
+        let cloned_vertex = vertex;
+
+        assert_eq!(vertex.point(), cloned_vertex.point());
+        assert_eq!(vertex.uuid(), cloned_vertex.uuid());
+        assert_eq!(vertex.data, cloned_vertex.data);
+        assert_eq!(vertex.data.unwrap(), 123_456_u64);
+    }
+
+    #[test]
+    fn vertex_eq_with_copy_data() {
+        // Test equality comparison with Copy data
+        let vertex1: Vertex<f64, i32, 2> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0]))
+            .data(100)
+            .build()
+            .unwrap();
+
+        let vertex2: Vertex<f64, i32, 2> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0]))
+            .data(200)
+            .build()
+            .unwrap();
+
+        let vertex3: Vertex<f64, i32, 2> = VertexBuilder::default()
+            .point(Point::new([3.0, 4.0]))
+            .data(100)
+            .build()
+            .unwrap();
+
+        // Equality is based on point coordinates only, not data or UUID
+        assert_eq!(vertex1, vertex2); // Same point, different data and UUID
+        assert_ne!(vertex1, vertex3); // Different points
+    }
+
+    #[test]
+    fn vertex_hash_with_copy_data() {
+        // Test hashing with Copy data
+        use std::collections::HashMap;
+
+        let vertex1: Vertex<f64, u16, 2> = VertexBuilder::default()
+            .point(Point::new([1.0, 2.0]))
+            .data(999u16)
+            .build()
+            .unwrap();
+
+        let vertex2: Vertex<f64, i32, 2> = VertexBuilder::default()
+            .point(Point::new([3.0, 4.0]))
+            .data(42)
+            .build()
+            .unwrap();
+
+        // Test that vertices with Copy data can be used as HashMap keys
+        let mut map: HashMap<Vertex<f64, u16, 2>, i32> = HashMap::new();
+        map.insert(vertex1, 100);
+
+        let mut map2: HashMap<Vertex<f64, i32, 2>, u8> = HashMap::new();
+        map2.insert(vertex2, 255u8);
+
+        assert_eq!(map.len(), 1);
+        assert_eq!(map2.len(), 1);
     }
 }

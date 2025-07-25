@@ -13,7 +13,6 @@
 
 #[macro_use]
 extern crate derive_builder;
-extern crate peroxide;
 
 /// The main module of the library. This module contains the public interface
 /// for the library.
@@ -23,9 +22,15 @@ pub mod delaunay_core {
     pub mod triangulation_data_structure;
     pub mod utilities;
     pub mod vertex;
+    /// Traits for Delaunay triangulation data structures.
+    pub mod traits {
+        pub mod data;
+        pub use data::*;
+    }
     // Re-export the `delaunay_core` modules.
     pub use cell::*;
     pub use facet::*;
+    pub use traits::*;
     pub use triangulation_data_structure::*;
     pub use utilities::*;
     pub use vertex::*;

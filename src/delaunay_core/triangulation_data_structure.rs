@@ -6,6 +6,7 @@
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
+    traits::data::DataType,
     vertex::Vertex,
 };
 use crate::delaunay_core::utilities::find_extreme_coordinates;
@@ -18,7 +19,6 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use std::hash::Hash;
 use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
 use thiserror::Error;
@@ -70,8 +70,8 @@ fn facets_are_adjacent<T, U, V, const D: usize>(
 ) -> bool
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     // Two facets are adjacent if they have the same vertices
@@ -94,7 +94,7 @@ fn generate_combinations<T, U, const D: usize>(
 ) -> Vec<Vec<Vertex<T, U, D>>>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     let mut combinations = Vec::new();
@@ -172,8 +172,8 @@ where
 pub struct Tds<T, U, V, const D: usize>
 where
     T: CoordinateScalar,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// A [`HashMap`] that stores [Vertex] objects with their corresponding [Uuid]s as
@@ -193,8 +193,8 @@ where
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
     T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
-    U: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
-    V: Clone + Copy + Eq + Hash + Ord + PartialEq + PartialOrd + Serialize + DeserializeOwned,
+    U: DataType,
+    V: DataType,
     f64: From<T>,
     for<'a> &'a T: Div<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
