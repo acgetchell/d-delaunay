@@ -139,4 +139,3 @@ jobs:
           done
           echo "Attempted to upload $upload_count SARIF files"
         continue-on-error: true
-

@@ -63,10 +63,11 @@ macro_rules! print_result {
 }
 
 /// Create a test vertex with minimal boilerplate
-fn create_vertex<T, const D: usize>(coords: [f64; D], data: Option<T>) -> Vertex<f64, T, D>
+fn create_vertex<T, U, const D: usize>(coords: [f64; D], data: Option<U>) -> Vertex<T, U, D>
 where
-    [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    T: Clone
+    T: From<f64> + d_delaunay::geometry::traits::coordinate::CoordinateScalar + Clone,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    U: Clone
         + Copy
         + Eq
         + std::hash::Hash
@@ -76,14 +77,15 @@ where
         + DeserializeOwned
         + Serialize,
 {
+    let converted_coords: [T; D] = coords.map(|x| <T as From<f64>>::from(x));
     match data {
         Some(value) => VertexBuilder::default()
-            .point(Point::new(coords))
+            .point(Point::new(converted_coords))
             .data(value)
             .build()
             .unwrap(),
         None => VertexBuilder::default()
-            .point(Point::new(coords))
+            .point(Point::new(converted_coords))
             .build()
             .unwrap(),
     }

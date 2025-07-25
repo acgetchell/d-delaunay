@@ -316,7 +316,7 @@ fn numeric_types_demo() {
     println!("🔢 Different Numeric Types");
     println!("--------------------------");
 
-    // f32 points
+    // f32 points - showing the library supports different numeric types
     let point_f32_1 = Point::new([1.5f32, 2.5f32]);
     let point_f32_2 = Point::new([1.5f32, 2.5f32]);
     let point_f32_nan = Point::new([f32::NAN, 2.5f32]);
@@ -324,6 +324,9 @@ fn numeric_types_demo() {
 
     println!("f32 points equal: {}", point_f32_1 == point_f32_2);
     println!("f32 NaN points equal: {}", point_f32_nan == point_f32_nan2);
+
+    // Note: This demonstrates that the library can work with different coordinate types T
+    // beyond just f64, as long as T implements the necessary traits
 
     // Integer-like values using f64
     let point_int_1 = Point::new([10.0, 20.0, 30.0]);

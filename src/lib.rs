@@ -7,6 +7,7 @@
 //! # Features
 //!
 //! - d-dimensional Delaunay triangulations
+//! - Generic floating-point coordinate types (supports `f32`, `f64`, and other types implementing `CoordinateScalar`)
 //! - Arbitrary data types associated with vertices and cells
 //! - Serialization/Deserialization with [serde](https://serde.rs)
 
@@ -34,8 +35,9 @@ pub mod delaunay_core {
 ///
 /// The geometry module provides a coordinate abstraction through the `Coordinate` trait
 /// that unifies coordinate operations across different storage mechanisms. The `Point`
-/// type implements this abstraction, providing floating-point coordinate support with
-/// proper NaN handling, validation, and hashing.
+/// type implements this abstraction, providing generic floating-point coordinate support
+/// (for `f32`, `f64`, and other types implementing `CoordinateScalar`) with proper NaN
+/// handling, validation, and hashing.
 pub mod geometry {
     pub mod matrix;
     pub mod point;

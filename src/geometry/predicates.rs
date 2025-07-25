@@ -9,13 +9,32 @@ use crate::geometry::traits::coordinate::{Coordinate, DEFAULT_TOLERANCE_F64};
 use crate::geometry::{OrderedEq, point::Point};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
-use num_traits::Float;
+use num_traits::{Float, Zero};
 use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
 use serde::{Serialize, de::DeserializeOwned};
 use std::iter::Sum;
 
 /// Tolerance for distance comparisons
 const DISTANCE_TOLERANCE: f64 = 1e-9;
+
+/// Helper function to compute squared norm using generic arithmetic on T.
+///
+/// This function computes the sum of squares of coordinates using generic
+/// arithmetic operations on type T, avoiding premature conversion to f64.
+///
+/// # Arguments
+///
+/// * `coords` - Array of coordinates of type T
+///
+/// # Returns
+///
+/// The squared norm (sum of squares) as type T
+fn squared_norm<T, const D: usize>(coords: [T; D]) -> T
+where
+    T: crate::geometry::traits::coordinate::CoordinateScalar + num_traits::Zero,
+{
+    coords.iter().fold(T::zero(), |acc, &x| acc + x * x)
+}
 
 /// Calculate the circumcenter of a set of points forming a simplex.
 ///
@@ -28,7 +47,7 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// Lévy, Bruno, and Yang Liu.
 /// "Lp Centroidal Voronoi Tessellation and Its Applications."
 /// ACM Transactions on Graphics 29, no. 4 (July 26, 2010): 119:1-119:11.
-/// <https://doi.org/10.1145/1778765.1778856>.
+/// <https://doi.org/10.1145/1778765.1778856>.
 ///
 /// The circumcenter C of a simplex with points `x_0`, `x_1`, ..., `x_n` is the
 /// solution to the system:
@@ -58,7 +77,7 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// * `points` - A slice of points that form the simplex
 ///
 /// # Returns
-/// The circumcenter as a Point<f64, D> if successful, or an error if the
+/// The circumcenter as a Point<T, D> if successful, or an error if the
 /// simplex is degenerate or the matrix inversion fails.
 ///
 /// # Errors
@@ -81,27 +100,15 @@ const DISTANCE_TOLERANCE: f64 = 1e-9;
 /// let center = circumcenter(&points).unwrap();
 /// assert_eq!(center, Point::new([0.5, 0.5, 0.5]));
 /// ```
-pub fn circumcenter<T, const D: usize>(
-    points: &[Point<T, D>],
-) -> Result<Point<f64, D>, anyhow::Error>
+pub fn circumcenter<T, const D: usize>(points: &[Point<T, D>]) -> Result<Point<T, D>, anyhow::Error>
 where
-    T: Clone
+    T: crate::geometry::traits::coordinate::CoordinateScalar
         + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
         + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+        + Zero,
     f64: From<T>,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: From<f64>,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
 {
     if points.is_empty() {
         return Err(anyhow::Error::msg("Empty point set"));
@@ -115,10 +122,8 @@ where
     // Build matrix A and vector B for the linear system
     let mut matrix = zeros(dim, dim);
     let mut b = zeros(dim, 1);
-    let coords_0_f64: [f64; D] = {
-        let coords_0: [T; D] = (&points[0]).into();
-        coords_0.map(std::convert::Into::into)
-    };
+    let coords_0: [T; D] = (&points[0]).into();
+    let coords_0_f64: [f64; D] = coords_0.map(std::convert::Into::into);
 
     for i in 0..dim {
         let coords_point: [T; D] = (&points[i + 1]).into();
@@ -129,11 +134,14 @@ where
             matrix[(i, j)] = coords_point_f64[j] - coords_0_f64[j];
         }
 
-        // Fill vector element
-        b[(i, 0)] = na::distance_squared(
-            &na::Point::from(coords_point_f64),
-            &na::Point::from(coords_0_f64),
-        );
+        // Calculate squared distance using generic arithmetic on T
+        let mut squared_distance = T::zero();
+        for j in 0..D {
+            let diff = coords_point[j] - coords_0[j];
+            squared_distance = squared_distance + diff * diff;
+        }
+        let squared_distance_f64: f64 = squared_distance.into();
+        b[(i, 0)] = squared_distance_f64;
     }
 
     let a_inv = invert(&matrix)?;
@@ -146,7 +154,9 @@ where
         .try_into()
         .map_err(|_| anyhow::Error::msg("Failed to convert solution vector to array"))?;
 
-    Ok(Point::<f64, D>::from(solution_array))
+    // Convert solution from f64 back to T
+    let solution_array_t: [T; D] = solution_array.map(|x| <T as From<f64>>::from(x));
+    Ok(Point::<T, D>::from(solution_array_t))
 }
 
 /// Calculate the circumradius of a set of points forming a simplex.
@@ -177,28 +187,18 @@ where
 /// let point4 = Point::new([0.0, 0.0, 1.0]);
 /// let points = vec![point1, point2, point3, point4];
 /// let radius = circumradius(&points).unwrap();
-/// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
+/// let expected_radius = (3.0_f64.sqrt() / 2.0);
 /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
 /// ```
 pub fn circumradius<T, const D: usize>(points: &[Point<T, D>]) -> Result<T, anyhow::Error>
 where
-    T: Clone
+    T: crate::geometry::traits::coordinate::CoordinateScalar
         + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
         + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+        + Zero,
     f64: From<T>,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: From<f64>,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
     let circumcenter = circumcenter(points)?;
@@ -239,31 +239,21 @@ where
 /// let points = vec![point1, point2, point3, point4];
 /// let center = circumcenter(&points).unwrap();
 /// let radius = circumradius_with_center(&points, &center).unwrap();
-/// let expected_radius: f64 = 3.0_f64.sqrt() / 2.0;
+/// let expected_radius = (3.0_f64.sqrt() / 2.0);
 /// assert_relative_eq!(radius, expected_radius, epsilon = 1e-9);
 /// ```
 pub fn circumradius_with_center<T, const D: usize>(
     points: &[Point<T, D>],
-    circumcenter: &Point<f64, D>,
+    circumcenter: &Point<T, D>,
 ) -> Result<T, anyhow::Error>
 where
-    T: Clone
+    T: crate::geometry::traits::coordinate::CoordinateScalar
         + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
         + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+        + Zero,
     f64: From<T>,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: From<f64>,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
     if points.is_empty() {
@@ -271,11 +261,16 @@ where
     }
 
     let point_coords: [T; D] = (&points[0]).into();
-    let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
-    Ok(na::distance(
-        &na::Point::<T, D>::from(circumcenter.to_array()),
-        &na::Point::<T, D>::from(point_coords_f64),
-    ))
+    let circumcenter_coords: [T; D] = circumcenter.to_array();
+
+    // Calculate distance using generic arithmetic on T
+    let mut squared_distance = T::zero();
+    for i in 0..D {
+        let diff = circumcenter_coords[i] - point_coords[i];
+        squared_distance = squared_distance + diff * diff;
+    }
+    let distance = Float::sqrt(squared_distance);
+    Ok(distance)
 }
 
 /// Represents the position of a point relative to a circumsphere.
@@ -486,37 +481,30 @@ pub fn insphere_distance<T, const D: usize>(
     test_point: Point<T, D>,
 ) -> Result<InSphere, anyhow::Error>
 where
-    T: Clone
+    T: crate::geometry::traits::coordinate::CoordinateScalar
         + ComplexField<RealField = T>
-        + Copy
-        + Default
-        + PartialEq
-        + PartialOrd
-        + OrderedEq
         + Sum
-        + Float
-        + crate::geometry::traits::finitecheck::FiniteCheck
-        + crate::geometry::traits::hashcoordinate::HashCoordinate
-        + std::fmt::Debug
-        + Serialize
-        + DeserializeOwned,
+        + Zero,
     f64: From<T>,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    [f64; D]: Default + DeserializeOwned + Serialize + Sized,
+    T: From<f64>,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
     OPoint<T, Const<D>>: From<[f64; D]>,
 {
     let circumcenter = circumcenter(simplex_points)?;
     let circumradius = circumradius_with_center(simplex_points, &circumcenter)?;
-    // Use conversion from point to coordinates, then convert to f64
-    let point_coords: [T; D] = (&test_point).into();
-    let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
-    let radius = na::distance(
-        &na::Point::<T, D>::from(circumcenter.to_array()),
-        &na::Point::<T, D>::from(point_coords_f64),
-    );
 
-    let tolerance =
-        T::from(DISTANCE_TOLERANCE).unwrap_or_else(|| T::from(f64::EPSILON).unwrap_or_default());
+    // Calculate distance using generic arithmetic on T
+    let point_coords: [T; D] = (&test_point).into();
+    let circumcenter_coords: [T; D] = circumcenter.to_array();
+
+    let mut squared_distance = T::zero();
+    for i in 0..D {
+        let diff = point_coords[i] - circumcenter_coords[i];
+        squared_distance = squared_distance + diff * diff;
+    }
+    let radius = Float::sqrt(squared_distance);
+
+    let tolerance = <T as From<f64>>::from(DISTANCE_TOLERANCE);
     if num_traits::Float::abs(circumradius - radius) < tolerance {
         Ok(InSphere::BOUNDARY)
     } else if circumradius > radius {
@@ -667,9 +655,10 @@ where
             matrix[(i, j)] = point_coords_f64[j];
         }
 
-        // Add squared norm (sum of squares of coordinates)
-        let squared_norm: f64 = point_coords_f64.iter().map(|&x| x * x).sum();
-        matrix[(i, D)] = squared_norm;
+        // Add squared norm using generic arithmetic on T
+        let squared_norm_t = squared_norm(point_coords);
+        let squared_norm_f64: f64 = squared_norm_t.into();
+        matrix[(i, D)] = squared_norm_f64;
 
         // Add one to the last column
         matrix[(i, D + 1)] = 1.0;
@@ -684,9 +673,10 @@ where
         matrix[(D + 1, j)] = test_point_coords_f64[j];
     }
 
-    // Add squared norm
-    let test_squared_norm: f64 = test_point_coords_f64.iter().map(|&x| x * x).sum();
-    matrix[(D + 1, D)] = test_squared_norm;
+    // Add squared norm using generic arithmetic on T
+    let test_squared_norm_t = squared_norm(test_point_coords);
+    let test_squared_norm_f64: f64 = test_squared_norm_t.into();
+    matrix[(D + 1, D)] = test_squared_norm_f64;
 
     // Add one to the last column
     matrix[(D + 1, D + 1)] = 1.0;
@@ -846,7 +836,6 @@ where
 
     // Get the reference point (first point of the simplex)
     let ref_point_coords: [T; D] = (&simplex_points[0]).into();
-    let ref_point_coords_f64: [f64; D] = ref_point_coords.map(std::convert::Into::into);
 
     // Create matrix for in-sphere test
     // Matrix dimensions: (D+1) x (D+1)
@@ -857,36 +846,52 @@ where
     // Populate rows with the coordinates relative to the reference point
     for i in 1..=D {
         let point_coords: [T; D] = (&simplex_points[i]).into();
-        let point_coords_f64: [f64; D] = point_coords.map(std::convert::Into::into);
 
-        let mut squared_norm = 0.0_f64;
-
-        // Calculate relative coordinates and squared norm
+        // Calculate relative coordinates using generic arithmetic on T
+        let mut relative_coords_t: [T; D] = [T::zero(); D];
         for j in 0..D {
-            let relative_coord = point_coords_f64[j] - ref_point_coords_f64[j];
-            matrix[(i - 1, j)] = relative_coord;
-            squared_norm += relative_coord * relative_coord;
+            relative_coords_t[j] = point_coords[j] - ref_point_coords[j];
         }
 
+        // Convert to f64 for matrix operations
+        let relative_coords_f64: [f64; D] = relative_coords_t.map(std::convert::Into::into);
+
+        // Fill matrix row
+        for j in 0..D {
+            matrix[(i - 1, j)] = relative_coords_f64[j];
+        }
+
+        // Calculate squared norm using generic arithmetic on T
+        let squared_norm_t = squared_norm(relative_coords_t);
+        let squared_norm_f64: f64 = squared_norm_t.into();
+
         // Add squared norm to the last column
-        matrix[(i - 1, D)] = squared_norm;
+        matrix[(i - 1, D)] = squared_norm_f64;
     }
 
     // Add the test point to the last row
     let test_point_coords: [T; D] = (&test_point).into();
-    let test_point_coords_f64: [f64; D] = test_point_coords.map(std::convert::Into::into);
 
-    let mut test_squared_norm = 0.0_f64;
-
-    // Calculate relative coordinates and squared norm for test point
+    // Calculate relative coordinates for test point using generic arithmetic on T
+    let mut test_relative_coords_t: [T; D] = [T::zero(); D];
     for j in 0..D {
-        let relative_coord = test_point_coords_f64[j] - ref_point_coords_f64[j];
-        matrix[(D, j)] = relative_coord;
-        test_squared_norm += relative_coord * relative_coord;
+        test_relative_coords_t[j] = test_point_coords[j] - ref_point_coords[j];
     }
 
+    // Convert to f64 for matrix operations
+    let test_relative_coords_f64: [f64; D] = test_relative_coords_t.map(std::convert::Into::into);
+
+    // Fill matrix row
+    for j in 0..D {
+        matrix[(D, j)] = test_relative_coords_f64[j];
+    }
+
+    // Calculate squared norm using generic arithmetic on T
+    let test_squared_norm_t = squared_norm(test_relative_coords_t);
+    let test_squared_norm_f64: f64 = test_squared_norm_t.into();
+
     // Add squared norm to the last column
-    matrix[(D, D)] = test_squared_norm;
+    matrix[(D, D)] = test_squared_norm_f64;
 
     // Calculate the determinant of the matrix
     let det = matrix.det();

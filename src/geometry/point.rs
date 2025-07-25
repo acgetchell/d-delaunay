@@ -25,13 +25,21 @@ use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, Default, PartialOrd)]
 /// The [Point] struct represents a point in a D-dimensional space, where the
-/// coordinates are of type `T`.
+/// coordinates are of generic type `T`.
+///
+/// # Generic Type Support
+///
+/// The Point struct supports any floating-point type `T` that implements the
+/// `CoordinateScalar` trait, including `f32`, `f64`, and other floating-point
+/// types. This generalization allows for flexibility in precision requirements
+/// and memory usage across different applications.
 ///
 /// # Properties
 ///
 /// * `coords`: `coords` is a private property of the [Point]. It is an array of
-///   type `T` with a length of `D`. The type `T` is a generic type parameter,
-///   which means it can be any type. The length `D` is a constant unsigned
+///   type `T` with a length of `D`. The type `T` is a generic type parameter
+///   constrained to implement `CoordinateScalar`, ensuring it has all necessary
+///   traits for coordinate operations. The length `D` is a constant unsigned
 ///   integer known at compile time.
 ///
 /// Points are intended to be immutable once created, so the `coords` field is

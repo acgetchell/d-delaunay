@@ -1475,11 +1475,32 @@ mod tests {
 
     use super::*;
 
+    // Type alias for easier test writing - change this to test different coordinate types
+    type TestFloat = f64;
+
     #[test]
     fn test_add_vertex_already_exists() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+        test_add_vertex_already_exists_generic::<TestFloat>();
+    }
 
-        let point = Point::new([1.0, 2.0, 3.0]);
+    fn test_add_vertex_already_exists_generic<T>()
+    where
+        T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+        f64: From<T>,
+        for<'a> &'a T: Div<T>,
+        [T; 3]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        ordered_float::OrderedFloat<f64>: From<T>,
+        OPoint<T, Const<3>>: From<[f64; 3]>,
+        [f64; 3]: Default + DeserializeOwned + Serialize + Sized,
+        T: num_traits::NumCast,
+    {
+        let mut tds: Tds<T, usize, usize, 3> = Tds::new(&[]).unwrap();
+
+        let point = Point::new([
+            num_traits::NumCast::from(1.0f64).unwrap(),
+            num_traits::NumCast::from(2.0f64).unwrap(),
+            num_traits::NumCast::from(3.0f64).unwrap(),
+        ]);
         let vertex = VertexBuilder::default().point(point).build().unwrap();
         tds.add(vertex).unwrap();
 
@@ -1489,15 +1510,37 @@ mod tests {
 
     #[test]
     fn test_add_vertex_uuid_collision() {
-        let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+        test_add_vertex_uuid_collision_generic::<TestFloat>();
+    }
 
-        let point1 = Point::new([1.0, 2.0, 3.0]);
+    fn test_add_vertex_uuid_collision_generic<T>()
+    where
+        T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+        f64: From<T>,
+        for<'a> &'a T: Div<T>,
+        [T; 3]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        ordered_float::OrderedFloat<f64>: From<T>,
+        OPoint<T, Const<3>>: From<[f64; 3]>,
+        [f64; 3]: Default + DeserializeOwned + Serialize + Sized,
+        T: num_traits::NumCast,
+    {
+        let mut tds: Tds<T, usize, usize, 3> = Tds::new(&[]).unwrap();
+
+        let point1 = Point::new([
+            num_traits::NumCast::from(1.0f64).unwrap(),
+            num_traits::NumCast::from(2.0f64).unwrap(),
+            num_traits::NumCast::from(3.0f64).unwrap(),
+        ]);
         let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
         let uuid1 = vertex1.uuid();
         tds.add(vertex1).unwrap();
 
         // Create a new vertex with different coordinates but same UUID
-        let point2 = Point::new([4.0, 5.0, 6.0]); // Different coordinates
+        let point2 = Point::new([
+            num_traits::NumCast::from(4.0f64).unwrap(),
+            num_traits::NumCast::from(5.0f64).unwrap(),
+            num_traits::NumCast::from(6.0f64).unwrap(),
+        ]); // Different coordinates
         let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
 
         // Manually insert the second vertex with the first vertex's UUID to simulate UUID collision
@@ -1510,11 +1553,14 @@ mod tests {
 
         // The vertex at uuid1 should now be vertex2 (the collision overwrote vertex1)
         let stored_vertex = tds.vertices.get(&uuid1).unwrap();
-        let stored_coords: [f64; 3] = stored_vertex.into();
-        #[allow(clippy::float_cmp)]
-        {
-            assert_eq!(stored_coords, [4.0, 5.0, 6.0]); // Should be vertex2's coordinates
-        }
+        let stored_coords: [T; 3] = stored_vertex.into();
+        // Convert to f64 for comparison
+        let expected_coords = [
+            num_traits::NumCast::from(4.0f64).unwrap(),
+            num_traits::NumCast::from(5.0f64).unwrap(),
+            num_traits::NumCast::from(6.0f64).unwrap(),
+        ];
+        assert_eq!(stored_coords, expected_coords); // Should be vertex2's coordinates
     }
 
     #[test]

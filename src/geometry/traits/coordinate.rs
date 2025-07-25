@@ -7,9 +7,11 @@
 //!
 //! # Overview
 //!
-//! The `Coordinate` trait was created to address the need for abstracting coordinate
-//! functionality that was previously spread across individual trait requirements
-//! in `Point`, `Vertex`, `Cell`, `Facet`, and `TriangulationDataStructure`. It consolidates
+//! The `Coordinate` trait provides a unified abstraction for coordinate operations
+//! across different scalar types and storage mechanisms. All geometric structures
+//! (`Point`, `Vertex`, `Cell`, `Facet`, and `TriangulationDataStructure`) now use
+//! generic type parameters constrained by this trait, enabling support for multiple
+//! floating-point precision levels (`f32`, `f64`, etc.). The trait consolidates
 //! all the trait bounds that these structures need:
 //!
 //! - `Float` for floating-point arithmetic operations
