@@ -17,13 +17,24 @@
 
 #![allow(clippy::similar_names)]
 
+// =============================================================================
+// IMPORTS
+// =============================================================================
+
 use crate::geometry::traits::coordinate::{
     Coordinate, CoordinateScalar, CoordinateValidationError,
 };
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Copy, Debug, Default, PartialOrd)]
+// =============================================================================
+// POINT STRUCT DEFINITION
+// =============================================================================
+
+#[derive(Clone, Copy, Debug, Default, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+#[serde(bound(serialize = "T: Serialize"))]
+#[serde(bound(deserialize = "T: serde::de::DeserializeOwned"))]
 /// The [Point] struct represents a point in a D-dimensional space, where the
 /// coordinates are of generic type `T`.
 ///
@@ -51,66 +62,6 @@ where
 {
     /// The coordinates of the point.
     coords: [T; D],
-}
-
-// Implement Hash using the Coordinate trait
-impl<T, const D: usize> Hash for Point<T, D>
-where
-    T: CoordinateScalar,
-    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
-{
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.hash_coordinate(state);
-    }
-}
-
-// Implement PartialEq using the Coordinate trait
-impl<T, const D: usize> PartialEq for Point<T, D>
-where
-    T: CoordinateScalar,
-    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.ordered_equals(other)
-    }
-}
-
-// Implement Eq using the Coordinate trait
-impl<T, const D: usize> Eq for Point<T, D>
-where
-    T: CoordinateScalar,
-    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
-{
-}
-
-/// Manual implementation of Serialize for Point
-impl<T, const D: usize> Serialize for Point<T, D>
-where
-    T: CoordinateScalar,
-    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.coords.serialize(serializer)
-    }
-}
-
-/// Manual implementation of Deserialize for Point
-impl<'de, T, const D: usize> Deserialize<'de> for Point<T, D>
-where
-    T: CoordinateScalar,
-    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
-{
-    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
-    where
-        De: serde::Deserializer<'de>,
-    {
-        let coords = <[T; D]>::deserialize(deserializer)?;
-        Ok(Point { coords })
-    }
 }
 
 /// Implementation of the `Coordinate` trait for Point
@@ -178,6 +129,47 @@ where
     }
 }
 
+// =============================================================================
+// STANDARD TRAIT IMPLEMENTATIONS
+// =============================================================================
+
+// Implement Hash using the Coordinate trait
+impl<T, const D: usize> Hash for Point<T, D>
+where
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_coordinate(state);
+    }
+}
+
+// Implement PartialEq using the Coordinate trait
+impl<T, const D: usize> PartialEq for Point<T, D>
+where
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ordered_equals(other)
+    }
+}
+
+// Implement Eq using the Coordinate trait
+impl<T, const D: usize> Eq for Point<T, D>
+where
+    T: CoordinateScalar,
+    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
+{
+}
+
+// Serde implementations are automatically derived using #[serde(transparent)]
+
+// =============================================================================
+// TYPE CONVERSION IMPLEMENTATIONS
+// =============================================================================
+
 /// From trait implementations for Point conversions - using Coordinate trait
 impl<T, U, const D: usize> From<[T; D]> for Point<U, D>
 where
@@ -189,8 +181,8 @@ where
     #[inline]
     fn from(coords: [T; D]) -> Self {
         // Convert the `coords` array to `[U; D]`
-        let coords_u: [U; D] = coords.map(std::convert::Into::into);
-        Point::new(coords_u)
+        let coords_u: [U; D] = coords.map(Into::into);
+        Self::new(coords_u)
     }
 }
 
