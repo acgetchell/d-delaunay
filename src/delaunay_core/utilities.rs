@@ -62,6 +62,7 @@ pub fn make_uuid() -> Uuid {
 /// use d_delaunay::delaunay_core::utilities::find_extreme_coordinates;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use std::collections::HashMap;
 /// use std::cmp::Ordering;
 /// let points = vec![
@@ -127,6 +128,7 @@ mod tests {
 
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
+    use crate::geometry::traits::coordinate::Coordinate;
     use approx::assert_relative_eq;
     use std::collections::HashMap;
 

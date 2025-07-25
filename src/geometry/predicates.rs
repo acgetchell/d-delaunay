@@ -89,6 +89,7 @@ where
 ///
 /// ```
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::circumcenter;
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
 /// let point2 = Point::new([1.0, 0.0, 0.0]);
@@ -174,6 +175,7 @@ where
 ///
 /// ```
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::circumradius;
 /// use approx::assert_relative_eq;
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
@@ -222,6 +224,7 @@ where
 ///
 /// ```
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::{circumcenter, circumradius_with_center};
 /// use approx::assert_relative_eq;
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
@@ -342,6 +345,7 @@ impl std::fmt::Display for Orientation {
 /// ```
 /// use d_delaunay::geometry::Orientation;
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::simplex_orientation;
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
 /// let point2 = Point::new([1.0, 0.0, 0.0]);
@@ -444,6 +448,7 @@ where
 ///
 /// ```
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::{insphere_distance, InSphere};
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
 /// let point2 = Point::new([1.0, 0.0, 0.0]);
@@ -567,6 +572,7 @@ where
 ///
 /// ```
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::insphere;
 /// use d_delaunay::geometry::InSphere;
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
@@ -755,6 +761,7 @@ where
 ///
 /// ```
 /// use d_delaunay::geometry::point::Point;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 /// use d_delaunay::geometry::predicates::insphere_lifted;
 /// let point1 = Point::new([0.0, 0.0, 0.0]);
 /// let point2 = Point::new([1.0, 0.0, 0.0]);

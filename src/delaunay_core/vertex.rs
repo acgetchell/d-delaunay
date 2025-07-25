@@ -284,6 +284,7 @@ where
     /// ```
     /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// use uuid::Uuid;
     /// let point = Point::new([1.0, 2.0, 3.0]);
     /// let vertex: Vertex<f64, Option<()>, 3> = VertexBuilder::default().point(point).build().unwrap();

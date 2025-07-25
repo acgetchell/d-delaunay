@@ -53,27 +53,6 @@ where
     coords: [T; D],
 }
 
-impl<T, const D: usize> Point<T, D>
-where
-    T: CoordinateScalar,
-    [T; D]: Copy + Default + serde::de::DeserializeOwned + Serialize + Sized,
-{
-    /// Create a new Point from an array of coordinates.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// assert_eq!(point.to_array(), [1.0, 2.0, 3.0]);
-    /// ```
-    #[inline]
-    pub fn new(coords: [T; D]) -> Self {
-        Self { coords }
-    }
-}
-
 // Implement Hash using the Coordinate trait
 impl<T, const D: usize> Hash for Point<T, D>
 where
@@ -225,6 +204,7 @@ where
     ///
     /// ```rust
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let point = Point::new([1.0, 2.0]);
     /// let coords: [f64; 2] = point.into();
     /// assert_eq!(coords, [1.0, 2.0]);
@@ -244,6 +224,7 @@ where
     ///
     /// ```rust
     /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     /// let point = Point::new([3.0, 4.0]);
     /// let coords: [f64; 2] = (&point).into();
     /// assert_eq!(coords, [3.0, 4.0]);
