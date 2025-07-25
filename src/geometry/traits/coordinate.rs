@@ -1008,8 +1008,16 @@ mod tests {
         }
 
         // Test that default_tolerance returns the expected values
-        assert_relative_eq!(f32::default_tolerance(), DEFAULT_TOLERANCE_F32, epsilon = f32::EPSILON);
-        assert_relative_eq!(f64::default_tolerance(), DEFAULT_TOLERANCE_F64, epsilon = f64::EPSILON);
+        assert_relative_eq!(
+            f32::default_tolerance(),
+            DEFAULT_TOLERANCE_F32,
+            epsilon = f32::EPSILON
+        );
+        assert_relative_eq!(
+            f64::default_tolerance(),
+            DEFAULT_TOLERANCE_F64,
+            epsilon = f64::EPSILON
+        );
 
         // Test that the tolerance values are reasonable
         assert_relative_eq!(f32::default_tolerance(), 1e-6_f32, epsilon = f32::EPSILON);
