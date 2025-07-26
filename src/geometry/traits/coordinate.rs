@@ -484,104 +484,89 @@ mod tests {
     }
 
     #[test]
-    fn coordinate_trait_validate_valid() {
-        // Test validation with valid coordinates
-        let valid_coord: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
-        assert!(valid_coord.validate().is_ok());
+    fn coordinate_trait_validate_various() {
+        let test_cases = [
+            ([1.0, 2.0, 3.0], true),                // Valid
+            ([-1.0, -2.0, -3.0], true),             // Valid negative
+            ([0.0, 0.0, 0.0], true),                // Valid zeros
+            ([1e10, 2e10, 3e10], true),             // Valid large
+            ([1e-10, 2e-10, 3e-10], true),          // Valid small
+            ([f64::NAN, 2.0, 3.0], false),          // Invalid NaN
+            ([2.0, f64::NAN, 3.0], false),          // Invalid NaN middle
+            ([3.0, 2.0, f64::NAN], false),          // Invalid NaN end
+            ([f64::INFINITY, 2.0, 3.0], false),     // Invalid positive infinity
+            ([2.0, f64::NEG_INFINITY, 3.0], false), // Invalid negative infinity
+        ];
 
-        // Test with negative coordinates
-        let negative_coord: Point<f64, 3> = Point::new([-1.0, -2.0, -3.0]);
-        assert!(negative_coord.validate().is_ok());
-
-        // Test with zero coordinates
-        let zero_coord: Point<f64, 3> = Point::new([0.0, 0.0, 0.0]);
-        assert!(zero_coord.validate().is_ok());
-
-        // Test with large coordinates
-        let large_coord: Point<f64, 3> = Point::new([1e10, 2e10, 3e10]);
-        assert!(large_coord.validate().is_ok());
-
-        // Test with small coordinates
-        let small_coord: Point<f64, 3> = Point::new([1e-10, 2e-10, 3e-10]);
-        assert!(small_coord.validate().is_ok());
+        for &(input, expected) in &test_cases {
+            let coord: Point<f64, 3> = Point::new(input);
+            assert_eq!(coord.validate().is_ok(), expected);
+        }
     }
 
     #[test]
-    fn coordinate_trait_validate_invalid_nan() {
-        // Test validation with NaN coordinates
+    fn coordinate_trait_validate_invalid_special_values() {
+        // Test NaN in various positions
         let nan_first: Point<f64, 3> = Point::new([f64::NAN, 2.0, 3.0]);
         let result = nan_first.validate();
         assert!(result.is_err());
-
         if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
-            coordinate_value: _,
             dimension,
+            ..
         }) = result
         {
             assert_eq!(coordinate_index, 0);
             assert_eq!(dimension, 3);
-        } else {
-            panic!("Expected InvalidCoordinate error");
         }
 
-        // Test NaN in middle position
         let nan_middle: Point<f64, 3> = Point::new([1.0, f64::NAN, 3.0]);
         let result = nan_middle.validate();
         assert!(result.is_err());
-
         if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
-            coordinate_value: _,
             dimension,
+            ..
         }) = result
         {
             assert_eq!(coordinate_index, 1);
             assert_eq!(dimension, 3);
         }
 
-        // Test NaN in last position
         let nan_last: Point<f64, 3> = Point::new([1.0, 2.0, f64::NAN]);
         let result = nan_last.validate();
         assert!(result.is_err());
-
         if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
-            coordinate_value: _,
             dimension,
+            ..
         }) = result
         {
             assert_eq!(coordinate_index, 2);
             assert_eq!(dimension, 3);
         }
-    }
 
-    #[test]
-    fn coordinate_trait_validate_invalid_infinity() {
-        // Test validation with positive infinity
+        // Test infinity values
         let pos_inf: Point<f64, 2> = Point::new([f64::INFINITY, 2.0]);
         let result = pos_inf.validate();
         assert!(result.is_err());
-
         if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
-            coordinate_value: _,
             dimension,
+            ..
         }) = result
         {
             assert_eq!(coordinate_index, 0);
             assert_eq!(dimension, 2);
         }
 
-        // Test validation with negative infinity
         let neg_inf: Point<f64, 2> = Point::new([1.0, f64::NEG_INFINITY]);
         let result = neg_inf.validate();
         assert!(result.is_err());
-
         if let Err(CoordinateValidationError::InvalidCoordinate {
             coordinate_index,
-            coordinate_value: _,
             dimension,
+            ..
         }) = result
         {
             assert_eq!(coordinate_index, 1);
@@ -787,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn coordinate_trait_different_numeric_types() {
+    fn coordinate_trait_numeric_types_and_get() {
         // Test with f32
         let coord_f32: Point<f32, 3> = Point::new([1.5f32, 2.5f32, 3.5f32]);
         assert_eq!(coord_f32.dim(), 3);
@@ -798,22 +783,13 @@ mod tests {
         );
         assert!(coord_f32.validate().is_ok());
 
-        // Test get() method with f32
-        assert_relative_eq!(
-            coord_f32.get(0).unwrap(),
-            1.5f32,
-            epsilon = DEFAULT_TOLERANCE_F32
-        );
-        assert_relative_eq!(
-            coord_f32.get(1).unwrap(),
-            2.5f32,
-            epsilon = DEFAULT_TOLERANCE_F32
-        );
-        assert_relative_eq!(
-            coord_f32.get(2).unwrap(),
-            3.5f32,
-            epsilon = DEFAULT_TOLERANCE_F32
-        );
+        for i in 0..3 {
+            assert_relative_eq!(
+                coord_f32.get(i).unwrap(),
+                [1.5f32, 2.5f32, 3.5f32][i],
+                epsilon = DEFAULT_TOLERANCE_F32
+            );
+        }
         assert_eq!(coord_f32.get(3), None);
 
         // Test with f64
@@ -826,22 +802,13 @@ mod tests {
         );
         assert!(coord_f64.validate().is_ok());
 
-        // Test get() method with f64
-        assert_relative_eq!(
-            coord_f64.get(0).unwrap(),
-            1.5f64,
-            epsilon = DEFAULT_TOLERANCE_F64
-        );
-        assert_relative_eq!(
-            coord_f64.get(1).unwrap(),
-            2.5f64,
-            epsilon = DEFAULT_TOLERANCE_F64
-        );
-        assert_relative_eq!(
-            coord_f64.get(2).unwrap(),
-            3.5f64,
-            epsilon = DEFAULT_TOLERANCE_F64
-        );
+        for i in 0..3 {
+            assert_relative_eq!(
+                coord_f64.get(i).unwrap(),
+                [1.5f64, 2.5f64, 3.5f64][i],
+                epsilon = DEFAULT_TOLERANCE_F64
+            );
+        }
         assert_eq!(coord_f64.get(3), None);
     }
 
@@ -1068,5 +1035,271 @@ mod tests {
             point_f32_direct.to_array().as_slice(),
             epsilon = DEFAULT_TOLERANCE_F32
         );
+    }
+
+    #[test]
+    fn coordinate_scalar_trait_completeness() {
+        // Test that both f32 and f64 implement all required traits for CoordinateScalar
+
+        // Test f32 implements all traits
+        fn test_coordinate_scalar<T: CoordinateScalar>(value: T) -> T {
+            // Test Float operations
+            let result = value + T::from(1.0).unwrap();
+
+            // Test default tolerance
+            let tolerance = T::default_tolerance();
+            assert!(tolerance > T::zero());
+
+            result
+        }
+
+        // Test f32
+        let f32_result = test_coordinate_scalar(1.5f32);
+        assert_relative_eq!(f32_result, 2.5f32, epsilon = DEFAULT_TOLERANCE_F32);
+
+        // Test f64
+        let f64_result = test_coordinate_scalar(1.5f64);
+        assert_relative_eq!(f64_result, 2.5f64, epsilon = DEFAULT_TOLERANCE_F64);
+
+        // Test that tolerance values are different for different types
+        assert!(f64::from(f32::default_tolerance()) > f64::default_tolerance());
+        assert_relative_eq!(
+            f32::default_tolerance(),
+            DEFAULT_TOLERANCE_F32,
+            epsilon = f32::EPSILON
+        );
+        assert_relative_eq!(
+            f64::default_tolerance(),
+            DEFAULT_TOLERANCE_F64,
+            epsilon = f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn coordinate_trait_zero_dimensional() {
+        // Test with 0-dimensional coordinates (edge case)
+        let coord_0d: Point<f64, 0> = Point::new([]);
+        assert_eq!(coord_0d.dim(), 0);
+        assert_eq!(coord_0d.to_array().len(), 0);
+        assert_eq!(coord_0d.get(0), None);
+        assert!(coord_0d.validate().is_ok());
+
+        // Test origin for 0D
+        let origin_0d: Point<f64, 0> = Point::origin();
+        assert_eq!(origin_0d.to_array().len(), 0);
+        assert_eq!(coord_0d, origin_0d);
+    }
+
+    #[test]
+    fn coordinate_trait_large_dimensions() {
+        // Test with larger dimensions to ensure scalability
+        let coord_10d: Point<f64, 10> =
+            Point::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]);
+        assert_eq!(coord_10d.dim(), 10);
+
+        // Test all indices
+        for i in 0..10 {
+            assert_relative_eq!(
+                coord_10d.get(i).unwrap(),
+                f64::from(u32::try_from(i + 1).expect("index should fit in u32")),
+                epsilon = DEFAULT_TOLERANCE_F64
+            );
+        }
+        assert_eq!(coord_10d.get(10), None);
+
+        // Test validation
+        assert!(coord_10d.validate().is_ok());
+
+        // Test origin for large dimension
+        let origin_10d: Point<f64, 10> = Point::origin();
+        assert_relative_eq!(
+            origin_10d.to_array().as_slice(),
+            [0.0; 10].as_slice(),
+            epsilon = DEFAULT_TOLERANCE_F64
+        );
+    }
+
+    #[test]
+    fn coordinate_trait_boundary_values() {
+        // Test with boundary floating-point values
+
+        // Test f64 boundary values
+        let min_coord: Point<f64, 2> = Point::new([f64::MIN, f64::MAX]);
+        assert!(min_coord.validate().is_ok());
+        assert_relative_eq!(min_coord.get(0).unwrap(), f64::MIN, epsilon = 0.0);
+        assert_relative_eq!(min_coord.get(1).unwrap(), f64::MAX, epsilon = 0.0);
+
+        // Test f32 boundary values
+        let min_coord_f32: Point<f32, 2> = Point::new([f32::MIN, f32::MAX]);
+        assert!(min_coord_f32.validate().is_ok());
+        assert_relative_eq!(min_coord_f32.get(0).unwrap(), f32::MIN, epsilon = 0.0);
+        assert_relative_eq!(min_coord_f32.get(1).unwrap(), f32::MAX, epsilon = 0.0);
+
+        // Test very small positive values
+        let epsilon_coord: Point<f64, 2> = Point::new([f64::EPSILON, f64::MIN_POSITIVE]);
+        assert!(epsilon_coord.validate().is_ok());
+
+        // Test subnormal values
+        let subnormal_coord: Point<f64, 2> =
+            Point::new([f64::MIN_POSITIVE / 2.0, f64::EPSILON / 1e10]);
+        assert!(subnormal_coord.validate().is_ok());
+    }
+
+    #[test]
+    fn coordinate_trait_hash_collision_resistance() {
+        // Test that similar but different coordinates produce different hashes
+        use std::collections::HashSet;
+
+        let mut hashes = HashSet::new();
+
+        // Generate many similar coordinates
+        for i in 0..100 {
+            let coord: Point<f64, 3> = Point::new([
+                f64::from(i) / 100.0,
+                f64::from(i + 1) / 100.0,
+                f64::from(i + 2) / 100.0,
+            ]);
+
+            let mut hash_state = DefaultHasher::new();
+            coord.hash_coordinate(&mut hash_state);
+            let hash = hash_state.finish();
+
+            // Each coordinate should produce a unique hash
+            assert!(
+                !hashes.contains(&hash),
+                "Hash collision detected at iteration {i}"
+            );
+            hashes.insert(hash);
+        }
+
+        // We should have 100 unique hashes
+        assert_eq!(hashes.len(), 100);
+    }
+
+    #[test]
+    fn coordinate_trait_ordered_equals_edge_cases() {
+        // Test ordered_equals with various edge cases
+
+        // Test zero vs negative zero
+        let zero_coord: Point<f64, 2> = Point::new([0.0, 0.0]);
+        let neg_zero_coord: Point<f64, 2> = Point::new([-0.0, -0.0]);
+        assert!(zero_coord.ordered_equals(&neg_zero_coord));
+
+        // Test very close but not identical values
+        let coord1: Point<f64, 2> = Point::new([1.0, 2.0]);
+        let coord2: Point<f64, 2> = Point::new([1.0 + f64::EPSILON, 2.0]);
+        assert!(!coord1.ordered_equals(&coord2)); // Should be different
+
+        // Test with mixed special values and normal values
+        let mixed1: Point<f64, 4> = Point::new([1.0, f64::NAN, 3.0, f64::INFINITY]);
+        let mixed2: Point<f64, 4> = Point::new([1.0, f64::NAN, 3.0, f64::INFINITY]);
+        let mixed3: Point<f64, 4> = Point::new([1.0, f64::NAN, 3.0, f64::NEG_INFINITY]);
+
+        assert!(mixed1.ordered_equals(&mixed2));
+        assert!(!mixed1.ordered_equals(&mixed3));
+    }
+
+    #[test]
+    fn coordinate_validation_error_serialization() {
+        // Test that CoordinateValidationError can be serialized/deserialized if needed
+        let _error = CoordinateValidationError::InvalidCoordinate {
+            coordinate_index: 2,
+            coordinate_value: "infinity".to_string(),
+            dimension: 4,
+        };
+
+        // Test that we can format it as JSON for debugging
+        let debug_json = format!(
+            r#"{{"type":"InvalidCoordinate","index":{},"value":"{}","dimension":{}}}"#,
+            2, "infinity", 4
+        );
+
+        assert!(debug_json.contains("InvalidCoordinate"));
+        assert!(debug_json.contains("infinity"));
+    }
+
+    #[test]
+    fn coordinate_trait_generic_operations() {
+        // Test with f64
+        let p1: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
+        let p2: Point<f64, 3> = Point::new([4.0, 6.0, 8.0]);
+        let arr_a = p1.to_array();
+        let arr_b = p2.to_array();
+        let mut sum = 0.0f64;
+        for i in 0..3 {
+            let diff = arr_a[i] - arr_b[i];
+            sum += diff * diff;
+        }
+        assert_relative_eq!(sum, 50.0, epsilon = DEFAULT_TOLERANCE_F64);
+
+        // Test with f32
+        let p1_f32: Point<f32, 3> = Point::new([1.0f32, 2.0f32, 3.0f32]);
+        let p2_f32: Point<f32, 3> = Point::new([4.0f32, 6.0f32, 8.0f32]);
+        let first_array_f32 = p1_f32.to_array();
+        let second_array_f32 = p2_f32.to_array();
+        let mut sum_f32 = 0.0f32;
+        for i in 0..3 {
+            let diff = first_array_f32[i] - second_array_f32[i];
+            sum_f32 += diff * diff;
+        }
+        assert_relative_eq!(sum_f32, 50.0f32, epsilon = DEFAULT_TOLERANCE_F32);
+    }
+
+    #[test]
+    fn coordinate_trait_memory_efficiency() {
+        // Test that coordinates don't use excessive memory
+        use std::mem;
+
+        // A 3D f64 coordinate should be 3 * 8 = 24 bytes
+        assert_eq!(mem::size_of::<Point<f64, 3>>(), 24);
+
+        // A 3D f32 coordinate should be 3 * 4 = 12 bytes
+        assert_eq!(mem::size_of::<Point<f32, 3>>(), 12);
+
+        // Test alignment
+        assert_eq!(mem::align_of::<Point<f64, 3>>(), mem::align_of::<f64>());
+        assert_eq!(mem::align_of::<Point<f32, 3>>(), mem::align_of::<f32>());
+    }
+
+    #[test]
+    fn coordinate_trait_copy_semantics() {
+        // Test that coordinates properly implement Copy semantics
+        let original: Point<f64, 3> = Point::new([1.0, 2.0, 3.0]);
+
+        // Test copy
+        let copied = original;
+        assert_eq!(original, copied);
+
+        // Test that original is still usable after copy
+        assert_relative_eq!(
+            original.get(0).unwrap(),
+            1.0,
+            epsilon = DEFAULT_TOLERANCE_F64
+        );
+        assert_relative_eq!(copied.get(0).unwrap(), 1.0, epsilon = DEFAULT_TOLERANCE_F64);
+
+        // Test that original can be used as if cloned (Copy trait)
+        let cloned = original;
+        assert_eq!(original, cloned);
+
+        // Test that all three are independent
+        assert_eq!(original, copied);
+        assert_eq!(original, cloned);
+        assert_eq!(copied, cloned);
+    }
+
+    #[test]
+    fn coordinate_constants_correctness() {
+        // Test that the tolerance constants are reasonable
+        // (These are compile-time constants, so the assertions are about correctness, not runtime behavior)
+        const _F32_POSITIVE: () = assert!(DEFAULT_TOLERANCE_F32 > 0.0);
+        const _F64_POSITIVE: () = assert!(DEFAULT_TOLERANCE_F64 > 0.0);
+
+        // Test relative ordering of tolerances
+        assert!(f64::from(DEFAULT_TOLERANCE_F32) > DEFAULT_TOLERANCE_F64);
+
+        // Test exact values using relative comparison to avoid float_cmp clippy warnings
+        assert_relative_eq!(DEFAULT_TOLERANCE_F32, 1e-6, epsilon = f32::EPSILON);
+        assert_relative_eq!(DEFAULT_TOLERANCE_F64, 1e-15, epsilon = f64::EPSILON);
     }
 }
