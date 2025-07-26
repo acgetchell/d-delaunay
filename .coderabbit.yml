@@ -77,7 +77,7 @@ reviews:
     # GitHub Actions linter
     github-checks:
       enabled: true
-      timeout_ms: 900000
+      timeout_ms: 90000
 
     # Language grammar, style, and spell checker
     languagetool:
@@ -107,7 +107,7 @@ reviews:
 
     # Disabled tools
     eslint:
-      enabled: true
+      enabled: false
     swiftlint:
       enabled: false
     hadolint:
