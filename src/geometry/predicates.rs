@@ -211,12 +211,12 @@ where
             matrix[(i, j)] = coords_point_f64[j] - coords_0_f64[j];
         }
 
-        // Calculate squared distance using generic arithmetic on T
-        let mut squared_distance = T::zero();
+        // Calculate squared distance using squared_norm for consistency
+        let mut diff_coords = [T::zero(); D];
         for j in 0..D {
-            let diff = coords_point[j] - coords_0[j];
-            squared_distance += diff * diff;
+            diff_coords[j] = coords_point[j] - coords_0[j];
         }
+        let squared_distance = squared_norm(diff_coords);
         let squared_distance_f64: f64 = squared_distance.into();
         b[(i, 0)] = squared_distance_f64;
     }
@@ -1653,10 +1653,14 @@ mod tests {
         println!("Circumradius: {radius}");
 
         // Test the point (0.9, 0.9, 0.9)
-        let distance_to_center = {
-            let val = 0.9_f64 - 0.5;
-            val.mul_add(val, val.mul_add(val, val.powi(2))).sqrt()
-        };
+        let test_point_coords = [0.9, 0.9, 0.9];
+        let center_coords = center.to_array();
+        let diff = [
+            test_point_coords[0] - center_coords[0],
+            test_point_coords[1] - center_coords[1],
+            test_point_coords[2] - center_coords[2],
+        ];
+        let distance_to_center = hypot(diff);
         println!("Point (0.9, 0.9, 0.9) distance to circumcenter: {distance_to_center}");
         println!(
             "Is point inside circumsphere (distance < radius)? {}",
@@ -1689,8 +1693,7 @@ mod tests {
         println!("4D Circumradius: {radius_4d}");
 
         // Test the origin (0, 0, 0, 0)
-        let distance_to_center_4d =
-            (center_4d.to_array().iter().map(|&x| x * x).sum::<f64>()).sqrt();
+        let distance_to_center_4d = hypot(center_4d.to_array());
         println!("Origin distance to circumcenter: {distance_to_center_4d}");
         println!(
             "Is origin inside circumsphere (distance < radius)? {}",
