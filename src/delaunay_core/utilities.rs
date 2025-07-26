@@ -140,10 +140,6 @@ mod tests {
 
         assert_eq!(uuid.get_version_num(), 4);
         assert_ne!(uuid, make_uuid());
-
-        // Human readable output for cargo test -- --nocapture
-        println!("make_uuid = {uuid:?}");
-        println!("uuid version: {:?}\n", uuid.get_version_num());
     }
 
     #[test]
