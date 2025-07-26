@@ -142,7 +142,7 @@ where
 
     let a_inv = invert(&matrix)?;
     let solution = a_inv * b * 0.5;
-    let solution_vec = solution.col(0).clone();
+    let solution_vec = solution.col(0);
     // Try different array conversion approaches
     // Approach 1: Using try_from (most idiomatic)
     let solution_slice: &[f64] = &solution_vec;
@@ -1514,8 +1514,10 @@ mod tests {
         println!("Circumradius: {radius}");
 
         // Test the point (0.9, 0.9, 0.9)
-        let distance_to_center =
-            ((0.9_f64 - 0.5).powi(2) + (0.9_f64 - 0.5).powi(2) + (0.9_f64 - 0.5).powi(2)).sqrt();
+        let distance_to_center = {
+            let val = 0.9_f64 - 0.5;
+            val.mul_add(val, val.mul_add(val, val.powi(2))).sqrt()
+        };
         println!("Point (0.9, 0.9, 0.9) distance to circumcenter: {distance_to_center}");
         println!(
             "Is point inside circumsphere (distance < radius)? {}",

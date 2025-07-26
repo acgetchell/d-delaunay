@@ -43,12 +43,7 @@ pub fn invert(matrix: &Matrix) -> Result<Matrix, anyhow::Error> {
         return Err(MatrixError::SingularMatrix.into());
     }
     let inv = matrix.inv();
-    Ok(Matrix {
-        data: inv.data,
-        col: inv.col,
-        row: inv.row,
-        shape: inv.shape,
-    })
+    Ok(inv)
 }
 
 #[cfg(test)]

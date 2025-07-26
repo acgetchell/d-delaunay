@@ -28,7 +28,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 /// Errors that can occur during triangulation validation.
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum TriangulationValidationError {
     /// The triangulation contains an invalid cell.
     #[error("Invalid cell {cell_id}: {source}")]
@@ -144,7 +144,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
 ///
@@ -721,7 +721,7 @@ where
                 for i in 0..D {
                     let center_f64: f64 = center[i].into();
                     let radius_f64: f64 = radius.into();
-                    let coord_f64 = center_f64 + radius_f64 * vertex_coords[i];
+                    let coord_f64 = radius_f64.mul_add(vertex_coords[i], center_f64);
                     coords[i] = NumCast::from(coord_f64).expect("Failed to convert coordinate");
                 }
                 points.push(Point::new(coords));
@@ -986,7 +986,7 @@ where
 
     #[allow(clippy::type_complexity)]
     fn find_bad_cells_and_boundary_facets(
-        &mut self,
+        &self,
         vertex: &Vertex<T, U, D>,
     ) -> Result<(Vec<Uuid>, Vec<Facet<T, U, V, D>>), anyhow::Error>
     where
@@ -1113,19 +1113,19 @@ where
                             if facets_are_adjacent(facet1, facet2) {
                                 neighbor_map
                                     .get_mut(&cell1_id)
-                                    .ok_or(TriangulationValidationError::FailedToCreateCell {
-                                        message: format!(
-                                            "Failed to access neighbor map for cell {cell1_id:?}"
-                                        ),
-                                    })?
+                    .ok_or_else(|| TriangulationValidationError::FailedToCreateCell {
+                        message: format!(
+                            "Failed to access neighbor map for cell {cell1_id:?}"
+                        ),
+                    })?
                                     .push(cell2_id);
                                 neighbor_map
                                     .get_mut(&cell2_id)
-                                    .ok_or(TriangulationValidationError::FailedToCreateCell {
-                                        message: format!(
-                                            "Failed to access neighbor map for cell {cell2_id:?}"
-                                        ),
-                                    })?
+                    .ok_or_else(|| TriangulationValidationError::FailedToCreateCell {
+                        message: format!(
+                            "Failed to access neighbor map for cell {cell2_id:?}"
+                        ),
+                    })?
                                     .push(cell1_id);
                             }
                         }
@@ -1692,7 +1692,7 @@ mod tests {
 
         let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
         cell.neighbors = Some(vec![Uuid::nil()]); // Invalid neighbor
-        tds.cells.insert(cell.uuid(), cell.clone());
+        tds.cells.insert(cell.uuid(), cell);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2468,7 +2468,7 @@ mod tests {
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         // Triangulation is automatically done in Tds::new
-        let mut result = tds;
+        let result = tds;
 
         if result.number_of_cells() > 0 {
             // Create a test vertex that might be inside/outside existing cells
@@ -2545,8 +2545,9 @@ mod tests {
             // Check that supercell vertices are well outside the input range
             // The center is roughly at [5.0, 3.75, 2.5] and the input range is roughly 10 units wide
             // With padding, supercell vertices should be well outside this range
-            let distance_from_origin =
-                (coords[0].powi(2) + coords[1].powi(2) + coords[2].powi(2)).sqrt();
+            let distance_from_origin = coords[0]
+                .mul_add(coords[0], coords[1].mul_add(coords[1], coords[2].powi(2)))
+                .sqrt();
             assert!(
                 distance_from_origin > 15.0,
                 "Supercell vertex should be outside input range: {:?}, distance: {}",
@@ -2775,7 +2776,7 @@ mod tests {
             Point::new([0.0, 0.0, 2.0]),
         ];
         let vertices = Vertex::from_points(points);
-        let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         // let mut result = tds.bowyer_watson().unwrap();
 
         if result.number_of_cells() > 0 {

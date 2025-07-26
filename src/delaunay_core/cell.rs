@@ -18,7 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 /// Errors that can occur during cell validation.
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum CellValidationError {
     /// The cell has an invalid vertex.
     #[error("Invalid vertex: {source}")]
@@ -879,7 +879,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex4).unwrap();
+        let facet = Facet::new(cell, vertex4).unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::origin())
             .build()

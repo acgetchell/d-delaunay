@@ -361,7 +361,7 @@ where
 }
 
 /// Errors that can occur during coordinate validation.
-#[derive(Clone, Debug, thiserror::Error, PartialEq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum CoordinateValidationError {
     /// A coordinate value is invalid (NaN or infinite).
     #[error(
