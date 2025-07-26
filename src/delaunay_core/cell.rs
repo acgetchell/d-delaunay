@@ -18,7 +18,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 /// Errors that can occur during cell validation.
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum CellValidationError {
     /// The cell has an invalid vertex.
     #[error("Invalid vertex: {source}")]
@@ -462,9 +462,9 @@ where
     /// # Type Parameters
     ///
     /// This method requires the coordinate type `T` to implement additional traits:
-    /// - [`FiniteCheck`]: Enables checking that all coordinate values are finite
+    /// - [`FiniteCheck`](crate::geometry::traits::finitecheck::FiniteCheck): Enables checking that all coordinate values are finite
     ///   (not infinite or NaN), which is essential for geometric computations.
-    /// - [`HashCoordinate`]: Enables hashing of coordinate values,
+    /// - [`HashCoordinate`](crate::geometry::traits::hashcoordinate::HashCoordinate): Enables hashing of coordinate values,
     ///   which is required for detecting duplicate vertices efficiently.
     /// - [`Copy`]: Required for efficient comparison operations.
     ///
@@ -879,7 +879,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex4).unwrap();
+        let facet = Facet::new(cell, vertex4).unwrap();
         let vertex5 = VertexBuilder::default()
             .point(Point::origin())
             .build()

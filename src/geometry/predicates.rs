@@ -27,11 +27,92 @@ use std::iter::Sum;
 /// # Returns
 ///
 /// The squared norm (sum of squares) as type T
-fn squared_norm<T, const D: usize>(coords: [T; D]) -> T
+pub fn squared_norm<T, const D: usize>(coords: [T; D]) -> T
 where
     T: CoordinateScalar + num_traits::Zero,
 {
     coords.iter().fold(T::zero(), |acc, &x| acc + x * x)
+}
+
+/// Compute the d-dimensional hypot (Euclidean norm) of a coordinate array.
+///
+/// This function provides a numerically stable way to compute the Euclidean distance
+/// (L2 norm) of a d-dimensional vector. For 2D, it uses the standard library's
+/// `f64::hypot` function which provides optimal numerical stability. For higher
+/// dimensions, it implements a generalized hypot calculation.
+///
+/// # Numerical Stability
+///
+/// The 2D case uses `f64::hypot(a, b)` which avoids overflow and underflow
+/// issues when computing `sqrt(a² + b²)`. For higher dimensions, the function
+/// implements a similar approach by finding the maximum absolute value and
+/// scaling all coordinates relative to it.
+///
+/// # Arguments
+///
+/// * `coords` - Array of coordinates of type T
+///
+/// # Returns
+///
+/// The Euclidean norm (hypot) as type T
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::geometry::predicates::hypot;
+///
+/// // 2D case - uses std::f64::hypot internally
+/// let distance_2d = hypot([3.0, 4.0]);
+/// assert_eq!(distance_2d, 5.0);
+///
+/// // 3D case - uses generalized algorithm
+/// let distance_3d = hypot([1.0, 2.0, 2.0]);
+/// assert_eq!(distance_3d, 3.0);
+///
+/// // Higher dimensions
+/// let distance_4d = hypot([1.0, 1.0, 1.0, 1.0]);
+/// assert_eq!(distance_4d, 2.0);
+/// ```
+pub fn hypot<T, const D: usize>(coords: [T; D]) -> T
+where
+    T: CoordinateScalar + num_traits::Zero + From<f64>,
+    f64: From<T>,
+{
+    match D {
+        0 => T::zero(),
+        1 => Float::abs(coords[0]),
+        2 => {
+            // Use standard library hypot for optimal 2D performance and stability
+            let a_f64: f64 = coords[0].into();
+            let b_f64: f64 = coords[1].into();
+            let result_f64 = a_f64.hypot(b_f64);
+            <T as From<f64>>::from(result_f64)
+        }
+        _ => {
+            // For higher dimensions, implement generalized hypot
+            // Find the maximum absolute value to avoid overflow/underflow
+            let max_abs = coords
+                .iter()
+                .map(|&x| Float::abs(x))
+                .fold(T::zero(), |acc, x| if x > acc { x } else { acc });
+
+            if max_abs == T::zero() {
+                return T::zero();
+            }
+
+            // Scale all coordinates by max_abs and compute sum of squares
+            let sum_of_scaled_squares = coords
+                .iter()
+                .map(|&x| {
+                    let scaled = x / max_abs;
+                    scaled * scaled
+                })
+                .fold(T::zero(), |acc, x| acc + x);
+
+            // Result is max_abs * sqrt(sum_of_scaled_squares)
+            max_abs * Float::sqrt(sum_of_scaled_squares)
+        }
+    }
 }
 
 /// Calculate the circumcenter of a set of points forming a simplex.
@@ -130,19 +211,19 @@ where
             matrix[(i, j)] = coords_point_f64[j] - coords_0_f64[j];
         }
 
-        // Calculate squared distance using generic arithmetic on T
-        let mut squared_distance = T::zero();
+        // Calculate squared distance using squared_norm for consistency
+        let mut diff_coords = [T::zero(); D];
         for j in 0..D {
-            let diff = coords_point[j] - coords_0[j];
-            squared_distance += diff * diff;
+            diff_coords[j] = coords_point[j] - coords_0[j];
         }
+        let squared_distance = squared_norm(diff_coords);
         let squared_distance_f64: f64 = squared_distance.into();
         b[(i, 0)] = squared_distance_f64;
     }
 
     let a_inv = invert(&matrix)?;
     let solution = a_inv * b * 0.5;
-    let solution_vec = solution.col(0).clone();
+    let solution_vec = solution.col(0);
     // Try different array conversion approaches
     // Approach 1: Using try_from (most idiomatic)
     let solution_slice: &[f64] = &solution_vec;
@@ -255,13 +336,12 @@ where
     let point_coords: [T; D] = (&points[0]).into();
     let circumcenter_coords: [T; D] = circumcenter.to_array();
 
-    // Calculate distance using generic arithmetic on T
-    let mut squared_distance = T::zero();
+    // Calculate distance using hypot for numerical stability
+    let mut diff_coords = [T::zero(); D];
     for i in 0..D {
-        let diff = circumcenter_coords[i] - point_coords[i];
-        squared_distance += diff * diff;
+        diff_coords[i] = circumcenter_coords[i] - point_coords[i];
     }
-    let distance = Float::sqrt(squared_distance);
+    let distance = hypot(diff_coords);
     Ok(distance)
 }
 
@@ -472,16 +552,15 @@ where
     let circumcenter = circumcenter(simplex_points)?;
     let circumradius = circumradius_with_center(simplex_points, &circumcenter)?;
 
-    // Calculate distance using generic arithmetic on T
+    // Calculate distance using hypot for numerical stability
     let point_coords: [T; D] = (&test_point).into();
     let circumcenter_coords: [T; D] = circumcenter.to_array();
 
-    let mut squared_distance = T::zero();
+    let mut diff_coords = [T::zero(); D];
     for i in 0..D {
-        let diff = point_coords[i] - circumcenter_coords[i];
-        squared_distance += diff * diff;
+        diff_coords[i] = point_coords[i] - circumcenter_coords[i];
     }
-    let radius = Float::sqrt(squared_distance);
+    let radius = hypot(diff_coords);
 
     let tolerance = T::default_tolerance();
     if num_traits::Float::abs(circumradius - radius) < tolerance {
@@ -895,6 +974,66 @@ mod tests {
     use super::*;
     use crate::geometry::point::Point;
     use approx::assert_relative_eq;
+
+    #[test]
+    fn test_hypot_2d() {
+        // Test 2D case - should use std::f64::hypot
+        let distance = hypot([3.0, 4.0]);
+        assert_relative_eq!(distance, 5.0, epsilon = 1e-10);
+
+        // Test with zero
+        let distance_zero = hypot([0.0, 0.0]);
+        assert_relative_eq!(distance_zero, 0.0, epsilon = 1e-10);
+
+        // Test with negative values
+        let distance_neg = hypot([-3.0, 4.0]);
+        assert_relative_eq!(distance_neg, 5.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_hypot_3d() {
+        // Test 3D case - uses generalized algorithm
+        let distance = hypot([1.0, 2.0, 2.0]);
+        assert_relative_eq!(distance, 3.0, epsilon = 1e-10);
+
+        // Test unit vector in 3D
+        let distance_unit = hypot([1.0, 0.0, 0.0]);
+        assert_relative_eq!(distance_unit, 1.0, epsilon = 1e-10);
+
+        // Test with all equal components
+        let distance_equal = hypot([1.0, 1.0, 1.0]);
+        assert_relative_eq!(distance_equal, 3.0_f64.sqrt(), epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_hypot_4d() {
+        // Test 4D case
+        let distance = hypot([1.0, 1.0, 1.0, 1.0]);
+        assert_relative_eq!(distance, 2.0, epsilon = 1e-10);
+
+        // Test with zero vector
+        let distance_zero = hypot([0.0, 0.0, 0.0, 0.0]);
+        assert_relative_eq!(distance_zero, 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_hypot_edge_cases() {
+        // Test 0D case
+        let distance_0d = hypot::<f64, 0>([]);
+        assert_relative_eq!(distance_0d, 0.0, epsilon = 1e-10);
+
+        // Test 1D case
+        let distance_1d_pos = hypot([5.0]);
+        assert_relative_eq!(distance_1d_pos, 5.0, epsilon = 1e-10);
+
+        let distance_1d_neg = hypot([-5.0]);
+        assert_relative_eq!(distance_1d_neg, 5.0, epsilon = 1e-10);
+
+        // Test large values that might cause overflow with naive sqrt(x² + y²)
+        let distance_large = hypot([1e200, 1e200]);
+        assert!(distance_large.is_finite());
+        assert!(distance_large > 0.0);
+    }
 
     #[test]
     fn predicates_circumcenter() {
@@ -1514,8 +1653,14 @@ mod tests {
         println!("Circumradius: {radius}");
 
         // Test the point (0.9, 0.9, 0.9)
-        let distance_to_center =
-            ((0.9_f64 - 0.5).powi(2) + (0.9_f64 - 0.5).powi(2) + (0.9_f64 - 0.5).powi(2)).sqrt();
+        let test_point_coords = [0.9, 0.9, 0.9];
+        let center_coords = center.to_array();
+        let diff = [
+            test_point_coords[0] - center_coords[0],
+            test_point_coords[1] - center_coords[1],
+            test_point_coords[2] - center_coords[2],
+        ];
+        let distance_to_center = hypot(diff);
         println!("Point (0.9, 0.9, 0.9) distance to circumcenter: {distance_to_center}");
         println!(
             "Is point inside circumsphere (distance < radius)? {}",
@@ -1548,8 +1693,7 @@ mod tests {
         println!("4D Circumradius: {radius_4d}");
 
         // Test the origin (0, 0, 0, 0)
-        let distance_to_center_4d =
-            (center_4d.to_array().iter().map(|&x| x * x).sum::<f64>()).sqrt();
+        let distance_to_center_4d = hypot(center_4d.to_array());
         println!("Origin distance to circumcenter: {distance_to_center_4d}");
         println!(
             "Is origin inside circumsphere (distance < radius)? {}",

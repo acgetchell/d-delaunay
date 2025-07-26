@@ -14,6 +14,7 @@ use d_delaunay::geometry::Point;
 use d_delaunay::geometry::predicates::{InSphere, Orientation};
 use d_delaunay::geometry::predicates::{
     circumcenter, circumradius, insphere, insphere_distance, insphere_lifted, simplex_orientation,
+    squared_norm,
 };
 use d_delaunay::geometry::traits::coordinate::Coordinate;
 use nalgebra as na;
@@ -70,21 +71,25 @@ where
     U: d_delaunay::delaunay_core::traits::DataType,
 {
     let converted_coords: [T; D] = coords.map(|x| <T as From<f64>>::from(x));
-    match data {
-        Some(value) => VertexBuilder::default()
-            .point(Point::new(converted_coords))
-            .data(value)
-            .build()
-            .unwrap(),
-        None => VertexBuilder::default()
-            .point(Point::new(converted_coords))
-            .build()
-            .unwrap(),
-    }
+    data.map_or_else(
+        || {
+            VertexBuilder::default()
+                .point(Point::new(converted_coords))
+                .build()
+                .unwrap()
+        },
+        |value| {
+            VertexBuilder::default()
+                .point(Point::new(converted_coords))
+                .data(value)
+                .build()
+                .unwrap()
+        },
+    )
 }
 
 /// Convert `InSphere` result to readable string
-fn format_result(result: &Result<InSphere, anyhow::Error>) -> &'static str {
+const fn format_result(result: &Result<InSphere, anyhow::Error>) -> &'static str {
     match result {
         Ok(InSphere::INSIDE) => "INSIDE",
         Ok(InSphere::BOUNDARY) => "BOUNDARY",
@@ -851,7 +856,8 @@ fn test_point_against_3d_simplex(
     println!("  Circumradius: {circumradius_3d:.6}");
     println!(
         "  Inside circumsphere: {}",
-        distance_to_test_3d < circumradius_3d
+        (distance_to_test_3d - circumradius_3d).abs() < f64::EPSILON
+            || distance_to_test_3d < circumradius_3d
     );
     println!();
 
@@ -977,7 +983,7 @@ fn build_and_analyze_matrix(simplex_vertices: &[Vertex<f64, i32, 3>]) -> (f64, b
 
     // Row 3: test_point - v0 = (0.9,0.9,0.9) - (0,0,0) = (0.9,0.9,0.9), ||test-v0||² = 0.9² + 0.9² + 0.9² = 2.43
     let test_rel = [0.9, 0.9, 0.9];
-    let test_norm2 = 0.9 * 0.9 + 0.9 * 0.9 + 0.9 * 0.9;
+    let test_norm2 = squared_norm(test_rel);
     matrix[(3, 0)] = test_rel[0];
     matrix[(3, 1)] = test_rel[1];
     matrix[(3, 2)] = test_rel[2];
@@ -1060,7 +1066,8 @@ fn compare_methods_with_geometry(
                     println!("  Distance to test point: {distance_to_test:.6}");
                     println!(
                         "  Geometric truth (distance < radius): {}",
-                        distance_to_test < circumradius
+                        (distance_to_test - circumradius).abs() < f64::EPSILON
+                            || distance_to_test < circumradius
                     );
 
                     // Compare with both methods
@@ -1070,7 +1077,8 @@ fn compare_methods_with_geometry(
                                 Ok(matrix_method_result) => Some((
                                     distance_to_test,
                                     circumradius,
-                                    distance_to_test < circumradius,
+                                    (distance_to_test - circumradius).abs() < f64::EPSILON
+                                        || distance_to_test < circumradius,
                                     standard_result,
                                     matrix_method_result,
                                 )),

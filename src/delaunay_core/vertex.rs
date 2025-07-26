@@ -16,7 +16,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 /// Errors that can occur during vertex validation.
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum VertexValidationError {
     /// The vertex has an invalid point.
     #[error("Invalid point: {source}")]
@@ -447,7 +447,7 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     #[inline]
-    fn from(vertex: &Vertex<T, U, D>) -> Point<T, D> {
+    fn from(vertex: &Vertex<T, U, D>) -> Self {
         *vertex.point()
     }
 }

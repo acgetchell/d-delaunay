@@ -6,6 +6,7 @@
     "words": [
         "acgetchell",
         "argjson",
+        "autobuild",
         "autocfg",
         "bindgen",
         "bitflags",
@@ -30,6 +31,7 @@
         "detekt",
         "docstrings",
         "dotenv",
+        "dtolnay",
         "EATCS",
         "Edelsbrunner",
         "finitecheck",
@@ -41,6 +43,7 @@
         "hashset",
         "htmlhint",
         "hypertetrahedron",
+        "hypot",
         "itoa",
         "languagetool",
         "Lévy",

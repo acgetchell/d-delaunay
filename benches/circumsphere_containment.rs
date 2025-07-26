@@ -27,9 +27,9 @@ use std::hint::black_box;
 fn generate_random_simplex_3d(rng: &mut impl Rng) -> Vec<Point<f64, 3>> {
     (0..4)
         .map(|_| {
-            let x = rng.random::<f64>() * 20.0 - 10.0; // Range -10.0..10.0
-            let y = rng.random::<f64>() * 20.0 - 10.0;
-            let z = rng.random::<f64>() * 20.0 - 10.0;
+            let x = rng.random::<f64>().mul_add(20.0, -10.0); // Range -10.0..10.0
+            let y = rng.random::<f64>().mul_add(20.0, -10.0);
+            let z = rng.random::<f64>().mul_add(20.0, -10.0);
             Point::new([x, y, z])
         })
         .collect()
@@ -37,9 +37,9 @@ fn generate_random_simplex_3d(rng: &mut impl Rng) -> Vec<Point<f64, 3>> {
 
 /// Generate a random test point
 fn generate_random_test_point_3d(rng: &mut impl Rng) -> Point<f64, 3> {
-    let x = rng.random::<f64>() * 10.0 - 5.0; // Range -5.0..5.0
-    let y = rng.random::<f64>() * 10.0 - 5.0;
-    let z = rng.random::<f64>() * 10.0 - 5.0;
+    let x = rng.random::<f64>().mul_add(10.0, -5.0); // Range -5.0..5.0
+    let y = rng.random::<f64>().mul_add(10.0, -5.0);
+    let z = rng.random::<f64>().mul_add(10.0, -5.0);
     Point::new([x, y, z])
 }
 

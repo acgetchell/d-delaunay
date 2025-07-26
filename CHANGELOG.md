@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2025-07-26
+
+### Changed
+
+- **Distance Calculation Consistency**: Standardized all distance calculations to use established utility functions
+  - Updated `circumcenter` function to use `squared_norm` for squared distance calculations instead of manual coordinate squaring
+  - Replaced manual distance calculations in tests with cleaner `hypot` function calls
+  - Simplified complex manual distance computations in debug test functions
+- **Code Quality Improvements**:
+  - Eliminated redundant manual distance calculation code throughout the codebase
+  - Improved code readability and maintainability by using consistent utility functions
+  - Enhanced numerical stability by leveraging optimized `hypot` implementation
+
+### Performance
+
+- **Measurable Performance Gains**: Consistent use of optimized functions improved performance across all methods
+  - `insphere_distance`: +2.8% improvement (1,505 ns → 1,463 ns)
+  - `insphere_lifted`: +1.7% improvement in batch operations (661 μs → 650 μs)
+  - `insphere`: +1.3% improvement in batch operations (822 μs → 811 μs)
+  - Updated benchmark results in `benches/README.md` with version 0.3.0 vs 0.3.1 comparison
+- **Cumulative Improvements**: Total performance gains from v0.2.0 to v0.3.1:
+  - `insphere_distance`: +4.0% faster overall
+  - `insphere_lifted`: +2.7% faster in batch operations
+
+### Technical Details
+
+- The `hypot` function provides numerically stable Euclidean distance calculations with better overflow/underflow handling
+- The `squared_norm` function efficiently computes squared distances using generic arithmetic operations
+- All distance calculations now benefit from the same optimized, well-tested implementations
+- Test code clarity improved by eliminating manual coordinate arithmetic in favor of established utility functions
+
 ## [0.3.0] - 2025-07-25
 
 ### Changed

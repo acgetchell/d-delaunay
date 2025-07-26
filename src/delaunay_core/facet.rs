@@ -1,4 +1,5 @@
 //! A facet is a d-1 sub-simplex of a d-dimensional simplex.
+//!
 //! It is defined in terms of a cell and the vertex in the cell opposite to it,
 //! as per [CGAL](https://doc.cgal.org/latest/TDS_3/index.html#title3).
 //! This provides convenience methods used in the
@@ -479,7 +480,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert!(Facet::new(cell.clone(), vertex5).is_err());
+        assert!(Facet::new(cell, vertex5).is_err());
     }
 
     #[test]
@@ -493,13 +494,13 @@ mod tests {
             .build()
             .unwrap();
 
-        assert!(Facet::new(cell.clone(), vertex1).is_err());
+        assert!(Facet::new(cell, vertex1).is_err());
     }
 
     #[test]
     fn facet_vertices() {
         let (cell, vertices) = create_tetrahedron();
-        let facet = Facet::new(cell.clone(), vertices[0]).unwrap();
+        let facet = Facet::new(cell, vertices[0]).unwrap();
         let facet_vertices = facet.vertices();
 
         assert_eq!(facet_vertices.len(), 3);
@@ -533,7 +534,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet = Facet::new(cell, vertex1).unwrap();
         let serialized = serde_json::to_string(&facet).unwrap();
 
         assert!(serialized.contains("[1.0,0.0,0.0]"));
@@ -571,7 +572,7 @@ mod tests {
             .unwrap();
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
-        let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
+        let facet3 = Facet::new(cell, vertex2).unwrap();
 
         assert_eq!(facet1, facet2);
         assert_ne!(facet1, facet3);
@@ -602,7 +603,7 @@ mod tests {
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
-        let facet4 = Facet::new(cell.clone(), vertex3).unwrap();
+        let facet4 = Facet::new(cell, vertex3).unwrap();
 
         assert!(facet1 < facet3);
         assert!(facet2 < facet3);
@@ -629,7 +630,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet = Facet::new(cell, vertex1).unwrap();
         let cloned_facet = facet.clone();
 
         assert_eq!(facet, cloned_facet);
@@ -665,7 +666,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet = Facet::new(cell, vertex1).unwrap();
         let debug_str = format!("{facet:?}");
 
         assert!(debug_str.contains("Facet"));
@@ -695,7 +696,7 @@ mod tests {
             .data(3)
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet = Facet::new(cell, vertex1).unwrap();
 
         assert_eq!(facet.cell().data, Some(3));
         assert_eq!(facet.vertex().data, Some(1));
@@ -709,7 +710,7 @@ mod tests {
     #[test]
     fn facet_2d_triangle() {
         let (cell, vertices) = create_triangle();
-        let facet = Facet::new(cell.clone(), vertices[0]).unwrap();
+        let facet = Facet::new(cell, vertices[0]).unwrap();
 
         // Facet of 2D triangle is an edge (1D)
         let facet_vertices = facet.vertices();
@@ -732,7 +733,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet = Facet::new(cell, vertex1).unwrap();
 
         // Facet of 1D edge is a point (0D)
         let vertices = facet.vertices();
@@ -766,7 +767,7 @@ mod tests {
             .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5])
             .build()
             .unwrap();
-        let facet = Facet::new(cell.clone(), vertex1).unwrap();
+        let facet = Facet::new(cell, vertex1).unwrap();
 
         // Facet of 4D simplex is a 3D tetrahedron
         let vertices = facet.vertices();
@@ -908,7 +909,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let facet = Facet::new(cell.clone(), vertex3).unwrap();
+        let facet = Facet::new(cell, vertex3).unwrap();
         let vertices = facet.vertices();
 
         // Should have all vertices except vertex3
@@ -1028,7 +1029,7 @@ mod tests {
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex2).unwrap();
         let facet3 = Facet::new(cell.clone(), vertex3).unwrap();
-        let facet4 = Facet::new(cell.clone(), vertex4).unwrap();
+        let facet4 = Facet::new(cell, vertex4).unwrap();
 
         // All facets should be different because they have different opposite vertices
         assert_ne!(facet1, facet2);
@@ -1161,7 +1162,7 @@ mod tests {
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
 
         // Create a different facet that should hash to a different value
-        let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
+        let facet3 = Facet::new(cell, vertex2).unwrap();
 
         // Test that equal facets hash to the same value
         assert_eq!(get_hash(&facet1), get_hash(&facet2));
