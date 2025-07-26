@@ -11,6 +11,9 @@
 //! - Arbitrary data types associated with vertices and cells
 //! - Serialization/Deserialization with [serde](https://serde.rs)
 
+// Allow multiple crate versions due to transitive dependencies
+#![allow(clippy::multiple_crate_versions)]
+
 #[macro_use]
 extern crate derive_builder;
 

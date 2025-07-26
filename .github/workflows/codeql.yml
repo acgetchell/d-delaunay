@@ -45,7 +45,7 @@ jobs:
       matrix:
         include:
           - language: rust
-            build-mode: manual
+            build-mode: none
           # CodeQL supports the following values keywords for 'language': 'c-cpp', 'csharp', 'go',
           # 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
           # Use `c-cpp` to analyze code written in C, C++ or both
@@ -93,26 +93,6 @@ jobs:
           # https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
           queries: security-extended,security-and-quality
 
-      # If the analyze step fails for one of the languages you are analyzing with
-      # "We were unable to automatically build your code", modify the matrix above
-      # to set the build mode to "manual" for that language. Then modify this step
-      # to build your code.
-      # ℹ️ Command-line programs to run using the OS shell.
-      # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-      # Build the Rust project with all features to ensure proper analysis
-      - if: matrix.build-mode == 'manual'
-        name: Build Rust project
-        shell: bash
-        run: |
-          # Update Rust toolchain and install components
-          rustup update stable
-          rustup component add clippy rustfmt
-
-          # Build with all features to ensure dependencies are resolved
-          cargo build --all-features --all-targets
-          # Also build tests and benchmarks for comprehensive analysis
-          cargo test --no-run --all-features
-          cargo bench --no-run
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

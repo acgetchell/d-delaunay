@@ -14,15 +14,15 @@
 
 use num_traits::Float;
 
-fn check_float_traits<T>()
+const fn check_float_traits<T>()
 where
     T: Float,
 {
     // Let's check if Float already includes the traits we're specifying
-    fn requires_partial_eq<U: PartialEq>() {}
-    fn requires_partial_ord<U: PartialOrd>() {}
-    fn requires_copy<U: Copy>() {}
-    fn requires_clone<U: Clone>() {}
+    const fn requires_partial_eq<U: PartialEq>() {}
+    const fn requires_partial_ord<U: PartialOrd>() {}
+    const fn requires_copy<U: Copy>() {}
+    const fn requires_clone<U: Clone>() {}
 
     requires_partial_eq::<T>();
     requires_partial_ord::<T>();
