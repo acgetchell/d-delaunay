@@ -81,14 +81,28 @@ pub enum VertexValidationError {
 
 /// Convenience macro for creating vertices with less boilerplate.
 ///
-/// This macro simplifies vertex creation by wrapping the `create_vertex` helper function.
-/// It takes coordinate arrays and optional data, automatically handling the `Some`/`None` wrapping.
+/// This macro simplifies vertex creation by using the `VertexBuilder` pattern internally
+/// and automatically unwrapping the result for convenience. It takes coordinate arrays
+/// and optional data, returning a `Vertex` directly.
+///
+/// # Returns
+///
+/// Returns `Vertex<T, U, D>` where:
+/// - `T` is the coordinate scalar type
+/// - `U` is the optional user data type  
+/// - `D` is the spatial dimension
+///
+/// # Panics
+///
+/// Panics if the `VertexBuilder` fails to construct a valid vertex, which should
+/// not happen under normal circumstances with valid input data.
 ///
 /// # Usage
 ///
 /// ```rust
 /// use d_delaunay::vertex;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 ///
 /// // Create a vertex without data (explicit type annotation required)
 /// let v1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
@@ -98,78 +112,26 @@ pub enum VertexValidationError {
 /// ```
 #[macro_export]
 macro_rules! vertex {
-    // Pattern 1: Just coordinates - no data (creates with None)
+    // Pattern 1: Just coordinates - no data
     ($coords:expr) => {
-        $crate::delaunay_core::vertex::create_vertex($coords, None)
+        $crate::delaunay_core::vertex::VertexBuilder::default()
+            .point($crate::geometry::point::Point::new($coords))
+            .build()
+            .expect("Failed to build vertex: invalid coordinates or builder configuration")
     };
 
-    // Pattern 2: Coordinates with raw data value (wraps in Some)
+    // Pattern 2: Coordinates with data
     ($coords:expr, $data:expr) => {
-        $crate::delaunay_core::vertex::create_vertex($coords, Some($data))
+        $crate::delaunay_core::vertex::VertexBuilder::default()
+            .point($crate::geometry::point::Point::new($coords))
+            .data($data)
+            .build()
+            .expect("Failed to build vertex with data: invalid coordinates, data, or builder configuration")
     };
 }
 
 // Re-export the macro at the crate level for convenience
 pub use crate::vertex;
-
-/// Create a vertex with minimal boilerplate.
-///
-/// This helper function simplifies vertex creation by accepting coordinates
-/// of the target type `T` directly and handling optional data.
-///
-/// # Generic Parameters
-///
-/// * `T` - The coordinate scalar type (typically `f32` or `f64`)
-/// * `U` - The optional user data type
-/// * `D` - The spatial dimension (compile-time constant)
-///
-/// # Arguments
-///
-/// * `coords` - Array of coordinate values of type `T`
-/// * `data` - Optional user data of type `U`
-///
-/// # Returns
-///
-/// A `Vertex<T, U, D>` with the specified coordinates and data.
-///
-/// # Examples
-///
-/// ```rust
-/// use d_delaunay::delaunay_core::vertex::{create_vertex, Vertex};
-///
-/// // Create a vertex without data (f64)
-/// let v1: Vertex<f64, Option<()>, 3> = create_vertex([1.0, 2.0, 3.0], None);
-///
-/// // Create a vertex with integer data (f32)
-/// let v2: Vertex<f32, i32, 2> = create_vertex([0.0f32, 1.0f32], Some(42));
-/// ```
-///
-/// # Panics
-///
-/// Panics if the `VertexBuilder` fails to construct a valid vertex, which should
-/// not happen under normal circumstances with valid input data.
-pub fn create_vertex<T, U, const D: usize>(coords: [T; D], data: Option<U>) -> Vertex<T, U, D>
-where
-    T: CoordinateScalar + Clone,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    U: DataType,
-{
-    data.map_or_else(
-        || {
-            VertexBuilder::default()
-                .point(Point::new(coords))
-                .build()
-                .unwrap()
-        },
-        |value| {
-            VertexBuilder::default()
-                .point(Point::new(coords))
-                .data(value)
-                .build()
-                .unwrap()
-        },
-    )
-}
 
 // =============================================================================
 // VERTEX STRUCT DEFINITION
@@ -684,40 +646,6 @@ mod tests {
     // =============================================================================
     // CONVENIENCE MACRO AND HELPER TESTS
     // =============================================================================
-
-    #[test]
-    fn test_create_vertex_helper() {
-        // Test creating a vertex without data
-        let vertex1: Vertex<f64, Option<()>, 3> = super::create_vertex([1.0, 2.0, 3.0], None);
-        assert_relative_eq!(
-            vertex1.point().to_array().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex1.dim(), 3);
-        assert!(!vertex1.uuid().is_nil());
-        assert!(vertex1.data.is_none());
-
-        // Test creating a vertex with data
-        let vertex2: Vertex<f64, i32, 2> = super::create_vertex([5.0, 10.0], Some(42));
-        assert_relative_eq!(
-            vertex2.point().to_array().as_slice(),
-            [5.0, 10.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex2.dim(), 2);
-        assert!(!vertex2.uuid().is_nil());
-        assert_eq!(vertex2.data.unwrap(), 42);
-
-        // Test type conversion (f64 -> f64, same type)
-        let vertex3: Vertex<f64, Option<()>, 2> = super::create_vertex([1.5, 2.5], None);
-        assert_relative_eq!(
-            vertex3.point().to_array().as_slice(),
-            [1.5f64, 2.5f64].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex3.dim(), 2);
-    }
 
     #[test]
     fn test_vertex_macro() {
@@ -1554,5 +1482,309 @@ mod tests {
 
         assert_eq!(map.len(), 1);
         assert_eq!(map2.len(), 1);
+    }
+
+    // =============================================================================
+    // DESERIALIZATION ERROR PATH TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_deserialize_duplicate_point_field() {
+        // Test duplicate "point" field error path (line 252)
+        let json_with_duplicate_point = r#"{
+            "point": [1.0, 2.0, 3.0],
+            "point": [4.0, 5.0, 6.0],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "incident_cell": null,
+            "data": null
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 3>, _> =
+            serde_json::from_str(json_with_duplicate_point);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("duplicate") || error_message.contains("point"));
+    }
+
+    #[test]
+    fn test_deserialize_duplicate_uuid_field() {
+        // Test duplicate "uuid" field error path (line 258)
+        let json_with_duplicate_uuid = r#"{
+            "point": [1.0, 2.0, 3.0],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "uuid": "550e8400-e29b-41d4-a716-446655440001", 
+            "incident_cell": null,
+            "data": null
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 3>, _> =
+            serde_json::from_str(json_with_duplicate_uuid);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("duplicate") || error_message.contains("uuid"));
+    }
+
+    #[test]
+    fn test_deserialize_duplicate_incident_cell_field() {
+        // Test duplicate "incident_cell" field error path (line 264)
+        let json_with_duplicate_incident_cell = r#"{
+            "point": [1.0, 2.0, 3.0],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "incident_cell": null,
+            "incident_cell": "550e8400-e29b-41d4-a716-446655440001",
+            "data": null
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 3>, _> =
+            serde_json::from_str(json_with_duplicate_incident_cell);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("duplicate") || error_message.contains("incident_cell"));
+    }
+
+    #[test]
+    fn test_deserialize_duplicate_data_field() {
+        // Test duplicate "data" field error path (line 270)
+        let json_with_duplicate_data = r#"{
+            "point": [1.0, 2.0, 3.0],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "incident_cell": null,
+            "data": 42,
+            "data": 84
+        }"#;
+
+        let result: Result<Vertex<f64, i32, 3>, _> = serde_json::from_str(json_with_duplicate_data);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("duplicate") || error_message.contains("data"));
+    }
+
+    #[test]
+    fn test_deserialize_missing_point_field() {
+        // Test missing "point" field error path (line 280)
+        let json_without_point = r#"{
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "incident_cell": null,
+            "data": null
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 3>, _> =
+            serde_json::from_str(json_without_point);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("missing") || error_message.contains("point"));
+    }
+
+    #[test]
+    fn test_deserialize_missing_uuid_field() {
+        // Test missing "uuid" field error path (line 281)
+        let json_without_uuid = r#"{
+            "point": [1.0, 2.0, 3.0],
+            "incident_cell": null,
+            "data": null
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 3>, _> = serde_json::from_str(json_without_uuid);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("missing") || error_message.contains("uuid"));
+    }
+
+    #[test]
+    fn test_deserialize_unknown_field() {
+        // Test unknown field handling (line 275)
+        let json_with_unknown_field = r#"{
+            "point": [1.0, 2.0, 3.0],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "incident_cell": null,
+            "data": null,
+            "unknown_field": "this should be ignored"
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 3>, _> =
+            serde_json::from_str(json_with_unknown_field);
+        // This should succeed - unknown fields are ignored
+        assert!(result.is_ok());
+        let vertex = result.unwrap();
+        assert_relative_eq!(
+            vertex.point().to_array().as_slice(),
+            [1.0, 2.0, 3.0].as_slice(),
+            epsilon = 1e-9
+        );
+    }
+
+    #[test]
+    fn test_deserialize_expecting_formatter() {
+        // Test the expecting formatter method (line 236)
+        // This will trigger the expecting method when serde needs to format an error
+        let invalid_json = r#"["not", "a", "vertex", "object"]"#;
+        let result: Result<Vertex<f64, Option<()>, 3>, _> = serde_json::from_str(invalid_json);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        // The error should mention that it expected a Vertex struct
+        assert!(
+            error_message.contains("Vertex") || error_message.to_lowercase().contains("struct")
+        );
+    }
+
+    // =============================================================================
+    // VERTEX VALIDATION ERROR TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_vertex_validation_nil_uuid() {
+        // Test validation error for nil UUID (line 503)
+        let vertex_with_nil_uuid = Vertex {
+            point: Point::new([1.0, 2.0, 3.0]),
+            uuid: uuid::Uuid::nil(),
+            incident_cell: None,
+            data: None::<Option<()>>,
+        };
+
+        let validation_result = vertex_with_nil_uuid.is_valid();
+        assert!(validation_result.is_err());
+        match validation_result.unwrap_err() {
+            VertexValidationError::InvalidUuid => (), // Expected
+            other @ VertexValidationError::InvalidPoint { .. } => {
+                panic!("Expected InvalidUuid error, got: {other:?}")
+            }
+        }
+    }
+
+    // =============================================================================
+    // COMPREHENSIVE DESERIALIZATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_comprehensive_deserialization_with_all_fields() {
+        // Test successful deserialization with all optional fields present
+        let json_with_all_fields = r#"{
+            "point": [1.5, 2.5, 3.5],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "incident_cell": "650e8400-e29b-41d4-a716-446655440000",
+            "data": 123
+        }"#;
+
+        let result: Result<Vertex<f64, i32, 3>, _> = serde_json::from_str(json_with_all_fields);
+        assert!(result.is_ok());
+        let vertex = result.unwrap();
+
+        assert_relative_eq!(
+            vertex.point().to_array().as_slice(),
+            [1.5, 2.5, 3.5].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_eq!(
+            vertex.uuid().to_string(),
+            "550e8400-e29b-41d4-a716-446655440000"
+        );
+        assert!(vertex.incident_cell.is_some());
+        assert_eq!(
+            vertex.incident_cell.unwrap().to_string(),
+            "650e8400-e29b-41d4-a716-446655440000"
+        );
+        assert_eq!(vertex.data.unwrap(), 123);
+    }
+
+    #[test]
+    fn test_deserialization_with_minimal_fields() {
+        // Test deserialization with only required fields
+        let json_minimal = r#"{
+            "point": [10.0, 20.0],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000"
+        }"#;
+
+        let result: Result<Vertex<f64, Option<()>, 2>, _> = serde_json::from_str(json_minimal);
+        assert!(result.is_ok());
+        let vertex = result.unwrap();
+
+        assert_relative_eq!(
+            vertex.point().to_array().as_slice(),
+            [10.0, 20.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_eq!(
+            vertex.uuid().to_string(),
+            "550e8400-e29b-41d4-a716-446655440000"
+        );
+        assert!(vertex.incident_cell.is_none());
+        assert!(vertex.data.is_none());
+    }
+
+    // =============================================================================
+    // ERROR HANDLING EDGE CASES
+    // =============================================================================
+
+    #[test]
+    fn test_vertex_validation_error_display() {
+        // Test error display formatting
+        let point_error =
+            crate::geometry::traits::coordinate::CoordinateValidationError::InvalidCoordinate {
+                coordinate_index: 1,
+                coordinate_value: "NaN".to_string(),
+                dimension: 3,
+            };
+        let vertex_error = VertexValidationError::InvalidPoint {
+            source: point_error,
+        };
+        let error_string = format!("{vertex_error}");
+        assert!(error_string.contains("Invalid point"));
+
+        let uuid_error = VertexValidationError::InvalidUuid;
+        let uuid_error_string = format!("{uuid_error}");
+        assert!(uuid_error_string.contains("Invalid UUID"));
+    }
+
+    #[test]
+    fn test_vertex_validation_error_equality() {
+        // Test PartialEq for VertexValidationError
+        let error1 = VertexValidationError::InvalidUuid;
+        let error2 = VertexValidationError::InvalidUuid;
+        assert_eq!(error1, error2);
+
+        let point_error =
+            crate::geometry::traits::coordinate::CoordinateValidationError::InvalidCoordinate {
+                coordinate_index: 1,
+                coordinate_value: "NaN".to_string(),
+                dimension: 3,
+            };
+        let error3 = VertexValidationError::InvalidPoint {
+            source: point_error.clone(),
+        };
+        let error4 = VertexValidationError::InvalidPoint {
+            source: point_error,
+        };
+        assert_eq!(error3, error4);
+
+        assert_ne!(error1, error3);
+    }
+
+    // =============================================================================
+    // SERIALIZATION ROUNDTRIP TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_serialization_deserialization_roundtrip() {
+        // Test that serialization -> deserialization preserves all data
+        let original_vertex: Vertex<f64, char, 4> = vertex!([1.0, 2.0, 3.0, 4.0], 'A');
+
+        // Serialize
+        let serialized = serde_json::to_string(&original_vertex).unwrap();
+
+        // Deserialize
+        let deserialized_vertex: Vertex<f64, char, 4> = serde_json::from_str(&serialized).unwrap();
+
+        // Verify all fields match
+        assert_relative_eq!(
+            original_vertex.point().to_array().as_slice(),
+            deserialized_vertex.point().to_array().as_slice(),
+            epsilon = 1e-9
+        );
+        assert_eq!(original_vertex.uuid(), deserialized_vertex.uuid());
+        assert_eq!(
+            original_vertex.incident_cell,
+            deserialized_vertex.incident_cell
+        );
+        assert_eq!(original_vertex.data, deserialized_vertex.data);
     }
 }

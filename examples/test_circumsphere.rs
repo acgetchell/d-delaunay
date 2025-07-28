@@ -260,7 +260,7 @@ fn test_point_generic<const D: usize>(
 ) where
     [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    let test_vertex = vertex!(coords, 99);
+    let test_vertex: Vertex<f64, i32, D> = vertex!(coords, 99);
 
     let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(Point::from).collect();
     let result_insphere = insphere(&vertex_points, Point::from(&test_vertex));
@@ -726,7 +726,7 @@ fn demonstrate_orientation_impact_on_circumsphere() {
     let vertices = create_unit_4d_simplex();
     let vertices_negative = create_negative_4d_simplex();
 
-    let test_point = vertex!([0.25, 0.25, 0.25, 0.25], 100);
+    let test_point: Vertex<f64, i32, 4> = vertex!([0.25, 0.25, 0.25, 0.25], 100);
 
     let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     let vertex_points_negative: Vec<Point<f64, 4>> =
@@ -1164,7 +1164,7 @@ fn debug_3d_circumsphere_properties() {
         distance_to_center < radius
     );
 
-    let test_vertex = vertex!([0.9, 0.9, 0.9], 4);
+    let test_vertex: Vertex<f64, i32, 3> = vertex!([0.9, 0.9, 0.9], 4);
 
     let standard_result = insphere_distance(&simplex_points, Point::from(&test_vertex)).unwrap();
     let matrix_result = insphere_lifted(&simplex_points, Point::from(&test_vertex)).unwrap();
