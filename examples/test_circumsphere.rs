@@ -9,7 +9,7 @@
 //! cargo run --example test_circumsphere [2d|3d|4d|all|help]
 //! ```
 
-use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+use d_delaunay::delaunay_core::vertex::{Vertex, vertex};
 use d_delaunay::geometry::Point;
 use d_delaunay::geometry::predicates::{InSphere, Orientation};
 use d_delaunay::geometry::predicates::{
@@ -23,13 +23,6 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, env};
 
 type TestFunction = fn();
-
-// Macro for creating vertices with less boilerplate
-macro_rules! vertex {
-    ($coords:expr, $data:expr) => {
-        create_vertex($coords, $data)
-    };
-}
 
 // Macro for standard test output formatting
 macro_rules! test_output {
@@ -61,31 +54,6 @@ macro_rules! print_result {
             insphere_to_string($result)
         );
     };
-}
-
-/// Create a test vertex with minimal boilerplate
-fn create_vertex<T, U, const D: usize>(coords: [f64; D], data: Option<U>) -> Vertex<T, U, D>
-where
-    T: From<f64> + d_delaunay::geometry::traits::coordinate::CoordinateScalar + Clone,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-    U: d_delaunay::delaunay_core::traits::DataType,
-{
-    let converted_coords: [T; D] = coords.map(|x| <T as From<f64>>::from(x));
-    data.map_or_else(
-        || {
-            VertexBuilder::default()
-                .point(Point::new(converted_coords))
-                .build()
-                .unwrap()
-        },
-        |value| {
-            VertexBuilder::default()
-                .point(Point::new(converted_coords))
-                .data(value)
-                .build()
-                .unwrap()
-        },
-    )
 }
 
 /// Convert `InSphere` result to readable string
@@ -213,9 +181,9 @@ fn print_help() {
 /// Test 2D circumsphere methods with a triangle
 fn test_2d_circumsphere() {
     let vertices = vec![
-        vertex!([0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0], Some(2)),
+        vertex!([0.0, 0.0], 0),
+        vertex!([1.0, 0.0], 1),
+        vertex!([0.0, 1.0], 2),
     ];
 
     let test_points = test_points!(
@@ -292,7 +260,7 @@ fn test_point_generic<const D: usize>(
 ) where
     [f64; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    let test_vertex = vertex!(coords, Some(99));
+    let test_vertex: Vertex<f64, i32, D> = vertex!(coords, 99);
 
     let vertex_points: Vec<Point<f64, D>> = vertices.iter().map(Point::from).collect();
     let result_insphere = insphere(&vertex_points, Point::from(&test_vertex));
@@ -332,10 +300,10 @@ fn test_point_generic<const D: usize>(
 fn test_3d_circumsphere() {
     // Create a unit tetrahedron: (0,0,0), (1,0,0), (0,1,0), (0,0,1)
     let vertices = vec![
-        vertex!([0.0, 0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0, 0.0], Some(2)),
-        vertex!([0.0, 0.0, 1.0], Some(3)),
+        vertex!([0.0, 0.0, 0.0], 0),
+        vertex!([1.0, 0.0, 0.0], 1),
+        vertex!([0.0, 1.0, 0.0], 2),
+        vertex!([0.0, 0.0, 1.0], 3),
     ];
 
     let test_points = test_points!(
@@ -366,11 +334,11 @@ fn test_3d_point(
 fn test_4d_circumsphere() {
     // Create a unit 4-simplex: vertices at origin and unit vectors along each axis
     let vertices = vec![
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0, 0.0, 0.0], Some(2)),
-        vertex!([0.0, 0.0, 1.0, 0.0], Some(3)),
-        vertex!([0.0, 0.0, 0.0, 1.0], Some(4)),
+        vertex!([0.0, 0.0, 0.0, 0.0], 0),
+        vertex!([1.0, 0.0, 0.0, 0.0], 1),
+        vertex!([0.0, 1.0, 0.0, 0.0], 2),
+        vertex!([0.0, 0.0, 1.0, 0.0], 3),
+        vertex!([0.0, 0.0, 0.0, 1.0], 4),
     ];
 
     let test_points = test_points!(
@@ -415,11 +383,11 @@ fn test_4d_circumsphere_methods() {
 
     // Create a unit 4-simplex: vertices at origin and unit vectors along each axis
     let vertices: Vec<Vertex<f64, i32, 4>> = vec![
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(1)),
-        vertex!([1.0, 0.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 0.0, 1.0, 0.0], Some(1)),
-        vertex!([0.0, 0.0, 0.0, 1.0], Some(2)),
+        vertex!([0.0, 0.0, 0.0, 0.0], 1),
+        vertex!([1.0, 0.0, 0.0, 0.0], 1),
+        vertex!([0.0, 1.0, 0.0, 0.0], 1),
+        vertex!([0.0, 0.0, 1.0, 0.0], 1),
+        vertex!([0.0, 0.0, 0.0, 1.0], 2),
     ];
 
     // Calculate circumcenter and circumradius for reference
@@ -473,11 +441,11 @@ fn test_circumsphere_containment() {
     // along each coordinate axis. The circumcenter is at [0.5, 0.5, 0.5, 0.5] and
     // the circumradius is √4/2 = 1.0.
     let vertices: [Vertex<f64, i32, 4>; 5] = [
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(0)), // Origin
-        vertex!([1.0, 0.0, 0.0, 0.0], Some(1)), // Unit vector along x-axis
-        vertex!([0.0, 1.0, 0.0, 0.0], Some(2)), // Unit vector along y-axis
-        vertex!([0.0, 0.0, 1.0, 0.0], Some(3)), // Unit vector along z-axis
-        vertex!([0.0, 0.0, 0.0, 1.0], Some(4)), // Unit vector along w-axis
+        vertex!([0.0, 0.0, 0.0, 0.0], 0), // Origin
+        vertex!([1.0, 0.0, 0.0, 0.0], 1), // Unit vector along x-axis
+        vertex!([0.0, 1.0, 0.0, 0.0], 2), // Unit vector along y-axis
+        vertex!([0.0, 0.0, 1.0, 0.0], 3), // Unit vector along z-axis
+        vertex!([0.0, 0.0, 0.0, 1.0], 4), // Unit vector along w-axis
     ];
 
     println!("4D simplex vertices:");
@@ -494,11 +462,11 @@ fn test_circumsphere_containment() {
     // These are points with small coordinates that should be well within
     // the circumsphere radius of √4/2 = 1.0
     let test_points_inside: [Vertex<f64, i32, 4>; 5] = [
-        vertex!([0.25, 0.25, 0.25, 0.25], Some(10)),
-        vertex!([0.1, 0.1, 0.1, 0.1], Some(11)),
-        vertex!([0.2, 0.2, 0.2, 0.2], Some(12)),
-        vertex!([0.3, 0.2, 0.1, 0.0], Some(13)),
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(14)), // Origin should be inside
+        vertex!([0.25, 0.25, 0.25, 0.25], 10),
+        vertex!([0.1, 0.1, 0.1, 0.1], 11),
+        vertex!([0.2, 0.2, 0.2, 0.2], 12),
+        vertex!([0.3, 0.2, 0.1, 0.0], 13),
+        vertex!([0.0, 0.0, 0.0, 0.0], 14), // Origin should be inside
     ];
 
     // Calculate circumcenter and circumradius for testing
@@ -520,12 +488,12 @@ fn test_circumsphere_containment() {
     // These include points with large coordinates and points along the axes
     // that extend beyond the simplex vertices
     let test_points_outside: [Vertex<f64, i32, 4>; 6] = [
-        vertex!([2.0, 2.0, 2.0, 2.0], Some(20)),
-        vertex!([1.0, 1.0, 1.0, 1.0], Some(21)),
-        vertex!([0.8, 0.8, 0.8, 0.8], Some(22)),
-        vertex!([1.5, 0.0, 0.0, 0.0], Some(23)),
-        vertex!([0.0, 1.5, 0.0, 0.0], Some(24)),
-        vertex!([0.0, 0.0, 1.5, 0.0], Some(25)),
+        vertex!([2.0, 2.0, 2.0, 2.0], 20),
+        vertex!([1.0, 1.0, 1.0, 1.0], 21),
+        vertex!([0.8, 0.8, 0.8, 0.8], 22),
+        vertex!([1.5, 0.0, 0.0, 0.0], 23),
+        vertex!([0.0, 1.5, 0.0, 0.0], 24),
+        vertex!([0.0, 0.0, 1.5, 0.0], 25),
     ];
 
     println!("Testing points that should be OUTSIDE the circumsphere:");
@@ -585,11 +553,11 @@ fn test_circumsphere_containment() {
     // These points lie on the boundary of the 4D simplex and test
     // numerical stability near the boundary
     let boundary_points: [Vertex<f64, i32, 4>; 5] = [
-        vertex!([0.5, 0.5, 0.0, 0.0], Some(30)),
-        vertex!([0.5, 0.0, 0.5, 0.0], Some(31)),
-        vertex!([0.0, 0.5, 0.5, 0.0], Some(32)),
-        vertex!([0.33, 0.33, 0.33, 0.01], Some(33)),
-        vertex!([0.25, 0.25, 0.25, 0.25], Some(34)),
+        vertex!([0.5, 0.5, 0.0, 0.0], 30),
+        vertex!([0.5, 0.0, 0.5, 0.0], 31),
+        vertex!([0.0, 0.5, 0.5, 0.0], 32),
+        vertex!([0.33, 0.33, 0.33, 0.01], 33),
+        vertex!([0.25, 0.25, 0.25, 0.25], 34),
     ];
 
     println!("Testing boundary/edge points:");
@@ -653,10 +621,10 @@ fn test_simplex_orientation() {
 
     // Test 3D orientation (tetrahedron) for comparison
     let tetrahedron_vertices: [Vertex<f64, i32, 3>; 4] = [
-        vertex!([0.0, 0.0, 0.0], Some(0)), // Origin
-        vertex!([1.0, 0.0, 0.0], Some(1)), // Unit vector along x-axis
-        vertex!([0.0, 1.0, 0.0], Some(2)), // Unit vector along y-axis
-        vertex!([0.0, 0.0, 1.0], Some(3)), // Unit vector along z-axis
+        vertex!([0.0, 0.0, 0.0], 0), // Origin
+        vertex!([1.0, 0.0, 0.0], 1), // Unit vector along x-axis
+        vertex!([0.0, 1.0, 0.0], 2), // Unit vector along y-axis
+        vertex!([0.0, 0.0, 1.0], 3), // Unit vector along z-axis
     ];
 
     let tetrahedron_points: Vec<Point<f64, 3>> =
@@ -674,9 +642,9 @@ fn test_simplex_orientation() {
 
     // Test 2D orientation (triangle)
     let triangle_vertices: [Vertex<f64, i32, 2>; 3] = [
-        vertex!([0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0], Some(2)),
+        vertex!([0.0, 0.0], 0),
+        vertex!([1.0, 0.0], 1),
+        vertex!([0.0, 1.0], 2),
     ];
 
     let triangle_points: Vec<Point<f64, 2>> = triangle_vertices.iter().map(Point::from).collect();
@@ -693,9 +661,9 @@ fn test_simplex_orientation() {
 
     // Test 2D orientation with reversed vertex order
     let triangle_vertices_reversed: [Vertex<f64, i32, 2>; 3] = [
-        vertex!([0.0, 0.0], Some(0)),
-        vertex!([0.0, 1.0], Some(2)), // Swapped order
-        vertex!([1.0, 0.0], Some(1)), // Swapped order
+        vertex!([0.0, 0.0], 0),
+        vertex!([0.0, 1.0], 2), // Swapped order
+        vertex!([1.0, 0.0], 1), // Swapped order
     ];
 
     let triangle_points_reversed: Vec<Point<f64, 2>> =
@@ -713,9 +681,9 @@ fn test_simplex_orientation() {
 
     // Test degenerate case (collinear points in 2D)
     let collinear_vertices: [Vertex<f64, i32, 2>; 3] = [
-        vertex!([0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0], Some(1)),
-        vertex!([2.0, 0.0], Some(2)), // Collinear point
+        vertex!([0.0, 0.0], 0),
+        vertex!([1.0, 0.0], 1),
+        vertex!([2.0, 0.0], 2), // Collinear point
     ];
 
     let collinear_points: Vec<Point<f64, 2>> = collinear_vertices.iter().map(Point::from).collect();
@@ -733,21 +701,21 @@ fn test_simplex_orientation() {
 
 fn create_unit_4d_simplex() -> [Vertex<f64, i32, 4>; 5] {
     [
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0, 0.0, 0.0], Some(2)),
-        vertex!([0.0, 0.0, 1.0, 0.0], Some(3)),
-        vertex!([0.0, 0.0, 0.0, 1.0], Some(4)),
+        vertex!([0.0, 0.0, 0.0, 0.0], 0),
+        vertex!([1.0, 0.0, 0.0, 0.0], 1),
+        vertex!([0.0, 1.0, 0.0, 0.0], 2),
+        vertex!([0.0, 0.0, 1.0, 0.0], 3),
+        vertex!([0.0, 0.0, 0.0, 1.0], 4),
     ]
 }
 
 fn create_negative_4d_simplex() -> [Vertex<f64, i32, 4>; 5] {
     [
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(0)),
-        vertex!([0.0, 1.0, 0.0, 0.0], Some(2)),
-        vertex!([1.0, 0.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 0.0, 1.0, 0.0], Some(3)),
-        vertex!([0.0, 0.0, 0.0, 1.0], Some(4)),
+        vertex!([0.0, 0.0, 0.0, 0.0], 0),
+        vertex!([0.0, 1.0, 0.0, 0.0], 2),
+        vertex!([1.0, 0.0, 0.0, 0.0], 1),
+        vertex!([0.0, 0.0, 1.0, 0.0], 3),
+        vertex!([0.0, 0.0, 0.0, 1.0], 4),
     ]
 }
 
@@ -758,7 +726,7 @@ fn demonstrate_orientation_impact_on_circumsphere() {
     let vertices = create_unit_4d_simplex();
     let vertices_negative = create_negative_4d_simplex();
 
-    let test_point = vertex!([0.25, 0.25, 0.25, 0.25], Some(100));
+    let test_point: Vertex<f64, i32, 4> = vertex!([0.25, 0.25, 0.25, 0.25], 100);
 
     let vertex_points: Vec<Point<f64, 4>> = vertices.iter().map(Point::from).collect();
     let vertex_points_negative: Vec<Point<f64, 4>> =
@@ -818,10 +786,10 @@ fn test_3d_simplex_analysis() {
 }
 
 fn create_3d_test_simplex() -> Vec<Vertex<f64, i32, 3>> {
-    let vertex1_3d: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], Some(1));
-    let vertex2_3d = vertex!([1.0, 0.0, 0.0], Some(1));
-    let vertex3_3d = vertex!([0.0, 1.0, 0.0], Some(1));
-    let vertex4_3d = vertex!([0.0, 0.0, 1.0], Some(2));
+    let vertex1_3d: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 1);
+    let vertex2_3d = vertex!([1.0, 0.0, 0.0], 1);
+    let vertex3_3d = vertex!([0.0, 1.0, 0.0], 1);
+    let vertex4_3d = vertex!([0.0, 0.0, 1.0], 2);
     vec![vertex1_3d, vertex2_3d, vertex3_3d, vertex4_3d]
 }
 
@@ -843,7 +811,7 @@ fn test_point_against_3d_simplex(
     circumradius_3d: f64,
 ) {
     // Test the point [0.9, 0.9, 0.9]
-    let test_vertex_3d = vertex!([0.9, 0.9, 0.9], Some(3));
+    let test_vertex_3d = vertex!([0.9, 0.9, 0.9], 3);
 
     // Calculate distance from circumcenter to test point
     let distance_to_test_3d = na::distance(
@@ -913,10 +881,10 @@ fn setup_3d_matrix_test() -> Setup3DResult {
     println!("=============================================");
 
     // Create the 3D simplex: vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
-    let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], Some(1));
-    let vertex2 = vertex!([1.0, 0.0, 0.0], Some(1));
-    let vertex3 = vertex!([0.0, 1.0, 0.0], Some(1));
-    let vertex4 = vertex!([0.0, 0.0, 1.0], Some(2));
+    let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 1);
+    let vertex2 = vertex!([1.0, 0.0, 0.0], 1);
+    let vertex3 = vertex!([0.0, 1.0, 0.0], 1);
+    let vertex4 = vertex!([0.0, 0.0, 1.0], 2);
     let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
     println!("3D Simplex vertices:");
@@ -928,7 +896,7 @@ fn setup_3d_matrix_test() -> Setup3DResult {
 
     // Test point
     let test_point = [0.9, 0.9, 0.9];
-    let test_vertex = vertex!(test_point, Some(3));
+    let test_vertex = vertex!(test_point, 3);
 
     // Get reference vertex (first vertex)
     let ref_coords = [0.0, 0.0, 0.0];
@@ -1172,10 +1140,10 @@ fn debug_3d_circumsphere_properties() {
     println!("=== 3D Unit Tetrahedron Analysis ===");
 
     // Unit tetrahedron: vertices at (0,0,0), (1,0,0), (0,1,0), (0,0,1)
-    let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], Some(1));
-    let vertex2 = vertex!([1.0, 0.0, 0.0], Some(1));
-    let vertex3 = vertex!([0.0, 1.0, 0.0], Some(1));
-    let vertex4 = vertex!([0.0, 0.0, 1.0], Some(2));
+    let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 1);
+    let vertex2 = vertex!([1.0, 0.0, 0.0], 1);
+    let vertex3 = vertex!([0.0, 1.0, 0.0], 1);
+    let vertex4 = vertex!([0.0, 0.0, 1.0], 2);
     let simplex_vertices = vec![vertex1, vertex2, vertex3, vertex4];
 
     let simplex_points: Vec<Point<f64, 3>> = simplex_vertices.iter().map(Point::from).collect();
@@ -1196,7 +1164,7 @@ fn debug_3d_circumsphere_properties() {
         distance_to_center < radius
     );
 
-    let test_vertex = vertex!([0.9, 0.9, 0.9], Some(4));
+    let test_vertex: Vertex<f64, i32, 3> = vertex!([0.9, 0.9, 0.9], 4);
 
     let standard_result = insphere_distance(&simplex_points, Point::from(&test_vertex)).unwrap();
     let matrix_result = insphere_lifted(&simplex_points, Point::from(&test_vertex)).unwrap();
@@ -1210,11 +1178,11 @@ fn debug_4d_circumsphere_properties() {
     println!("\n=== 4D Symmetric Simplex Analysis ===");
 
     // Regular 4D simplex with vertices forming a specific pattern
-    let vertex1: Vertex<f64, Option<()>, 4> = vertex!([1.0, 1.0, 1.0, 1.0], None);
-    let vertex2 = vertex!([1.0, -1.0, -1.0, -1.0], None);
-    let vertex3 = vertex!([-1.0, 1.0, -1.0, -1.0], None);
-    let vertex4 = vertex!([-1.0, -1.0, 1.0, -1.0], None);
-    let vertex5 = vertex!([-1.0, -1.0, -1.0, 1.0], None);
+    let vertex1: Vertex<f64, Option<()>, 4> = vertex!([1.0, 1.0, 1.0, 1.0]);
+    let vertex2 = vertex!([1.0, -1.0, -1.0, -1.0]);
+    let vertex3 = vertex!([-1.0, 1.0, -1.0, -1.0]);
+    let vertex4 = vertex!([-1.0, -1.0, 1.0, -1.0]);
+    let vertex5 = vertex!([-1.0, -1.0, -1.0, 1.0]);
     let simplex_vertices_4d = vec![vertex1, vertex2, vertex3, vertex4, vertex5];
 
     let simplex_points_4d: Vec<Point<f64, 4>> =
@@ -1236,7 +1204,7 @@ fn debug_4d_circumsphere_properties() {
         distance_to_center_4d < radius_4d
     );
 
-    let origin_vertex: Vertex<f64, Option<()>, 4> = vertex!([0.0, 0.0, 0.0, 0.0], None);
+    let origin_vertex: Vertex<f64, Option<()>, 4> = vertex!([0.0, 0.0, 0.0, 0.0]);
 
     let standard_result_4d =
         insphere_distance(&simplex_points_4d, Point::from(&origin_vertex)).unwrap();
@@ -1252,9 +1220,9 @@ fn compare_circumsphere_methods() {
     println!("\n=== Comparing Circumsphere Methods ===");
 
     // Compare results between standard and matrix methods
-    let vertex1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0], None);
-    let vertex2 = vertex!([1.0, 0.0], None);
-    let vertex3 = vertex!([0.0, 1.0], None);
+    let vertex1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+    let vertex2 = vertex!([1.0, 0.0]);
+    let vertex3 = vertex!([0.0, 1.0]);
     let simplex_vertices = [vertex1, vertex2, vertex3];
 
     // Test various points
@@ -1267,7 +1235,7 @@ fn compare_circumsphere_methods() {
     ];
 
     for (i, point) in test_points.iter().enumerate() {
-        let test_vertex: Vertex<f64, Option<()>, 2> = vertex!(point.to_array(), None);
+        let test_vertex: Vertex<f64, Option<()>, 2> = vertex!(point.to_array());
         let simplex_points: Vec<Point<f64, 2>> = simplex_vertices.iter().map(Point::from).collect();
 
         let standard_result =
@@ -1345,9 +1313,9 @@ fn test_single_2d_point() {
 
     // Create a unit triangle: (0,0), (1,0), (0,1)
     let vertices = vec![
-        vertex!([0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0], Some(2)),
+        vertex!([0.0, 0.0], 0),
+        vertex!([1.0, 0.0], 1),
+        vertex!([0.0, 1.0], 2),
     ];
 
     // Calculate circumcenter and circumradius
@@ -1387,10 +1355,10 @@ fn test_single_3d_point() {
 
     // Create a unit tetrahedron: (0,0,0), (1,0,0), (0,1,0), (0,0,1)
     let vertices = vec![
-        vertex!([0.0, 0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0, 0.0], Some(2)),
-        vertex!([0.0, 0.0, 1.0], Some(3)),
+        vertex!([0.0, 0.0, 0.0], 0),
+        vertex!([1.0, 0.0, 0.0], 1),
+        vertex!([0.0, 1.0, 0.0], 2),
+        vertex!([0.0, 0.0, 1.0], 3),
     ];
 
     // Calculate circumcenter and circumradius
@@ -1430,11 +1398,11 @@ fn test_single_4d_point() {
 
     // Create a unit 4-simplex: vertices at origin and unit vectors along each axis
     let vertices = vec![
-        vertex!([0.0, 0.0, 0.0, 0.0], Some(0)),
-        vertex!([1.0, 0.0, 0.0, 0.0], Some(1)),
-        vertex!([0.0, 1.0, 0.0, 0.0], Some(2)),
-        vertex!([0.0, 0.0, 1.0, 0.0], Some(3)),
-        vertex!([0.0, 0.0, 0.0, 1.0], Some(4)),
+        vertex!([0.0, 0.0, 0.0, 0.0], 0),
+        vertex!([1.0, 0.0, 0.0, 0.0], 1),
+        vertex!([0.0, 1.0, 0.0, 0.0], 2),
+        vertex!([0.0, 0.0, 1.0, 0.0], 3),
+        vertex!([0.0, 0.0, 0.0, 1.0], 4),
     ];
 
     // Calculate circumcenter and circumradius
