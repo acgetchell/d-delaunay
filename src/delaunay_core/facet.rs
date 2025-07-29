@@ -153,16 +153,15 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 0.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 0.0, 0.0]);
+    /// let vertex3: Vertex<f64, Option<()>, 3> = vertex!([0.0, 1.0, 0.0]);
+    /// let vertex4: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 1.0]);
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
     /// assert_eq!(facet.cell(), &cell);
     /// ```
@@ -380,9 +379,7 @@ pub enum FacetError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::{cell::CellBuilder, vertex::VertexBuilder};
-    use crate::geometry::point::Point;
-    use crate::geometry::traits::coordinate::Coordinate;
+    use crate::{cell, vertex};
     use approx::assert_relative_eq;
 
     // Define type aliases for complex types
@@ -392,27 +389,12 @@ mod tests {
     // Helper function to create a standard tetrahedron (3D cell with 4 vertices)
     fn create_tetrahedron() -> (TestCell3D, Vec<TestVertex3D>) {
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
-        let cell = CellBuilder::default()
-            .vertices(vertices.clone())
-            .build()
-            .unwrap();
+        let cell = cell!(vertices.clone());
         (cell, vertices)
     }
     // Define type aliases for 2D types
@@ -422,23 +404,11 @@ mod tests {
     // Helper function to create a triangle (2D cell with 3 vertices)
     fn create_triangle() -> (TestCell2D, Vec<TestVertex2D>) {
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.5, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.5, 1.0]),
         ];
-        let cell = CellBuilder::default()
-            .vertices(vertices.clone())
-            .build()
-            .unwrap();
+        let cell = cell!(vertices.clone());
         (cell, vertices)
     }
 
@@ -455,44 +425,21 @@ mod tests {
 
     #[test]
     fn facet_new_with_incorrect_vertex() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
+        let vertex5 = vertex!([1.0, 1.0, 1.0]);
 
         assert!(Facet::new(cell, vertex5).is_err());
     }
 
     #[test]
     fn facet_new_with_1_simplex() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1]);
 
         assert!(Facet::new(cell, vertex1).is_err());
     }
@@ -514,26 +461,12 @@ mod tests {
 
     #[test]
     fn facet_to_json() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
         let facet = Facet::new(cell, vertex1).unwrap();
         let serialized = serde_json::to_string(&facet).unwrap();
 
@@ -550,26 +483,12 @@ mod tests {
 
     #[test]
     fn facet_partial_eq() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet3 = Facet::new(cell, vertex2).unwrap();
@@ -580,26 +499,12 @@ mod tests {
 
     #[test]
     fn facet_partial_ord() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet3 = Facet::new(cell.clone(), vertex2).unwrap();
@@ -614,22 +519,10 @@ mod tests {
 
     #[test]
     fn facet_clone() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
         let facet = Facet::new(cell, vertex1).unwrap();
         let cloned_facet = facet.clone();
 
@@ -654,18 +547,9 @@ mod tests {
 
     #[test]
     fn facet_debug() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([4.0, 5.0, 6.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([1.0, 2.0, 3.0]);
+        let vertex2 = vertex!([4.0, 5.0, 6.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
         let facet = Facet::new(cell, vertex1).unwrap();
         let debug_str = format!("{facet:?}");
 
@@ -676,26 +560,10 @@ mod tests {
 
     #[test]
     fn facet_with_typed_data() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .data(3)
-            .build()
-            .unwrap();
+        let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 1);
+        let vertex2: Vertex<f64, i32, 3> = vertex!([1.0, 0.0, 0.0], 2);
+        let vertex3: Vertex<f64, i32, 3> = vertex!([0.0, 1.0, 0.0], 3);
+        let cell: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 3);
         let facet = Facet::new(cell, vertex1).unwrap();
 
         assert_eq!(facet.cell().data, Some(3));
@@ -721,18 +589,9 @@ mod tests {
 
     #[test]
     fn facet_1d_edge() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 1> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0]);
+        let vertex2 = vertex!([1.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 1> = cell!(vec![vertex1, vertex2]);
         let facet = Facet::new(cell, vertex1).unwrap();
 
         // Facet of 1D edge is a point (0D)
@@ -743,30 +602,13 @@ mod tests {
 
     #[test]
     fn facet_4d_simplex() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 4> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0, 0.0]);
+        let vertex5 = vertex!([0.0, 0.0, 0.0, 1.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 4> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4, vertex5]);
         let facet = Facet::new(cell, vertex1).unwrap();
 
         // Facet of 4D simplex is a 3D tetrahedron
@@ -781,26 +623,11 @@ mod tests {
 
     #[test]
     fn facet_error_cell_does_not_contain_vertex() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex_not_in_cell = VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex_not_in_cell = vertex!([2.0, 2.0, 2.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
 
         let result = Facet::new(cell, vertex_not_in_cell);
         assert!(result.is_err());
@@ -815,14 +642,8 @@ mod tests {
 
     #[test]
     fn facet_error_cell_is_zero_simplex() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1]);
 
         let result = Facet::new(cell, vertex1);
         assert!(result.is_err());
@@ -866,12 +687,8 @@ mod tests {
     fn facet_vertices_empty_cell() {
         // This tests the edge case where a cell might be empty
         // Although this shouldn't happen in practice due to validation
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let empty_cell: Cell<f64, Option<()>, Option<()>, 3> =
-            CellBuilder::default().vertices(vec![]).build().unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let empty_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![]);
 
         // Create facet directly without using new() to bypass validation
         let facet = Facet {
@@ -886,28 +703,14 @@ mod tests {
     #[test]
     fn facet_vertices_ordering() {
         // Test that vertices are returned in the same order as in the cell
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
         // Create 3D cell with exactly 4 vertices (3+1)
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         let facet = Facet::new(cell, vertex3).unwrap();
         let vertices = facet.vertices();
@@ -927,27 +730,11 @@ mod tests {
 
     #[test]
     fn facet_to_and_from_json() {
-        let vertex1: Vertex<f32, u8, 2> = VertexBuilder::default()
-            .point(Point::new([0.0f32, 0.0f32]))
-            .data(1u8)
-            .build()
-            .unwrap();
-        let vertex2: Vertex<f32, u8, 2> = VertexBuilder::default()
-            .point(Point::new([1.0f32, 0.0f32]))
-            .data(2u8)
-            .build()
-            .unwrap();
-        let vertex3: Vertex<f32, u8, 2> = VertexBuilder::default()
-            .point(Point::new([0.5f32, 1.0f32]))
-            .data(3u8)
-            .build()
-            .unwrap();
+        let vertex1: Vertex<f32, u8, 2> = vertex!([0.0f32, 0.0f32], 1u8);
+        let vertex2: Vertex<f32, u8, 2> = vertex!([1.0f32, 0.0f32], 2u8);
+        let vertex3: Vertex<f32, u8, 2> = vertex!([0.5f32, 1.0f32], 3u8);
 
-        let cell: Cell<f32, u8, u16, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .data(100u16)
-            .build()
-            .unwrap();
+        let cell: Cell<f32, u8, u16, 2> = cell!(vec![vertex1, vertex2, vertex3], 100u16);
 
         let facet = Facet::new(cell, vertex1).unwrap();
 
@@ -1004,27 +791,13 @@ mod tests {
 
     #[test]
     fn facet_eq_different_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
         let facet2 = Facet::new(cell.clone(), vertex2).unwrap();
@@ -1042,29 +815,13 @@ mod tests {
 
     #[test]
     fn facet_eq_same_cells_same_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
 
         // Use the same vertices for both cells
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
 
         let facet1 = Facet::new(cell1, vertex1).unwrap();
         let facet2 = Facet::new(cell2, vertex1).unwrap();
@@ -1076,42 +833,17 @@ mod tests {
 
     #[test]
     fn facet_ne_different_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
 
         // Create completely different vertices with different coordinates
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([2.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([3.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex6 = VertexBuilder::default()
-            .point(Point::new([2.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex4 = vertex!([2.0, 0.0, 0.0]);
+        let vertex5 = vertex!([3.0, 0.0, 0.0]);
+        let vertex6 = vertex!([2.0, 1.0, 0.0]);
 
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex4, vertex5, vertex6])
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex4, vertex5, vertex6]);
 
         let facet1 = Facet::new(cell1, vertex1).unwrap();
         let facet2 = Facet::new(cell2, vertex4).unwrap();
@@ -1122,8 +854,6 @@ mod tests {
 
     #[test]
     fn facet_hash() {
-        use crate::delaunay_core::{cell::CellBuilder, vertex::VertexBuilder};
-        use crate::geometry::point::Point;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
@@ -1135,27 +865,13 @@ mod tests {
         }
 
         // Create a cell with some vertices
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         // Create two facets that should be equal and hash to the same value
         let facet1 = Facet::new(cell.clone(), vertex1).unwrap();
