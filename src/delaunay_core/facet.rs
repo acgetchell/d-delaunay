@@ -7,12 +7,22 @@
 //! Facets are not stored in the `Triangulation Data Structure` (TDS)
 //! directly, but created on the fly when needed.
 
+#![allow(clippy::similar_names)]
+
+// =============================================================================
+// IMPORTS
+// =============================================================================
+
 use super::{cell::Cell, vertex::Vertex};
 use crate::delaunay_core::traits::data::DataType;
 use crate::geometry::traits::coordinate::CoordinateScalar;
 use serde::{Serialize, de::DeserializeOwned};
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
+
+// =============================================================================
+// FACET STRUCT DEFINITION
+// =============================================================================
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd, Serialize)]
 /// The [Facet] struct represents a facet of a d-dimensional simplex.
@@ -39,6 +49,10 @@ where
     /// The [Vertex] opposite to this facet.
     vertex: Vertex<T, U, D>,
 }
+
+// =============================================================================
+// DESERIALIZATION IMPLEMENTATION
+// =============================================================================
 
 /// Manual implementation of Deserialize for Facet
 impl<'de, T, U, V, const D: usize> serde::Deserialize<'de> for Facet<T, U, V, D>
@@ -122,6 +136,10 @@ where
         )
     }
 }
+
+// =============================================================================
+// FACET IMPLEMENTATION
+// =============================================================================
 
 impl<T, U, V, const D: usize> Facet<T, U, V, D>
 where
@@ -338,6 +356,10 @@ where
     }
 }
 
+// =============================================================================
+// TRAIT IMPLEMENTATIONS
+// =============================================================================
+
 // Consolidated trait implementations for Facet
 impl<T, U, V, const D: usize> Eq for Facet<T, U, V, D>
 where
@@ -366,6 +388,10 @@ where
     }
 }
 
+// =============================================================================
+// ERROR TYPES
+// =============================================================================
+
 /// Error type for facet operations.
 #[derive(Debug, Error)]
 pub enum FacetError {
@@ -376,13 +402,21 @@ pub enum FacetError {
     #[error("The cell is a 0-simplex with no facet!")]
     CellIsZeroSimplex,
 }
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{cell, vertex};
     use approx::assert_relative_eq;
 
-    // Define type aliases for complex types
+    // =============================================================================
+    // TYPE ALIASES AND HELPERS
+    // =============================================================================
+
     type TestVertex3D = Vertex<f64, Option<()>, 3>;
     type TestCell3D = Cell<f64, Option<()>, Option<()>, 3>;
 
@@ -397,7 +431,7 @@ mod tests {
         let cell = cell!(vertices.clone());
         (cell, vertices)
     }
-    // Define type aliases for 2D types
+
     type TestVertex2D = Vertex<f64, Option<()>, 2>;
     type TestCell2D = Cell<f64, Option<()>, Option<()>, 2>;
 
@@ -411,6 +445,10 @@ mod tests {
         let cell = cell!(vertices.clone());
         (cell, vertices)
     }
+
+    // =============================================================================
+    // FACET CREATION TESTS
+    // =============================================================================
 
     #[test]
     fn facet_new() {
@@ -459,6 +497,10 @@ mod tests {
         println!("Facet: {facet:?}");
     }
 
+    // =============================================================================
+    // SERIALIZATION TESTS
+    // =============================================================================
+
     #[test]
     fn facet_to_json() {
         let vertex1 = vertex!([0.0, 0.0, 0.0]);
@@ -480,6 +522,10 @@ mod tests {
         // Human readable output for cargo test -- --nocapture
         println!("Serialized = {serialized:?}");
     }
+
+    // =============================================================================
+    // EQUALITY AND ORDERING TESTS
+    // =============================================================================
 
     #[test]
     fn facet_partial_eq() {
@@ -558,6 +604,10 @@ mod tests {
         assert!(debug_str.contains("vertex"));
     }
 
+    // =============================================================================
+    // DIMENSIONAL AND GEOMETRIC TESTS
+    // =============================================================================
+
     #[test]
     fn facet_with_typed_data() {
         let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 1);
@@ -620,6 +670,10 @@ mod tests {
         assert!(vertices.contains(&vertex5));
         assert!(!vertices.contains(&vertex1));
     }
+
+    // =============================================================================
+    // ERROR HANDLING TESTS
+    // =============================================================================
 
     #[test]
     fn facet_error_cell_does_not_contain_vertex() {
