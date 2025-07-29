@@ -1,6 +1,48 @@
 //! Data and operations on d-dimensional cells or [simplices](https://en.wikipedia.org/wiki/Simplex).
+//!
+//! This module provides the `Cell` struct which represents a geometric cell
+//! (simplex) in D-dimensional space with associated metadata including unique
+//! identification, neighboring cells, and optional user data.
+//!
+//! # Key Features
+//!
+//! - **Generic Coordinate Support**: Works with any floating-point type (`f32`, `f64`, etc.)
+//!   that implements the `CoordinateScalar` trait
+//! - **Unique Identification**: Each cell has a UUID for consistent identification
+//! - **Vertices Management**: Stores vertices that form the simplex
+//! - **Neighbor Tracking**: Maintains references to neighboring cells
+//! - **Optional Data Storage**: Supports attaching arbitrary user data of type `V`
+//! - **Serialization Support**: Full serde support for persistence
+//! - **Builder Pattern**: Convenient cell construction using `CellBuilder`
+//!
+//! # Examples
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+//! use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+//! use d_delaunay::geometry::point::Point;
+//! use d_delaunay::geometry::traits::coordinate::Coordinate;
+//!
+//! // Create vertices for a tetrahedron
+//! let vertices = vec![
+//!     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
+//!     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
+//!     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
+//!     VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(),
+//! ];
+//!
+//! // Create a 3D cell (tetrahedron)
+//! let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+//!     .vertices(vertices)
+//!     .build()
+//!     .unwrap();
+//! ```
 
 #![allow(clippy::similar_names)]
+
+// =============================================================================
+// IMPORTS
+// =============================================================================
 
 use super::{
     facet::Facet,
@@ -16,6 +58,10 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::Sum};
 use thiserror::Error;
 use uuid::Uuid;
+
+// =============================================================================
+// ERROR TYPES
+// =============================================================================
 
 /// Errors that can occur during cell validation.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -46,6 +92,79 @@ pub enum CellValidationError {
         dimension: usize,
     },
 }
+
+// =============================================================================
+// CONVENIENCE MACROS AND HELPERS
+// =============================================================================
+
+/// Convenience macro for creating cells with less boilerplate.
+///
+/// This macro simplifies cell creation by using the `CellBuilder` pattern internally
+/// and automatically unwrapping the result for convenience. It takes vertex arrays
+/// and optional data, returning a `Cell` directly.
+///
+/// # Returns
+///
+/// Returns `Cell<T, U, V, D>` where:
+/// - `T` is the coordinate scalar type
+/// - `U` is the vertex data type
+/// - `V` is the cell data type  
+/// - `D` is the spatial dimension
+///
+/// # Panics
+///
+/// Panics if the `CellBuilder` fails to construct a valid cell, which should
+/// not happen under normal circumstances with valid input data.
+///
+/// # Usage
+///
+/// ```rust
+/// use d_delaunay::{cell, vertex};
+/// use d_delaunay::delaunay_core::cell::Cell;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::geometry::traits::coordinate::Coordinate;
+///
+/// // Create vertices using the vertex! macro
+/// let vertices = vec![
+///     vertex!([0.0, 0.0, 0.0]),
+///     vertex!([1.0, 0.0, 0.0]),
+///     vertex!([0.0, 1.0, 0.0]),
+/// ];
+///
+/// // Create a cell without data (explicit type annotation required)
+/// let c1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices.clone());
+///
+/// // Create a cell with data (explicit type annotation required)
+/// let c2: Cell<f64, Option<()>, i32, 3> = cell!(vertices, 42);
+/// ```
+#[macro_export]
+macro_rules! cell {
+    // Pattern 1: Just vertices - no data
+    ($vertices:expr) => {
+        $crate::delaunay_core::cell::CellBuilder::default()
+            .vertices($vertices)
+            .build()
+            .expect("Failed to build cell: invalid vertices or builder configuration")
+    };
+
+    // Pattern 2: Vertices with data
+    ($vertices:expr, $data:expr) => {
+        $crate::delaunay_core::cell::CellBuilder::default()
+            .vertices($vertices)
+            .data($data)
+            .build()
+            .expect(
+                "Failed to build cell with data: invalid vertices, data, or builder configuration",
+            )
+    };
+}
+
+// Re-export the macro at the crate level for convenience
+pub use crate::cell;
+
+// =============================================================================
+// CELL STRUCT DEFINITION
+// =============================================================================
 
 #[derive(Builder, Clone, Debug, Default, Serialize)]
 #[builder(build_fn(validate = "Self::validate"))]
@@ -86,6 +205,10 @@ where
     #[builder(setter(into, strip_option), default)]
     pub data: Option<V>,
 }
+
+// =============================================================================
+// DESERIALIZATION IMPLEMENTATION
+// =============================================================================
 
 /// Manual implementation of Deserialize for Cell
 impl<'de, T, U, V, const D: usize> Deserialize<'de> for Cell<T, U, V, D>
@@ -216,7 +339,9 @@ where
     }
 }
 
-// Basic implementation block with minimal trait bounds for common methods
+// =============================================================================
+// CELL IMPLEMENTATION - CORE METHODS
+// =============================================================================
 impl<T, U, V, const D: usize> Cell<T, U, V, D>
 where
     T: CoordinateScalar,
@@ -233,14 +358,15 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 1.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    /// ];
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
     /// assert_eq!(cell.number_of_vertices(), 3);
     /// ```
     #[inline]
@@ -257,14 +383,15 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 1.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    /// ];
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
     /// assert_eq!(cell.vertices().len(), 3);
     /// ```
     #[inline]
@@ -281,13 +408,14 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
     /// use uuid::Uuid;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1]).build().unwrap();
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 1.0])
+    /// ];
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
     /// assert_ne!(cell.uuid(), Uuid::nil());
     /// ```
     #[inline]
@@ -305,14 +433,15 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3]).build().unwrap();
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 1.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    /// ];
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
     /// assert_eq!(cell.dim(), 2);
     /// ```
     #[inline]
@@ -335,35 +464,16 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-    ///     .point(Point::new([0.0, 0.0, 1.0]))
-    ///     .data(1)
-    ///     .build()
-    ///     .unwrap();
-    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default()
-    ///     .point(Point::new([0.0, 1.0, 0.0]))
-    ///     .data(1)
-    ///     .build()
-    ///     .unwrap();
-    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default()
-    ///     .point(Point::new([1.0, 0.0, 0.0]))
-    ///     .data(1)
-    ///     .build()
-    ///     .unwrap();
-    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default()
-    ///     .point(Point::new([1.0, 1.0, 1.0]))
-    ///     .data(2)
-    ///     .build()
-    ///     .unwrap();
-    /// let cell: Cell<f64, i32, i32, 3> = CellBuilder::default()
-    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-    ///     .data(42)
-    ///     .build()
-    ///     .unwrap();
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    ///
+    /// let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 1.0], 1);
+    /// let vertex2: Vertex<f64, i32, 3> = vertex!([0.0, 1.0, 0.0], 1);
+    /// let vertex3: Vertex<f64, i32, 3> = vertex!([1.0, 0.0, 0.0], 1);
+    /// let vertex4: Vertex<f64, i32, 3> = vertex!([1.0, 1.0, 1.0], 2);
+    /// let vertices = vec![vertex1, vertex2, vertex3, vertex4];
+    /// let cell: Cell<f64, i32, i32, 3> = cell!(vertices, 42);
     /// assert!(cell.contains_vertex(vertex1));
     /// ```
     pub fn contains_vertex(&self, vertex: Vertex<T, U, D>) -> bool {
@@ -383,17 +493,17 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
-    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell: Cell<f64, i32, i32, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data(42).build().unwrap();
-    /// let vertex5: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).data(0).build().unwrap();
-    /// let cell2: Cell<f64, i32, i32, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex5]).data(24).build().unwrap();
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    ///
+    /// let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 1.0], 1);
+    /// let vertex2: Vertex<f64, i32, 3> = vertex!([0.0, 1.0, 0.0], 1);
+    /// let vertex3: Vertex<f64, i32, 3> = vertex!([1.0, 0.0, 0.0], 1);
+    /// let vertex4: Vertex<f64, i32, 3> = vertex!([1.0, 1.0, 1.0], 2);
+    /// let vertex5: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 0);
+    /// let cell: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4], 42);
+    /// let cell2: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex5], 24);
     /// assert!(cell.contains_vertex_of(&cell2));
     /// ```
     pub fn contains_vertex_of(&self, cell: &Self) -> bool {
@@ -418,18 +528,18 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex4 = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    ///
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 1.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([0.0, 1.0, 0.0]);
+    /// let vertex3: Vertex<f64, Option<()>, 3> = vertex!([1.0, 0.0, 0.0]);
+    /// let vertex4: Vertex<f64, Option<()>, 3> = vertex!([1.0, 1.0, 1.0]);
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
     /// let facet = Facet::new(cell.clone(), vertex4).unwrap();
-    /// let vertex5 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex5: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 0.0]);
     /// let new_cell = Cell::from_facet_and_vertex(&facet, vertex5).unwrap();
     /// assert!(new_cell.vertices().contains(&vertex5));
     /// ```
@@ -489,15 +599,15 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).build().unwrap();
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    ///
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 1.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([0.0, 1.0, 0.0]);
+    /// let vertex3: Vertex<f64, Option<()>, 3> = vertex!([1.0, 0.0, 0.0]);
+    /// let vertex4: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 0.0]);
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
     /// assert!(cell.is_valid().is_ok());
     /// ```
     pub fn is_valid(&self) -> Result<(), CellValidationError> {
@@ -552,16 +662,16 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
-    /// use d_delaunay::geometry::point::Point;
-    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::delaunay_core::facet::Facet;
-    /// let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).data(1).build().unwrap();
-    /// let vertex2: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).data(1).build().unwrap();
-    /// let vertex3: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).data(1).build().unwrap();
-    /// let vertex4: Vertex<f64, i32, 3> = VertexBuilder::default().point(Point::new([1.0, 1.0, 1.0])).data(2).build().unwrap();
-    /// let cell: Cell<f64, i32, i32, 3> = CellBuilder::default().vertices(vec![vertex1, vertex2, vertex3, vertex4]).data(42).build().unwrap();
+    ///
+    /// let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 1.0], 1);
+    /// let vertex2: Vertex<f64, i32, 3> = vertex!([0.0, 1.0, 0.0], 1);
+    /// let vertex3: Vertex<f64, i32, 3> = vertex!([1.0, 0.0, 0.0], 1);
+    /// let vertex4: Vertex<f64, i32, 3> = vertex!([1.0, 1.0, 1.0], 2);
+    /// let cell: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4], 42);
     /// let facets = cell.facets();
     /// assert_eq!(facets.len(), 4);
     /// ```
@@ -572,6 +682,10 @@ where
             .collect()
     }
 }
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 /// Helper function to sort vertices for comparison and hashing
 fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
@@ -584,6 +698,10 @@ where
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     sorted
 }
+
+// =============================================================================
+// STANDARD TRAIT IMPLEMENTATIONS
+// =============================================================================
 
 /// Equality of cells is based on equality of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialEq for Cell<T, U, V, D>
@@ -599,16 +717,6 @@ where
     }
 }
 
-/// Eq implementation for Cell based on equality of sorted vector of vertices.
-impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
-where
-    T: CoordinateScalar,
-    U: DataType,
-    V: DataType,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-}
-
 /// Order of cells is based on lexicographic order of sorted vector of vertices.
 impl<T, U, V, const D: usize> PartialOrd for Cell<T, U, V, D>
 where
@@ -622,6 +730,20 @@ where
         sorted_vertices::<T, U, D>(&self.vertices)
             .partial_cmp(&sorted_vertices::<T, U, D>(&other.vertices))
     }
+}
+
+// =============================================================================
+// HASHING AND EQUALITY IMPLEMENTATIONS
+// =============================================================================
+
+/// Eq implementation for Cell based on equality of sorted vector of vertices.
+impl<T, U, V, const D: usize> Eq for Cell<T, U, V, D>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    V: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
 }
 
 /// Custom Hash implementation for Cell
@@ -648,289 +770,427 @@ where
     }
 }
 
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::vertex::VertexBuilder;
+    use crate::delaunay_core::vertex::{VertexBuilder, vertex};
     use crate::geometry::point::Point;
     use crate::geometry::predicates::{
         circumcenter, circumradius, circumradius_with_center, insphere, insphere_distance,
     };
     use crate::geometry::traits::coordinate::Coordinate;
     use approx::assert_relative_eq;
+
     // Type aliases for commonly used types to reduce repetition
     type TestCell3D = Cell<f64, Option<()>, Option<()>, 3>;
     type TestCell2D = Cell<f64, Option<()>, Option<()>, 2>;
     type TestVertex3D = crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>;
     type TestVertex2D = crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>;
 
-    // Helper functions for creating common test data
+    // =============================================================================
+    // HELPER FUNCTIONS
+    // =============================================================================
+
+    /// Simplified helper function to test basic cell properties
+    fn assert_cell_properties<T, U, V, const D: usize>(
+        cell: &Cell<T, U, V, D>,
+        expected_vertices: usize,
+        expected_dim: usize,
+    ) where
+        T: CoordinateScalar,
+        U: DataType,
+        V: DataType,
+        [T; D]: Copy + Default + serde::de::DeserializeOwned + serde::Serialize + Sized,
+    {
+        assert_eq!(cell.number_of_vertices(), expected_vertices);
+        assert_eq!(cell.dim(), expected_dim);
+        assert!(!cell.uuid().is_nil());
+    }
+
+    // Helper functions for creating common test data using macros
     fn create_test_vertices_3d() -> Vec<TestVertex3D> {
         vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ]
     }
 
     fn create_test_vertices_2d() -> Vec<TestVertex2D> {
         vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
         ]
     }
 
     fn create_tetrahedron() -> TestCell3D {
         let vertices = create_test_vertices_3d();
-        CellBuilder::default().vertices(vertices).build().unwrap()
+        cell!(vertices)
     }
 
     fn create_triangle() -> TestCell2D {
         let vertices = create_test_vertices_2d();
-        CellBuilder::default().vertices(vertices).build().unwrap()
+        cell!(vertices)
     }
 
     // =============================================================================
-    // CONSTRUCTOR AND BUILDER TESTS
+    // CONVENIENCE MACRO TESTS
     // =============================================================================
-    // Tests covering basic cell construction, the builder pattern, and various
-    // cell instantiation scenarios including different dimensions and data types.
+    // Tests covering the cell! macro functionality to ensure it works correctly
+    // with different scenarios including vertex arrays and optional data.
 
     #[test]
-    fn cell_build() {
-        let vertices = create_test_vertices_3d();
-        let cell: TestCell3D = CellBuilder::default()
-            .vertices(vertices.clone())
-            .build()
-            .unwrap();
+    fn cell_macro_without_data() {
+        // Test the cell! macro without data (explicit type annotation required)
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+        ];
 
-        assert_eq!(*cell.vertices(), vertices);
-        assert_eq!(cell.dim(), 3);
-        assert_eq!(cell.number_of_vertices(), 4);
-        assert!(cell.neighbors.is_none());
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices.clone());
+
+        assert_eq!(cell.number_of_vertices(), 3);
+        assert_eq!(cell.dim(), 2);
         assert!(cell.data.is_none());
-    }
+        assert!(!cell.uuid().is_nil());
 
-    #[test]
-    #[should_panic(expected = "Must create a Cell with Vertices")]
-    fn cell_empty() {
-        let _cell: Result<Cell<f64, i32, Option<()>, 3>, CellBuilderError> =
-            CellBuilder::default().build();
-    }
-
-    #[test]
-    fn cell_build_with_too_many_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0]))
-            .data(3)
-            .build()
-            .unwrap();
-        let cell: Result<Cell<f64, i32, Option<()>, 3>, CellBuilderError> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5])
-            .build();
-
-        assert!(cell.is_err());
+        // Verify vertices match what we put in
+        for (original, result) in vertices.iter().zip(cell.vertices().iter()) {
+            assert_relative_eq!(
+                original.point().to_array().as_slice(),
+                result.point().to_array().as_slice(),
+                epsilon = f64::EPSILON
+            );
+        }
 
         // Human readable output for cargo test -- --nocapture
-        println!("{cell:?}");
+        println!("Cell without data: {cell:?}");
     }
 
     #[test]
-    fn cell_build_with_data() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
+    fn cell_macro_with_data() {
+        // Test the cell! macro with data (explicit type annotation required)
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+
+        let cell: Cell<f64, Option<()>, i32, 3> = cell!(vertices.clone(), 42);
+
+        assert_eq!(cell.number_of_vertices(), 4);
+        assert_eq!(cell.dim(), 3);
+        assert_eq!(cell.data.unwrap(), 42);
+        assert!(!cell.uuid().is_nil());
+
+        // Verify vertices match what we put in
+        for (original, result) in vertices.iter().zip(cell.vertices().iter()) {
+            assert_relative_eq!(
+                original.point().to_array().as_slice(),
+                result.point().to_array().as_slice(),
+                epsilon = f64::EPSILON
+            );
+        }
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Cell with data: {cell:?}");
+    }
+
+    #[test]
+    fn cell_macro_with_vertex_data() {
+        // Test creating cells where vertices have data
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0], 1),
+            vertex!([1.0, 0.0, 0.0], 2),
+            vertex!([0.0, 1.0, 0.0], 3),
+        ];
+
+        // Use an array of characters to represent "test cell"
+        let test_cell_data: [char; 9] = ['t', 'e', 's', 't', ' ', 'c', 'e', 'l', 'l'];
+        let cell: Cell<f64, i32, [char; 9], 3> = cell!(vertices, test_cell_data);
+
+        assert_eq!(cell.number_of_vertices(), 3);
+        assert_eq!(cell.dim(), 2);
+        assert_eq!(cell.data.unwrap(), test_cell_data);
+
+        // Check vertex data
+        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
+        assert_eq!(cell.vertices()[1].data.unwrap(), 2);
+        assert_eq!(cell.vertices()[2].data.unwrap(), 3);
+    }
+
+    #[test]
+    fn cell_macro_with_different_data_types() {
+        use ordered_float::OrderedFloat;
+        // Test the cell! macro with various valid DataType types
+        let vertices = vec![
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
+        ];
+
+        // Test with u32 data
+        let cell_u32: Cell<f64, Option<()>, u32, 2> = cell!(vertices.clone(), 123u32);
+        assert_eq!(cell_u32.data.unwrap(), 123u32);
+
+        // Test with char array data (representing "hello")
+        let hello_array: [char; 5] = ['h', 'e', 'l', 'l', 'o'];
+        let cell_chars: Cell<f64, Option<()>, [char; 5], 2> = cell!(vertices.clone(), hello_array);
+        assert_eq!(cell_chars.data.unwrap(), hello_array);
+
+        // Test with tuple data (using types OrderedFloat<f64> that implement Hash and Ord)
+        let tuple_data: (OrderedFloat<f64>, OrderedFloat<f64>) =
+            (OrderedFloat(42.0), OrderedFloat(3.15));
+        let cell_tuple: Cell<f64, Option<()>, (OrderedFloat<f64>, OrderedFloat<f64>), 2> =
+            cell!(vertices, tuple_data);
+        assert_eq!(cell_tuple.data.unwrap(), tuple_data);
+    }
+
+    #[test]
+    fn cell_macro_equivalence_with_builder() {
+        // Test that the cell! macro produces equivalent results to CellBuilder
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+
+        // Create cell using macro
+        let cell_macro: Cell<f64, Option<()>, i32, 3> = cell!(vertices.clone(), 42);
+
+        // Create cell using builder
+        let cell_builder: Cell<f64, Option<()>, i32, 3> = CellBuilder::default()
+            .vertices(vertices)
             .data(42)
             .build()
             .unwrap();
 
-        assert_eq!(*cell.vertices(), vec![vertex1, vertex2, vertex3, vertex4]);
-        assert_eq!(cell.vertices()[0].data.unwrap(), 1);
-        assert_eq!(cell.vertices()[1].data.unwrap(), 1);
-        assert_eq!(cell.vertices()[2].data.unwrap(), 1);
-        assert_eq!(cell.vertices()[3].data.unwrap(), 2);
-        assert_eq!(cell.dim(), 3);
-        assert_eq!(cell.number_of_vertices(), 4);
-        assert!(cell.neighbors.is_none());
-        assert!(cell.data.is_some());
-        assert_eq!(cell.data.unwrap(), 42);
+        // They should be equal (based on vertices, not UUID)
+        assert_eq!(cell_macro, cell_builder);
+        assert_eq!(
+            cell_macro.number_of_vertices(),
+            cell_builder.number_of_vertices()
+        );
+        assert_eq!(cell_macro.dim(), cell_builder.dim());
+        assert_eq!(cell_macro.data, cell_builder.data);
 
-        // Human readable output for cargo test -- --nocapture
-        println!("Cell: {cell:?}");
+        // UUIDs will be different since they're generated separately
+        assert_ne!(cell_macro.uuid(), cell_builder.uuid());
+    }
+
+    // =============================================================================
+    // TRAIT IMPLEMENTATION TESTS
+    // =============================================================================
+    // Tests covering core Rust traits like PartialEq, PartialOrd, Hash, Clone
+
+    #[test]
+    fn cell_partial_eq() {
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 0.0]);
+        let vertex5 = vertex!([1.0, 1.0, 1.0]);
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
+        let cell2 = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
+        let cell3 = cell!(vec![vertex4, vertex3, vertex2, vertex1]);
+        let cell4 = cell!(vec![vertex5, vertex4, vertex3, vertex2]);
+
+        assert_eq!(cell1, cell2);
+        // Two cells with the same vertices but different uuids are equal
+        assert_ne!(cell1.uuid(), cell2.uuid());
+        assert_eq!(cell1.vertices(), cell2.vertices());
+        assert_eq!(cell2, cell3);
+        assert_ne!(cell3, cell4);
+    }
+
+    #[test]
+    fn cell_partial_ord() {
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 0.0]);
+        let vertex5 = vertex!([1.0, 1.0, 1.0]);
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
+        let cell2 = cell!(vec![vertex4, vertex3, vertex2, vertex1]);
+        let cell3 = cell!(vec![vertex5, vertex4, vertex3, vertex2]);
+
+        assert!(cell1 < cell3);
+        assert!(cell2 < cell3);
+        assert!(cell3 > cell1);
+        assert!(cell3 > cell2);
+    }
+
+    #[test]
+    fn cell_hash() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        cell1.hash(&mut hasher1);
+        cell2.hash(&mut hasher2);
+
+        // Different UUIDs mean different hashes even with same vertices
+        assert_ne!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn cell_hash_with_neighbors_and_data() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        use uuid::Uuid;
+
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+
+        // Create cells with neighbors and data to test hash implementation
+        let mut cell1: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42);
+        let mut cell2: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42);
+
+        // Set different neighbors to ensure different hashes
+        let neighbor_id1 = Uuid::new_v4();
+        let neighbor_id2 = Uuid::new_v4();
+        cell1.neighbors = Some(vec![neighbor_id1]);
+        cell2.neighbors = Some(vec![neighbor_id2]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        cell1.hash(&mut hasher1);
+        cell2.hash(&mut hasher2);
+
+        // Different neighbors should result in different hashes
+        assert_ne!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn cell_hash_distinct_neighbors() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        use uuid::Uuid;
+
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+
+        // Create two cells with same vertices but different neighbors
+        let mut cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
+            .vertices(vec![vertex1, vertex2, vertex3])
+            .build()
+            .unwrap();
+        let mut cell2 = cell1.clone();
+
+        // Set different neighbors
+        let neighbor_id1 = Uuid::new_v4();
+        let neighbor_id2 = Uuid::new_v4();
+        cell1.neighbors = Some(vec![neighbor_id1]);
+        cell2.neighbors = Some(vec![neighbor_id2]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        cell1.hash(&mut hasher1);
+        cell2.hash(&mut hasher2);
+
+        // Even with same vertices and UUID, different neighbors should produce different hashes
+        assert_ne!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn cell_hash_distinct_data() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+
+        let cell1: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42);
+        let cell2: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 24);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        cell1.hash(&mut hasher1);
+        cell2.hash(&mut hasher2);
+
+        // Different data should result in different hashes
+        assert_ne!(hasher1.finish(), hasher2.finish());
     }
 
     #[test]
     fn cell_clone() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell1: Cell<f64, i32, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .data(42)
-            .build()
-            .unwrap();
+        let vertices = vec![
+            vertex!([0.0, 0.0, 1.0], 1),
+            vertex!([0.0, 1.0, 0.0], 1),
+            vertex!([1.0, 0.0, 0.0], 1),
+            vertex!([1.0, 1.0, 1.0], 2),
+        ];
+        let cell1: Cell<f64, i32, i32, 3> = cell!(vertices, 42);
         let cell2 = cell1.clone();
 
         assert_eq!(cell1, cell2);
     }
 
     #[test]
-    fn cell_from_facet_and_vertex() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let facet = Facet::new(cell, vertex4).unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::origin())
-            .build()
-            .unwrap();
-        let new_cell = Cell::from_facet_and_vertex(&facet, vertex5).unwrap();
+    fn cell_eq_trait() {
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
 
-        assert!(new_cell.vertices().contains(&vertex1));
-        assert!(new_cell.vertices().contains(&vertex2));
-        assert!(new_cell.vertices().contains(&vertex3));
-        assert!(new_cell.vertices().contains(&vertex5));
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell3: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
 
-        // Human readable output for cargo test -- --nocapture
-        println!("New Cell: {new_cell:?}");
+        // Test Eq trait (reflexivity, symmetry) - equality is based on vertices only
+        assert_eq!(cell1, cell1); // reflexive
+        assert_eq!(cell1, cell2); // same vertices
+        assert_eq!(cell2, cell1); // symmetric
+        assert_ne!(cell1, cell3); // different vertices
+        assert_ne!(cell3, cell1); // symmetric
     }
 
     #[test]
-    fn cell_into_hashmap() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let hashmap = Cell::into_hashmap(vec![cell.clone()]);
-        let values: Vec<Cell<f64, i32, Option<()>, 3>> = hashmap.into_values().collect();
+    fn cell_ordering_edge_cases() {
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
 
-        assert_eq!(values.len(), 1);
-        assert_eq!(values[0], cell);
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
 
-        // Human readable output for cargo test -- --nocapture
-        println!("values: {values:?}");
-        println!("cells = {cell:?}");
+        // Test that equal cells are not less than each other
+        assert_ne!(cell1.partial_cmp(&cell2), Some(std::cmp::Ordering::Less));
+        assert_ne!(cell2.partial_cmp(&cell1), Some(std::cmp::Ordering::Less));
+        assert!(cell1 <= cell2);
+        assert!(cell2 <= cell1);
+        assert!(cell1 >= cell2);
+        assert!(cell2 >= cell1);
     }
+    // =============================================================================
+    // CORE CELL METHODS TESTS
+    // =============================================================================
+    // Tests covering core cell functionality including basic properties, containment
+    // checks, facet operations, and other fundamental cell methods.
 
     #[test]
     fn cell_number_of_vertices() {
@@ -952,30 +1212,11 @@ mod tests {
 
     #[test]
     fn cell_contains_vertex() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 1.0], 1);
+        let vertex2 = vertex!([0.0, 1.0, 0.0], 1);
+        let vertex3 = vertex!([1.0, 0.0, 0.0], 1);
+        let vertex4 = vertex!([1.0, 1.0, 1.0], 2);
+        let cell: Cell<f64, i32, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         assert!(cell.contains_vertex(vertex1));
         assert!(cell.contains_vertex(vertex2));
@@ -988,41 +1229,13 @@ mod tests {
 
     #[test]
     fn cell_contains_vertex_of() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .data(42)
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::origin())
-            .data(0)
-            .build()
-            .unwrap();
-        let cell2 = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex5])
-            .data(43)
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 1.0], 1);
+        let vertex2 = vertex!([0.0, 1.0, 0.0], 1);
+        let vertex3 = vertex!([1.0, 0.0, 0.0], 1);
+        let vertex4 = vertex!([1.0, 1.0, 1.0], 2);
+        let cell: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4], 42);
+        let vertex5 = vertex!([0.0, 0.0, 0.0], 0);
+        let cell2 = cell!(vec![vertex1, vertex2, vertex3, vertex5], 43);
 
         assert!(cell.contains_vertex_of(&cell2));
 
@@ -1032,31 +1245,13 @@ mod tests {
 
     #[test]
     fn cell_facets_contains() {
-        let vertex1: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .data(31)
-            .build()
-            .unwrap();
+        let vertices = vec![
+            vertex!([0.0, 0.0, 1.0], 1),
+            vertex!([0.0, 1.0, 0.0], 1),
+            vertex!([1.0, 0.0, 0.0], 1),
+            vertex!([1.0, 1.0, 1.0], 2),
+        ];
+        let cell: Cell<f64, i32, i32, 3> = cell!(vertices, 31);
         let facets = cell.facets();
 
         assert_eq!(facets.len(), 4);
@@ -1070,339 +1265,76 @@ mod tests {
         println!("Facets: {facets:?}");
     }
 
-    #[test]
-    fn cell_to_and_from_json() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let serialized = serde_json::to_string(&cell).unwrap();
-
-        assert!(serialized.contains("[0.0,0.0,1.0]"));
-        assert!(serialized.contains("[0.0,1.0,0.0]"));
-        assert!(serialized.contains("[1.0,0.0,0.0]"));
-        assert!(serialized.contains("[1.0,1.0,1.0]"));
-
-        // Test deserialization with manual Deserialize implementation
-        let deserialized: Cell<f64, Option<()>, Option<()>, 3> =
-            serde_json::from_str(&serialized).unwrap();
-
-        // Check that deserialized cell has same number of vertices and properties
-        assert_eq!(deserialized.vertices().len(), cell.vertices().len());
-        assert_eq!(deserialized.dim(), cell.dim());
-        assert_eq!(deserialized.neighbors, cell.neighbors);
-        assert_eq!(deserialized.data, cell.data);
-        // Note: UUID will be the same as it's loaded from serialized data
-        assert_eq!(deserialized.uuid(), cell.uuid());
-
-        // Check that vertices have the same coordinates
-        for (original_vertex, deserialized_vertex) in
-            cell.vertices().iter().zip(deserialized.vertices().iter())
-        {
-            assert_relative_eq!(
-                original_vertex.point().to_array().as_slice(),
-                deserialized_vertex.point().to_array().as_slice(),
-                epsilon = f64::EPSILON
-            );
-        }
-
-        // Human readable output for cargo test -- --nocapture
-        println!("Serialized: {serialized:?}");
-    }
-
-    #[test]
-    fn cell_partial_eq() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::origin())
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let cell2 = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let cell3 = CellBuilder::default()
-            .vertices(vec![vertex4, vertex3, vertex2, vertex1])
-            .build()
-            .unwrap();
-        let cell4 = CellBuilder::default()
-            .vertices(vec![vertex5, vertex4, vertex3, vertex2])
-            .build()
-            .unwrap();
-
-        assert_eq!(cell1, cell2);
-        // Two cells with the same vertices but different uuids are equal
-        assert_ne!(cell1.uuid(), cell2.uuid());
-        assert_eq!(cell1.vertices(), cell2.vertices());
-        assert_eq!(cell2, cell3);
-        assert_ne!(cell3, cell4);
-    }
-
-    #[test]
-    fn cell_partial_ord() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::origin())
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .build()
-            .unwrap();
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
-        let cell2 = CellBuilder::default()
-            .vertices(vec![vertex4, vertex3, vertex2, vertex1])
-            .build()
-            .unwrap();
-        let cell3 = CellBuilder::default()
-            .vertices(vec![vertex5, vertex4, vertex3, vertex2])
-            .build()
-            .unwrap();
-
-        assert!(cell1 < cell3);
-        assert!(cell2 < cell3);
-        assert!(cell3 > cell1);
-        assert!(cell3 > cell2);
-    }
-
-    #[test]
-    fn cell_hash() {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-
-        let mut hasher1 = DefaultHasher::new();
-        let mut hasher2 = DefaultHasher::new();
-
-        cell1.hash(&mut hasher1);
-        cell2.hash(&mut hasher2);
-
-        // Different UUIDs mean different hashes even with same vertices
-        assert_ne!(hasher1.finish(), hasher2.finish());
-    }
-
-    #[test]
-    fn cell_default() {
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = Cell::default();
-
-        assert!(cell.vertices().is_empty());
-        assert!(cell.uuid().is_nil());
-        assert!(cell.neighbors.is_none());
-        assert!(cell.data.is_none());
-    }
+    // =============================================================================
+    // DIMENSIONAL TESTS
+    // =============================================================================
+    // Tests covering cells in different dimensions (1D, 2D, 3D, 4D+) and
+    // various coordinate types (f32, f64) to ensure dimensional flexibility.
 
     #[test]
     fn cell_1d() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0]))
-            .build()
-            .unwrap();
+        let vertices = vec![vertex!([0.0]), vertex!([1.0])];
+        let cell: Cell<f64, Option<()>, Option<()>, 1> = cell!(vertices);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 1> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-
-        assert_eq!(cell.number_of_vertices(), 2);
-        assert_eq!(cell.dim(), 1);
-        assert!(!cell.uuid().is_nil());
+        assert_cell_properties(&cell, 2, 1);
     }
 
     #[test]
     fn cell_2d() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertices = vec![
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
+        ];
+        let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-
-        assert_eq!(cell.number_of_vertices(), 3);
-        assert_eq!(cell.dim(), 2);
-        assert!(!cell.uuid().is_nil());
+        assert_cell_properties(&cell, 3, 2);
     }
 
     #[test]
     fn cell_4d() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 0.0, 1.0]),
+        ];
+        let cell: Cell<f64, Option<()>, Option<()>, 4> = cell!(vertices);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 4> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5])
-            .build()
-            .unwrap();
-
-        assert_eq!(cell.number_of_vertices(), 5);
-        assert_eq!(cell.dim(), 4);
-        assert!(!cell.uuid().is_nil());
+        assert_cell_properties(&cell, 5, 4);
     }
 
     #[test]
     fn cell_with_f32() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0f32, 0.0f32]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0f32, 0.0f32]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0f32, 1.0f32]))
-            .build()
-            .unwrap();
-
-        let cell: Cell<f32, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let vertices = vec![
+            vertex!([0.0f32, 0.0f32]),
+            vertex!([1.0f32, 0.0f32]),
+            vertex!([0.0f32, 1.0f32]),
+        ];
+        let cell: Cell<f32, Option<()>, Option<()>, 2> = cell!(vertices);
 
         assert_eq!(cell.number_of_vertices(), 3);
         assert_eq!(cell.dim(), 2);
+        assert!(!cell.uuid().is_nil());
     }
 
     #[test]
     fn cell_single_vertex() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertices = vec![vertex!([0.0, 0.0, 0.0])];
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1])
-            .build()
-            .unwrap();
-
-        assert_eq!(cell.number_of_vertices(), 1);
-        assert_eq!(cell.dim(), 0);
+        assert_cell_properties(&cell, 1, 0);
     }
 
     #[test]
     fn cell_uuid_uniqueness() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
 
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
 
         // Same vertices but different UUIDs
         assert_ne!(cell1.uuid(), cell2.uuid());
@@ -1412,50 +1344,28 @@ mod tests {
 
     #[test]
     fn cell_neighbors_none_by_default() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
 
         assert!(cell.neighbors.is_none());
     }
 
     #[test]
     fn cell_data_none_by_default() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1]);
 
         assert!(cell.data.is_none());
     }
 
     #[test]
     fn cell_data_can_be_set() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
 
-        let cell: Cell<f64, Option<()>, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1])
-            .data(42)
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1], 42);
 
         assert_eq!(cell.data.unwrap(), 42);
     }
@@ -1470,27 +1380,12 @@ mod tests {
 
     #[test]
     fn cell_into_hashmap_multiple() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
 
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex2, vertex3]);
 
         let uuid1 = cell1.uuid();
         let uuid2 = cell2.uuid();
@@ -1504,20 +1399,10 @@ mod tests {
 
     #[test]
     fn cell_debug_format() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([4.0, 5.0, 6.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([1.0, 2.0, 3.0]);
+        let vertex2 = vertex!([4.0, 5.0, 6.0]);
 
-        let cell: Cell<f64, Option<()>, i32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .data(42)
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2], 42);
         let debug_str = format!("{cell:?}");
 
         assert!(debug_str.contains("Cell"));
@@ -1528,44 +1413,55 @@ mod tests {
         assert!(debug_str.contains("3.0"));
     }
 
+    // =============================================================================
+    // COMPREHENSIVE SERIALIZATION TESTS
+    // =============================================================================
+    // Tests covering cell serialization and deserialization with different
+    // data types, dimensions, and configurations using serde_json.
+
+    #[test]
+    fn cell_to_and_from_json() {
+        let vertices = vec![
+            vertex!([1.0, 2.0, 3.0]),
+            vertex!([4.0, 5.0, 6.0]),
+            vertex!([7.0, 8.0, 9.0]),
+        ];
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
+        let serialized = serde_json::to_string(&cell).unwrap();
+
+        assert!(serialized.contains("vertices"));
+        assert!(serialized.contains("[1.0,2.0,3.0]"));
+        assert!(serialized.contains("uuid"));
+
+        // Test deserialization
+        let deserialized: Cell<f64, Option<()>, Option<()>, 3> =
+            serde_json::from_str(&serialized).unwrap();
+
+        // Check that deserialized cell has same properties
+        assert_eq!(deserialized.number_of_vertices(), cell.number_of_vertices());
+        assert_eq!(deserialized.dim(), cell.dim());
+        assert_eq!(deserialized.data, cell.data);
+        assert_eq!(deserialized.neighbors, cell.neighbors);
+        assert_eq!(deserialized.uuid(), cell.uuid());
+        assert_eq!(deserialized, cell);
+    }
+
     #[test]
     fn cell_comprehensive_serialization() {
         // Test with different data types and dimensions
-        let vertex_2d_1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0]))
-            .build()
-            .unwrap();
-        let vertex_2d_2 = VertexBuilder::default()
-            .point(Point::new([3.0, 4.0]))
-            .build()
-            .unwrap();
-        let vertex_2d_3 = VertexBuilder::default()
-            .point(Point::new([5.0, 6.0]))
-            .build()
-            .unwrap();
-
-        let cell_2d: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex_2d_1, vertex_2d_2, vertex_2d_3])
-            .build()
-            .unwrap();
+        let vertices_2d = vec![
+            vertex!([1.0, 2.0]),
+            vertex!([3.0, 4.0]),
+            vertex!([5.0, 6.0]),
+        ];
+        let cell_2d: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices_2d);
         let serialized_2d = serde_json::to_string(&cell_2d).unwrap();
         let deserialized_2d: Cell<f64, Option<()>, Option<()>, 2> =
             serde_json::from_str(&serialized_2d).unwrap();
         assert_eq!(cell_2d, deserialized_2d);
 
-        let vertex_1d_1 = VertexBuilder::default()
-            .point(Point::new([42.0]))
-            .build()
-            .unwrap();
-        let vertex_1d_2 = VertexBuilder::default()
-            .point(Point::new([84.0]))
-            .build()
-            .unwrap();
-
-        let cell_1d: Cell<f64, Option<()>, Option<()>, 1> = CellBuilder::default()
-            .vertices(vec![vertex_1d_1, vertex_1d_2])
-            .build()
-            .unwrap();
+        let vertices_1d = vec![vertex!([42.0]), vertex!([84.0])];
+        let cell_1d: Cell<f64, Option<()>, Option<()>, 1> = cell!(vertices_1d);
         let serialized_1d = serde_json::to_string(&cell_1d).unwrap();
         let deserialized_1d: Cell<f64, Option<()>, Option<()>, 1> =
             serde_json::from_str(&serialized_1d).unwrap();
@@ -1573,20 +1469,109 @@ mod tests {
     }
 
     #[test]
-    fn cell_negative_coordinates() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([-1.0, -2.0, -3.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([-4.0, -5.0, -6.0]))
-            .build()
-            .unwrap();
+    fn cell_serialization_with_data() {
+        // Test serialization with cell data
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0], 1),
+            vertex!([1.0, 0.0, 0.0], 2),
+            vertex!([0.0, 1.0, 0.0], 3),
+        ];
+        let cell: Cell<f64, i32, i32, 3> = cell!(vertices, 42);
+        let serialized = serde_json::to_string(&cell).unwrap();
+        let deserialized: Cell<f64, i32, i32, 3> = serde_json::from_str(&serialized).unwrap();
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        assert_eq!(cell, deserialized);
+        assert_eq!(cell.data.unwrap(), deserialized.data.unwrap());
+        assert_eq!(
+            cell.vertices()[0].data.unwrap(),
+            deserialized.vertices()[0].data.unwrap()
+        );
+    }
+
+    #[test]
+    fn cell_serialization_different_dimensions() {
+        // Test 4D cell serialization
+        let vertices_4d = vec![
+            vertex!([0.0, 0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 0.0, 1.0]),
+        ];
+        let cell_4d: Cell<f64, Option<()>, Option<()>, 4> = cell!(vertices_4d);
+        let serialized_4d = serde_json::to_string(&cell_4d).unwrap();
+        let deserialized_4d: Cell<f64, Option<()>, Option<()>, 4> =
+            serde_json::from_str(&serialized_4d).unwrap();
+
+        assert_eq!(cell_4d, deserialized_4d);
+        assert_eq!(cell_4d.dim(), 4);
+        assert_eq!(deserialized_4d.dim(), 4);
+    }
+
+    #[test]
+    fn cell_deserialization_error_cases() {
+        // Test deserialization with duplicate fields to cover error paths
+        let invalid_json_duplicate_vertices = r#"{
+            "vertices": [],
+            "vertices": [],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000"
+        }"#;
+        let result: Result<Cell<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(invalid_json_duplicate_vertices);
+        assert!(result.is_err());
+
+        let invalid_json_duplicate_uuid = r#"{
+            "vertices": [],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "uuid": "550e8400-e29b-41d4-a716-446655440001"
+        }"#;
+        let result: Result<Cell<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(invalid_json_duplicate_uuid);
+        assert!(result.is_err());
+
+        let invalid_json_duplicate_neighbors = r#"{
+            "vertices": [],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "neighbors": null,
+            "neighbors": null
+        }"#;
+        let result: Result<Cell<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(invalid_json_duplicate_neighbors);
+        assert!(result.is_err());
+
+        let invalid_json_duplicate_data = r#"{
+            "vertices": [],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "data": null,
+            "data": null
+        }"#;
+        let result: Result<Cell<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(invalid_json_duplicate_data);
+        assert!(result.is_err());
+
+        // Test deserialization with unknown fields
+        let json_unknown_field = r#"{
+            "vertices": [],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "unknown_field": "value"
+        }"#;
+        let result: Result<Cell<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(json_unknown_field);
+        // Should succeed - unknown fields are ignored
+        assert!(result.is_ok());
+    }
+
+    // =============================================================================
+    // GEOMETRIC PROPERTIES TESTS
+    // =============================================================================
+    // Tests for geometric properties and validation of cells
+
+    #[test]
+    fn cell_negative_coordinates() {
+        let vertex1 = vertex!([-1.0, -2.0, -3.0]);
+        let vertex2 = vertex!([-4.0, -5.0, -6.0]);
+
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
@@ -1594,19 +1579,10 @@ mod tests {
 
     #[test]
     fn cell_large_coordinates() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1e6, 2e6, 3e6]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([4e6, 5e6, 6e6]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([1e6, 2e6, 3e6]);
+        let vertex2 = vertex!([4e6, 5e6, 6e6]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
@@ -1614,108 +1590,22 @@ mod tests {
 
     #[test]
     fn cell_small_coordinates() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1e-6, 2e-6, 3e-6]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([4e-6, 5e-6, 6e-6]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([1e-6, 2e-6, 3e-6]);
+        let vertex2 = vertex!([4e-6, 5e-6, 6e-6]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2]);
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
     }
 
     #[test]
-    fn cell_ordering_edge_cases() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-
-        // Test that equal cells are not less than each other
-        assert_ne!(cell1.partial_cmp(&cell2), Some(std::cmp::Ordering::Less));
-        assert_ne!(cell2.partial_cmp(&cell1), Some(std::cmp::Ordering::Less));
-        assert!(cell1 <= cell2);
-        assert!(cell2 <= cell1);
-        assert!(cell1 >= cell2);
-        assert!(cell2 >= cell1);
-    }
-
-    #[test]
-    fn cell_eq_trait() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let cell3: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
-
-        // Test Eq trait (reflexivity, symmetry) - equality is based on vertices only
-        assert_eq!(cell1, cell1); // reflexive
-        assert_eq!(cell1, cell2); // same vertices
-        assert_eq!(cell2, cell1); // symmetric
-        assert_ne!(cell1, cell3); // different vertices
-        assert_ne!(cell3, cell1); // symmetric
-    }
-
-    #[test]
     fn cell_circumradius_2d() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![vertex1, vertex2, vertex3]);
         let circumradius =
             circumradius(&cell.vertices.iter().map(Point::from).collect::<Vec<_>>()).unwrap();
 
@@ -1726,19 +1616,10 @@ mod tests {
 
     #[test]
     fn cell_mixed_positive_negative_coordinates() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, -2.0, 3.0, -4.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([-5.0, 6.0, -7.0, 8.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([1.0, -2.0, 3.0, -4.0]);
+        let vertex2 = vertex!([-5.0, 6.0, -7.0, 8.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 4> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 4> = cell!(vec![vertex1, vertex2]);
 
         assert_eq!(cell.number_of_vertices(), 2);
         assert_eq!(cell.dim(), 1);
@@ -1746,80 +1627,35 @@ mod tests {
 
     #[test]
     fn cell_contains_vertex_false() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([2.0, 2.0, 2.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
 
         assert!(!cell.contains_vertex(vertex4));
     }
 
     #[test]
     fn cell_contains_vertex_of_false() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([2.0, 2.0, 2.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([3.0, 3.0, 3.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([2.0, 2.0, 2.0]);
+        let vertex5 = vertex!([3.0, 3.0, 3.0]);
 
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex4, vertex5])
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex4, vertex5]);
 
         assert!(!cell1.contains_vertex_of(&cell2));
     }
 
     #[test]
     fn cell_validation_max_vertices() {
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0]);
 
         // This should work (3 vertices for 2D)
         let cell: Result<Cell<f64, Option<()>, Option<()>, 2>, CellBuilderError> =
@@ -1835,48 +1671,21 @@ mod tests {
     fn cell_circumsphere_contains_vertex_determinant() {
         // Test the matrix determinant method for circumsphere containment
         // Use a simple, well-known case: unit tetrahedron
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let cell: Cell<f64, i32, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0], 1);
+        let vertex2 = vertex!([1.0, 0.0, 0.0], 1);
+        let vertex3 = vertex!([0.0, 1.0, 0.0], 1);
+        let vertex4 = vertex!([0.0, 0.0, 1.0], 2);
+        let cell: Cell<f64, i32, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         // Test vertex clearly outside circumsphere
-        let vertex_far_outside: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0, 10.0]))
-            .data(4)
-            .build()
-            .unwrap();
+        let vertex_far_outside: Vertex<f64, i32, 3> = vertex!([10.0, 10.0, 10.0], 4);
         // Just check that the method runs without error for now
         let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(Point::from).collect();
         let result = insphere(&vertex_points, *vertex_far_outside.point());
         assert!(result.is_ok());
 
         // Test with origin (should be inside or on boundary)
-        let origin: Vertex<f64, i32, 3> = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap();
+        let origin: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 0.0], 3);
         let vertex_points: Vec<Point<f64, 3>> = cell.vertices.iter().map(Point::from).collect();
         let result_origin = insphere(&vertex_points, *origin.point());
         assert!(result_origin.is_ok());
@@ -1885,38 +1694,20 @@ mod tests {
     #[test]
     fn cell_circumsphere_contains_vertex_2d() {
         // Test 2D case for circumsphere containment using determinant method
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![vertex1, vertex2, vertex3]);
 
         // Test vertex far outside circumcircle
-        let vertex_far_outside: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
-            .point(Point::new([10.0, 10.0]))
-            .build()
-            .unwrap();
+        let vertex_far_outside: Vertex<f64, Option<()>, 2> = vertex!([10.0, 10.0]);
         let vertex_points: Vec<Point<f64, 2>> = cell.vertices.iter().map(|v| *v.point()).collect();
         let result = insphere(&vertex_points, *vertex_far_outside.point());
         assert!(result.is_ok());
 
         // Test with center of triangle (should be inside)
-        let center: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
-            .point(Point::new([0.33, 0.33]))
-            .build()
-            .unwrap();
+        let center: Vertex<f64, Option<()>, 2> = vertex!([0.33, 0.33]);
         let vertex_points: Vec<Point<f64, 2>> = cell.vertices.iter().map(|v| *v.point()).collect();
         let result_center = insphere(&vertex_points, *center.point());
         assert!(result_center.is_ok());
@@ -1925,27 +1716,13 @@ mod tests {
     #[test]
     fn cell_circumradius_with_center() {
         // Test the circumradius_with_center method
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         let circumcenter =
             circumcenter(&cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>()).unwrap();
@@ -1962,27 +1739,13 @@ mod tests {
     #[test]
     fn cell_facets_completeness() {
         // Test that facets are generated correctly and completely
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         let facets = cell.facets();
         assert_eq!(facets.len(), 4); // A tetrahedron should have 4 facets
@@ -2004,22 +1767,10 @@ mod tests {
     #[test]
     fn cell_builder_validation_edge_cases() {
         // Test builder validation with exactly D+1 vertices (should work)
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
         // Exactly 4 vertices for 3D (D+1 = 3+1 = 4) should work
         let cell_result: Result<Cell<f64, Option<()>, Option<()>, 3>, CellBuilderError> =
@@ -2029,10 +1780,7 @@ mod tests {
         assert!(cell_result.is_ok());
 
         // Test with D+2 vertices (should fail)
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex5 = vertex!([1.0, 1.0, 1.0]);
         let cell_too_many: Result<Cell<f64, Option<()>, Option<()>, 3>, CellBuilderError> =
             CellBuilder::default()
                 .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5])
@@ -2043,22 +1791,10 @@ mod tests {
     #[test]
     fn cell_from_facet_and_vertex_comprehensive() {
         // More comprehensive test of from_facet_and_vertex
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
         let original_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
@@ -2069,10 +1805,7 @@ mod tests {
         let facet = Facet::new(original_cell, vertex4).unwrap();
 
         // Create a new vertex
-        let new_vertex = VertexBuilder::default()
-            .point(Point::new([1.0, 1.0, 1.0]))
-            .build()
-            .unwrap();
+        let new_vertex = vertex!([1.0, 1.0, 1.0]);
 
         // Create new cell from facet and vertex
         let new_cell = Cell::from_facet_and_vertex(&facet, new_vertex).unwrap();
@@ -2091,18 +1824,9 @@ mod tests {
     fn cell_different_numeric_types() {
         // Test with different numeric types to ensure type flexibility
         // Test with f32
-        let vertex1_f32 = VertexBuilder::default()
-            .point(Point::new([0.0f32, 0.0f32]))
-            .build()
-            .unwrap();
-        let vertex2_f32 = VertexBuilder::default()
-            .point(Point::new([1.0f32, 0.0f32]))
-            .build()
-            .unwrap();
-        let vertex3_f32 = VertexBuilder::default()
-            .point(Point::new([0.0f32, 1.0f32]))
-            .build()
-            .unwrap();
+        let vertex1_f32 = vertex!([0.0f32, 0.0f32]);
+        let vertex2_f32 = vertex!([1.0f32, 0.0f32]);
+        let vertex3_f32 = vertex!([0.0f32, 1.0f32]);
 
         let cell_f32: Cell<f32, Option<()>, Option<()>, 2> = CellBuilder::default()
             .vertices(vec![vertex1_f32, vertex2_f32, vertex3_f32])
@@ -2115,30 +1839,12 @@ mod tests {
     #[test]
     fn cell_high_dimensional() {
         // Test with higher dimensions (5D)
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex6 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0, 0.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0, 0.0, 0.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0, 0.0, 0.0]);
+        let vertex5 = vertex!([0.0, 0.0, 0.0, 1.0, 0.0]);
+        let vertex6 = vertex!([0.0, 0.0, 0.0, 0.0, 1.0]);
 
         let cell: Cell<f64, Option<()>, Option<()>, 5> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6])
@@ -2153,21 +1859,9 @@ mod tests {
     #[test]
     fn cell_vertex_data_consistency() {
         // Test cells with vertices that have different data types
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .data(1)
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .data(2)
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .data(3)
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 0.0], 1);
+        let vertex2 = vertex!([1.0, 0.0, 0.0], 2);
+        let vertex3 = vertex!([0.0, 1.0, 0.0], 3);
 
         let cell: Cell<f64, i32, u32, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3])
@@ -2184,18 +1878,9 @@ mod tests {
     #[test]
     fn cell_circumsphere_edge_cases() {
         // Test circumsphere containment with simple cases
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0]);
+        let vertex3 = vertex!([0.0, 1.0]);
 
         let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3])
@@ -2203,10 +1888,7 @@ mod tests {
             .unwrap();
 
         // Test that the methods run without error
-        let test_point: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
-            .point(Point::new([0.5, 0.5]))
-            .build()
-            .unwrap();
+        let test_point: Vertex<f64, Option<()>, 2> = vertex!([0.5, 0.5]);
 
         let circumsphere_result = insphere_distance(
             &cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>(),
@@ -2219,10 +1901,7 @@ mod tests {
         assert!(determinant_result.is_ok());
 
         // At minimum, both methods should give the same result for the same input
-        let far_point: Vertex<f64, Option<()>, 2> = VertexBuilder::default()
-            .point(Point::new([100.0, 100.0]))
-            .build()
-            .unwrap();
+        let far_point: Vertex<f64, Option<()>, 2> = vertex!([100.0, 100.0]);
 
         let circumsphere_far = insphere_distance(
             &cell.vertices.iter().map(|v| *v.point()).collect::<Vec<_>>(),
@@ -2238,26 +1917,13 @@ mod tests {
     #[test]
     fn cell_is_valid_correct_cell() {
         // Test cell is_valid with valid vertices (exactly D+1 = 4 vertices for 3D)
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let vertices = vec![
+            vertex!([0.0, 0.0, 1.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 0.0, 0.0]),
+        ];
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
 
         // Human readable output for cargo test -- --nocapture
         println!("Valid Cell: {cell:?}");
@@ -2267,22 +1933,10 @@ mod tests {
     #[test]
     fn cell_is_valid_invalid_vertex_error() {
         // Test cell is_valid with invalid vertices (containing NaN)
-        let vertex_invalid = VertexBuilder::default()
-            .point(Point::new([f64::NAN, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex_valid1 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex_valid2 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex_valid3 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
+        let vertex_invalid = vertex!([f64::NAN, 0.0, 0.0]);
+        let vertex_valid1 = vertex!([0.0, 1.0, 0.0]);
+        let vertex_valid2 = vertex!([1.0, 0.0, 0.0]);
+        let vertex_valid3 = vertex!([0.0, 0.0, 1.0]);
         let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![
                 vertex_invalid,
@@ -2315,22 +1969,10 @@ mod tests {
     #[test]
     fn cell_is_valid_invalid_uuid_error() {
         // Test cell is_valid with nil UUID
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 0.0]);
         let mut invalid_uuid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
             .vertices(vec![vertex1, vertex2, vertex3, vertex4])
             .build()

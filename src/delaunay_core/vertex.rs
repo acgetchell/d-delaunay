@@ -102,7 +102,6 @@ pub enum VertexValidationError {
 /// ```rust
 /// use d_delaunay::vertex;
 /// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::geometry::traits::coordinate::Coordinate;
 ///
 /// // Create a vertex without data (explicit type annotation required)
 /// let v1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
@@ -115,7 +114,7 @@ macro_rules! vertex {
     // Pattern 1: Just coordinates - no data
     ($coords:expr) => {
         $crate::delaunay_core::vertex::VertexBuilder::default()
-            .point($crate::geometry::point::Point::new($coords))
+            .point($crate::geometry::point::Point::from($coords))
             .build()
             .expect("Failed to build vertex: invalid coordinates or builder configuration")
     };
@@ -123,7 +122,7 @@ macro_rules! vertex {
     // Pattern 2: Coordinates with data
     ($coords:expr, $data:expr) => {
         $crate::delaunay_core::vertex::VertexBuilder::default()
-            .point($crate::geometry::point::Point::new($coords))
+            .point($crate::geometry::point::Point::from($coords))
             .data($data)
             .build()
             .expect("Failed to build vertex with data: invalid coordinates, data, or builder configuration")
