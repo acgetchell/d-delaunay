@@ -89,15 +89,6 @@ where
         self.coords.get(index).copied()
     }
 
-    /// Create an origin point (all coordinates are zero)
-    #[inline]
-    fn origin() -> Self
-    where
-        T: num_traits::Zero,
-    {
-        Self::new([T::zero(); D])
-    }
-
     /// Validate that all coordinates are finite (no NaN or infinite values)
     fn validate(&self) -> Result<(), CoordinateValidationError> {
         // Verify all coordinates are finite
