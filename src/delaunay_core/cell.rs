@@ -928,33 +928,6 @@ mod tests {
     }
 
     #[test]
-    fn cell_macro_with_different_data_types() {
-        use ordered_float::OrderedFloat;
-        // Test the cell! macro with various valid DataType types
-        let vertices = vec![
-            vertex!([0.0, 0.0]),
-            vertex!([1.0, 0.0]),
-            vertex!([0.0, 1.0]),
-        ];
-
-        // Test with u32 data
-        let cell_u32: Cell<f64, Option<()>, u32, 2> = cell!(vertices.clone(), 123u32);
-        assert_eq!(cell_u32.data.unwrap(), 123u32);
-
-        // Test with char array data (representing "hello")
-        let hello_array: [char; 5] = ['h', 'e', 'l', 'l', 'o'];
-        let cell_chars: Cell<f64, Option<()>, [char; 5], 2> = cell!(vertices.clone(), hello_array);
-        assert_eq!(cell_chars.data.unwrap(), hello_array);
-
-        // Test with tuple data (using types OrderedFloat<f64> that implement Hash and Ord)
-        let tuple_data: (OrderedFloat<f64>, OrderedFloat<f64>) =
-            (OrderedFloat(42.0), OrderedFloat(3.15));
-        let cell_tuple: Cell<f64, Option<()>, (OrderedFloat<f64>, OrderedFloat<f64>), 2> =
-            cell!(vertices, tuple_data);
-        assert_eq!(cell_tuple.data.unwrap(), tuple_data);
-    }
-
-    #[test]
     fn cell_macro_equivalence_with_builder() {
         // Test that the cell! macro produces equivalent results to CellBuilder
         let vertices = vec![
@@ -1447,48 +1420,6 @@ mod tests {
     }
 
     #[test]
-    fn cell_comprehensive_serialization() {
-        // Test with different data types and dimensions
-        let vertices_2d = vec![
-            vertex!([1.0, 2.0]),
-            vertex!([3.0, 4.0]),
-            vertex!([5.0, 6.0]),
-        ];
-        let cell_2d: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices_2d);
-        let serialized_2d = serde_json::to_string(&cell_2d).unwrap();
-        let deserialized_2d: Cell<f64, Option<()>, Option<()>, 2> =
-            serde_json::from_str(&serialized_2d).unwrap();
-        assert_eq!(cell_2d, deserialized_2d);
-
-        let vertices_1d = vec![vertex!([42.0]), vertex!([84.0])];
-        let cell_1d: Cell<f64, Option<()>, Option<()>, 1> = cell!(vertices_1d);
-        let serialized_1d = serde_json::to_string(&cell_1d).unwrap();
-        let deserialized_1d: Cell<f64, Option<()>, Option<()>, 1> =
-            serde_json::from_str(&serialized_1d).unwrap();
-        assert_eq!(cell_1d, deserialized_1d);
-    }
-
-    #[test]
-    fn cell_serialization_with_data() {
-        // Test serialization with cell data
-        let vertices = vec![
-            vertex!([0.0, 0.0, 0.0], 1),
-            vertex!([1.0, 0.0, 0.0], 2),
-            vertex!([0.0, 1.0, 0.0], 3),
-        ];
-        let cell: Cell<f64, i32, i32, 3> = cell!(vertices, 42);
-        let serialized = serde_json::to_string(&cell).unwrap();
-        let deserialized: Cell<f64, i32, i32, 3> = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(cell, deserialized);
-        assert_eq!(cell.data.unwrap(), deserialized.data.unwrap());
-        assert_eq!(
-            cell.vertices()[0].data.unwrap(),
-            deserialized.vertices()[0].data.unwrap()
-        );
-    }
-
-    #[test]
     fn cell_serialization_different_dimensions() {
         // Test 4D cell serialization
         let vertices_4d = vec![
@@ -1559,6 +1490,24 @@ mod tests {
             serde_json::from_str(json_unknown_field);
         // Should succeed - unknown fields are ignored
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn cell_deserialization_duplicate_vertex_field() {
+        // Test deserialization with duplicate "vertex" fields
+        // Since "vertex" is not a valid field in Cell, the unknown fields are ignored
+        // and we get an error about missing the required "vertices" field
+        let invalid_json_duplicate_vertex = r#"{
+            "vertex": [],
+            "vertex": [],
+            "uuid": "550e8400-e29b-41d4-a716-446655440000"
+        }"#;
+        let result: Result<Cell<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(invalid_json_duplicate_vertex);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        // The deserializer should fail with missing field "vertices" since "vertex" is unknown
+        assert!(error_message.contains("missing field") && error_message.contains("vertices"));
     }
 
     // =============================================================================

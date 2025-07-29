@@ -135,14 +135,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn utilities_uuid() {
-        let uuid = make_uuid();
-
-        assert_eq!(uuid.get_version_num(), 4);
-        assert_ne!(uuid, make_uuid());
-    }
-
-    #[test]
     fn utilities_make_uuid_uniqueness() {
         let uuid1 = make_uuid();
         let uuid2 = make_uuid();
@@ -179,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn utilities_find_min_coordinate() {
+    fn utilities_find_extreme_coordinates_min_max() {
         let points = vec![
             Point::new([-1.0, 2.0, 3.0]),
             Point::new([4.0, -5.0, 6.0]),
@@ -188,30 +180,15 @@ mod tests {
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+
         let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(
             min_coords.as_slice(),
             [-1.0, -5.0, -9.0].as_slice(),
             epsilon = 1e-9
         );
-
-        // Human readable output for cargo test -- --nocapture
-        println!("min_coords = {min_coords:?}");
-    }
-
-    #[test]
-    fn utilities_find_max_coordinate() {
-        let points = vec![
-            Point::new([-1.0, 2.0, 3.0]),
-            Point::new([4.0, -5.0, 6.0]),
-            Point::new([7.0, 8.0, -9.0]),
-        ];
-        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
-
         assert_relative_eq!(
             max_coords.as_slice(),
             [7.0, 8.0, 6.0].as_slice(),
@@ -219,19 +196,8 @@ mod tests {
         );
 
         // Human readable output for cargo test -- --nocapture
+        println!("min_coords = {min_coords:?}");
         println!("max_coords = {max_coords:?}");
-    }
-
-    #[test]
-    fn utilities_find_extreme_coordinates_empty() {
-        let empty_hashmap: HashMap<Uuid, crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            HashMap::new();
-        let min_coords_result = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
-        let max_coords_result = find_extreme_coordinates(&empty_hashmap, Ordering::Greater);
-
-        // With empty hashmap, should return an error
-        assert!(min_coords_result.is_err());
-        assert!(max_coords_result.is_err());
     }
 
     #[test]
@@ -397,6 +363,82 @@ mod tests {
         assert_relative_eq!(
             max_coords.as_slice(),
             [1e15, 1e9, 1e12].as_slice(),
+            epsilon = 1e-9
+        );
+    }
+
+    #[test]
+    fn utilities_find_extreme_coordinates_with_f32() {
+        // Test with f32 type to ensure generic type coverage
+        let points = vec![
+            Point::new([1.5f32, 2.5f32, 3.5f32]),
+            Point::new([0.5f32, 4.5f32, 1.5f32]),
+            Point::new([2.5f32, 1.5f32, 2.5f32]),
+        ];
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f32, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
+        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [0.5f32, 1.5f32, 1.5f32].as_slice(),
+            epsilon = 1e-6
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [2.5f32, 4.5f32, 3.5f32].as_slice(),
+            epsilon = 1e-6
+        );
+    }
+
+    #[test]
+    fn utilities_find_extreme_coordinates_empty_error_message() {
+        // Test that the correct error message is returned for empty hashmap
+        let empty_hashmap: HashMap<Uuid, crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            HashMap::new();
+        let result = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
+
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("Cannot find extreme coordinates"));
+        assert!(error_message.contains("vertices HashMap is empty"));
+    }
+
+    #[test]
+    fn utilities_find_extreme_coordinates_custom_hasher() {
+        // Test with a custom hasher to ensure the generic hasher parameter works
+        use std::collections::HashMap;
+        use std::collections::hash_map::RandomState;
+
+        let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 1.0, 2.0])];
+        let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
+            crate::delaunay_core::vertex::Vertex::from_points(points);
+
+        // Create HashMap with explicit RandomState hasher
+        let mut hashmap: HashMap<
+            Uuid,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+            RandomState,
+        > = HashMap::with_hasher(RandomState::new());
+
+        for vertex in vertices {
+            hashmap.insert(vertex.uuid(), vertex);
+        }
+
+        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+
+        assert_relative_eq!(
+            min_coords.as_slice(),
+            [1.0, 1.0, 2.0].as_slice(),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            max_coords.as_slice(),
+            [4.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
     }

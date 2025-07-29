@@ -35,8 +35,6 @@
 //!     .unwrap();
 //! ```
 
-#![allow(clippy::similar_names)]
-
 // =============================================================================
 // IMPORTS
 // =============================================================================
@@ -704,46 +702,6 @@ mod tests {
     }
 
     #[test]
-    fn vertex_builder() {
-        let mut vertex: Vertex<f64, i32, 3> = vertex!([1.0, 2.0, 3.0]);
-
-        assert_relative_eq!(
-            vertex.point().to_array().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid().is_nil());
-        assert!(vertex.incident_cell.is_none());
-        assert!(vertex.data.is_none());
-
-        // Can mutate later
-        vertex.data = Some(42);
-        assert_eq!(vertex.data.unwrap(), 42);
-
-        // Human readable output for cargo test -- --nocapture
-        println!("{vertex:?}");
-    }
-
-    #[test]
-    fn vertex_builder_with_data() {
-        let vertex: Vertex<f64, i32, 3> = vertex!([1.0, 2.0, 3.0], 1);
-
-        assert_relative_eq!(
-            vertex.point().to_array().as_slice(),
-            [1.0, 2.0, 3.0].as_slice(),
-            epsilon = 1e-9
-        );
-        assert_eq!(vertex.dim(), 3);
-        assert!(!vertex.uuid().is_nil());
-        assert!(vertex.incident_cell.is_none());
-        assert_eq!(vertex.data.unwrap(), 1);
-
-        // Human readable output for cargo test -- --nocapture
-        println!("{vertex:?}");
-    }
-
-    #[test]
     fn vertex_copy() {
         let vertex: Vertex<f64, u8, 4> = vertex!([1.0, 2.0, 3.0, 4.0], 4u8);
         let vertex_copy = vertex;
@@ -809,12 +767,6 @@ mod tests {
         // Human readable output for cargo test -- --nocapture
         println!("values = {values:?}");
         println!("vertices = {vertices:?}");
-    }
-
-    #[test]
-    fn vertex_dim() {
-        let vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        assert_eq!(vertex.dim(), 3);
     }
 
     #[test]
@@ -905,19 +857,6 @@ mod tests {
         assert_eq!(map.len(), 2);
     }
 
-    #[test]
-    fn vertex_clone() {
-        let vertex: Vertex<f64, i32, 3> = vertex!([1.0, 2.0, 3.0], 42);
-        let cloned_vertex = vertex;
-
-        // Points should be equal but UUIDs should be the same (since we cloned)
-        assert_eq!(vertex.point(), cloned_vertex.point());
-        assert_eq!(vertex.uuid(), cloned_vertex.uuid());
-        assert_eq!(vertex.incident_cell, cloned_vertex.incident_cell);
-        assert_eq!(vertex.data, cloned_vertex.data);
-        assert_eq!(vertex.dim(), cloned_vertex.dim());
-    }
-
     // =============================================================================
     // DIMENSION-SPECIFIC TESTS
     // =============================================================================
@@ -972,20 +911,6 @@ mod tests {
     // =============================================================================
 
     #[test]
-    fn vertex_with_string_data() {
-        let vertex: Vertex<f64, u32, 3> = vertex!([1.0, 2.0, 3.0], 123u32);
-        assert_vertex_properties(&vertex, [1.0, 2.0, 3.0]);
-        assert_eq!(vertex.data.unwrap(), 123u32);
-    }
-
-    #[test]
-    fn vertex_with_numeric_data() {
-        let vertex: Vertex<f64, u32, 2> = vertex!([5.0, 10.0], 123u32);
-        assert_vertex_properties(&vertex, [5.0, 10.0]);
-        assert_eq!(vertex.data.unwrap(), 123u32);
-    }
-
-    #[test]
     fn vertex_with_tuple_data() {
         let vertex: Vertex<f64, (i32, i32), 2> = vertex!([1.0, 2.0], (42, 84));
         assert_vertex_properties(&vertex, [1.0, 2.0]);
@@ -1003,20 +928,6 @@ mod tests {
         assert!(debug_str.contains("1.0"));
         assert!(debug_str.contains("2.0"));
         assert!(debug_str.contains("3.0"));
-    }
-
-    #[test]
-    fn vertex_eq_trait() {
-        let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex3: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 4.0]);
-
-        // Test Eq trait (reflexivity, symmetry) - equality is based on point only
-        assert_eq!(vertex1, vertex1); // reflexive
-        assert_eq!(vertex1, vertex2); // same points
-        assert_eq!(vertex2, vertex1); // symmetric
-        assert_ne!(vertex1, vertex3); // different points
-        assert_ne!(vertex3, vertex1); // symmetric
     }
 
     #[test]
@@ -1043,29 +954,6 @@ mod tests {
             vertex2.partial_cmp(&vertex1),
             Some(Ordering::Greater | Ordering::Equal)
         ));
-    }
-
-    #[test]
-    fn vertex_comprehensive_serialization() {
-        // Test with different data types and dimensions
-        let vertex_no_data: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let _serialized = serde_json::to_string(&vertex_no_data).unwrap();
-        // Note: Deserialization test removed since we use DeserializeOwned trait bound
-        // instead of the derive macro to avoid conflicts with serde trait bounds
-        // let deserialized: Vertex<f64, Option<()>, 3> = serde_json::from_str(&serialized).unwrap();
-        // assert_eq!(vertex_no_data, deserialized);
-
-        let vertex_with_data: Vertex<f64, i32, 2> = vertex!([10.5, -5.3], 42);
-        let _serialized_data = serde_json::to_string(&vertex_with_data).unwrap();
-        // let deserialized_data: Vertex<f64, i32, 2> =
-        //     serde_json::from_str(&serialized_data).unwrap();
-        // assert_eq!(vertex_with_data, deserialized_data);
-
-        let vertex_1d: Vertex<f64, Option<()>, 1> = vertex!([42.0]);
-        let _serialized_1d = serde_json::to_string(&vertex_1d).unwrap();
-        // let deserialized_1d: Vertex<f64, Option<()>, 1> =
-        //     serde_json::from_str(&serialized_1d).unwrap();
-        // assert_eq!(vertex_1d, deserialized_1d);
     }
 
     // =============================================================================
@@ -1193,27 +1081,6 @@ mod tests {
         assert_ne!(vertex1.uuid(), vertex2.uuid());
         assert!(!vertex1.uuid().is_nil());
         assert!(!vertex2.uuid().is_nil());
-    }
-
-    #[test]
-    fn vertex_incident_cell_none_by_default() {
-        let vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-
-        assert!(vertex.incident_cell.is_none());
-    }
-
-    #[test]
-    fn vertex_data_none_by_default() {
-        let vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-
-        assert!(vertex.data.is_none());
-    }
-
-    #[test]
-    fn vertex_data_can_be_set() {
-        let vertex: Vertex<f64, i32, 3> = vertex!([1.0, 2.0, 3.0], 42);
-
-        assert_eq!(vertex.data.unwrap(), 42);
     }
 
     // =============================================================================
@@ -1406,22 +1273,6 @@ mod tests {
     // =============================================================================
 
     #[test]
-    fn vertex_with_str_data() {
-        // Test that Vertex works with simple Copy data
-        let vertex: Vertex<f64, i16, 3> = vertex!([1.0, 2.0, 3.0], 999i16);
-        assert_vertex_properties(&vertex, [1.0, 2.0, 3.0]);
-        assert_eq!(vertex.data.unwrap(), 999i16);
-    }
-
-    #[test]
-    fn vertex_with_i32_data() {
-        // Test that Vertex works with i32 data (Copy type)
-        let vertex: Vertex<f64, i32, 2> = vertex!([5.0, 10.0], 42);
-        assert_vertex_properties(&vertex, [5.0, 10.0]);
-        assert_eq!(vertex.data.unwrap(), 42);
-    }
-
-    #[test]
     fn vertex_from_points_with_str_data() {
         // Test creating vertices from points and then adding Copy data
         let points = vec![Point::new([1.0, 2.0]), Point::new([3.0, 4.0])];
@@ -1434,33 +1285,6 @@ mod tests {
         assert_eq!(vertices[0].data.unwrap(), 1u8);
         assert_eq!(vertices[1].data.unwrap(), 2u8);
         assert_eq!(vertices.len(), 2);
-    }
-
-    #[test]
-    fn vertex_clone_with_copy_data() {
-        // Test that vertices with Copy data can be cloned
-        let vertex: Vertex<f64, u64, 3> = vertex!([1.0, 2.0, 3.0], 123_456_u64);
-
-        let cloned_vertex = vertex;
-
-        assert_eq!(vertex.point(), cloned_vertex.point());
-        assert_eq!(vertex.uuid(), cloned_vertex.uuid());
-        assert_eq!(vertex.data, cloned_vertex.data);
-        assert_eq!(vertex.data.unwrap(), 123_456_u64);
-    }
-
-    #[test]
-    fn vertex_eq_with_copy_data() {
-        // Test equality comparison with Copy data
-        let vertex1: Vertex<f64, i32, 2> = vertex!([1.0, 2.0], 100);
-
-        let vertex2: Vertex<f64, i32, 2> = vertex!([1.0, 2.0], 200);
-
-        let vertex3: Vertex<f64, i32, 2> = vertex!([3.0, 4.0], 100);
-
-        // Equality is based on point coordinates only, not data or UUID
-        assert_eq!(vertex1, vertex2); // Same point, different data and UUID
-        assert_ne!(vertex1, vertex3); // Different points
     }
 
     #[test]

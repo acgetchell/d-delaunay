@@ -1,13 +1,42 @@
-//! A facet is a d-1 sub-simplex of a d-dimensional simplex.
+//! D-dimensional Facets Representation
 //!
-//! It is defined in terms of a cell and the vertex in the cell opposite to it,
-//! as per [CGAL](https://doc.cgal.org/latest/TDS_3/index.html#title3).
-//! This provides convenience methods used in the
-//! [Bowyer-Watson algorithm](https://en.wikipedia.org/wiki/Bowyer–Watson_algorithm).
-//! Facets are not stored in the `Triangulation Data Structure` (TDS)
-//! directly, but created on the fly when needed.
-
-#![allow(clippy::similar_names)]
+//! This module provides the `Facet` struct which represents a facet of a d-dimensional simplex
+//! (d-1 sub-simplex) within a triangulation. Each facet is defined in terms of a cell and the
+//! vertex opposite to it, similar to [CGAL](https://doc.cgal.org/latest/TDS_3/index.html#title3).
+//!
+//! # Key Features
+//!
+//! - **Dimensional Simplicity**: Represents co-dimension 1 sub-simplexes of d-dimensional simplexes
+//! - **Cell Association**: Each facet resides within a specific cell and is described by its opposite vertex
+//! - **Support for Delaunay Triangulations**: Facilitates operations fundamental to the
+//!   [Bowyer-Watson algorithm](https://en.wikipedia.org/wiki/Bowyer–Watson_algorithm)
+//! - **On-demand Creation**: Facets are generated dynamically as needed rather than stored persistently in the TDS
+//! - **Serialization Support**: Full serde support for persistence and interoperability
+//!
+//! # Examples
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::facet::Facet;
+//! use d_delaunay::delaunay_core::cell::Cell;
+//! use d_delaunay::delaunay_core::vertex::Vertex;
+//! use d_delaunay::{cell, vertex};
+//! use d_delaunay::geometry::point::Point;
+//!
+//! // Create vertices for a tetrahedron
+//! let vertices = vec![
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
+//! ];
+//!
+//! // Create a 3D cell (tetrahedron)
+//! let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices.clone());
+//!
+//! // Create a facet with vertex as opposite
+//! let facet = Facet::new(cell, vertices[0]).unwrap();
+//! assert_eq!(facet.vertices().len(), 3);  // Facet (triangle) in 3D has 3 vertices
+//! ```
 
 // =============================================================================
 // IMPORTS
@@ -451,6 +480,23 @@ mod tests {
     // =============================================================================
 
     #[test]
+    fn test_facet_error_handling() {
+        let vertex1: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 0.0]);
+        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1]);
+
+        // Test zero simplex error
+        assert!(
+            matches!(Facet::new(cell.clone(), vertex1), Err(e) if matches!(e.downcast_ref::<FacetError>(), Some(FacetError::CellIsZeroSimplex)))
+        );
+
+        // Test cell does not contain vertex error
+        let vertex3: Vertex<f64, Option<()>, 3> = vertex!([0.0, 1.0, 0.0]);
+        assert!(
+            matches!(Facet::new(cell, vertex3), Err(e) if matches!(e.downcast_ref::<FacetError>(), Some(FacetError::CellDoesNotContainVertex)))
+        );
+    }
+
+    #[test]
     fn facet_new() {
         let (cell, vertices) = create_tetrahedron();
         let facet = Facet::new(cell.clone(), vertices[0]).unwrap();
@@ -459,6 +505,29 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Facet: {facet:?}");
+    }
+
+    #[test]
+    fn test_facet_new_success_coverage() {
+        // Test 2D case: Create a triangle (2D cell with 3 vertices)
+        let (cell_2d, vertices_2d) = create_triangle();
+        let result_2d = Facet::new(cell_2d, vertices_2d[0]);
+
+        // Assert that the result is Ok, ensuring the Ok(Self { ... }) line is covered
+        assert!(result_2d.is_ok());
+        let facet_2d = result_2d.unwrap();
+        assert_eq!(facet_2d.vertices().len(), 2); // 2D facet should have 2 vertices
+
+        // Test 1D case: Create an edge (1D cell with 2 vertices)
+        let vertex1 = vertex!([0.0]);
+        let vertex2 = vertex!([1.0]);
+        let cell_1d: Cell<f64, Option<()>, Option<()>, 1> = cell!(vec![vertex1, vertex2]);
+        let result_1d = Facet::new(cell_1d, vertex1);
+
+        // Assert that the result is Ok, ensuring the Ok(Self { ... }) line is covered
+        assert!(result_1d.is_ok());
+        let facet_1d = result_1d.unwrap();
+        assert_eq!(facet_1d.vertices().len(), 1); // 1D facet should have 1 vertex
     }
 
     #[test]
@@ -501,6 +570,59 @@ mod tests {
     // SERIALIZATION TESTS
     // =============================================================================
 
+    /// Helper function that constructs a simple 2D facet (triangle) and serializes it to JSON,
+    /// then splits the JSON string into separate `cell` and `vertex` components for reuse
+    /// in custom JSON inputs for error-path tests.
+    fn create_facet_json_components() -> (String, String) {
+        // Create a simple 2D triangle facet
+        let (cell, vertices) = create_triangle();
+        let facet = Facet::new(cell, vertices[0]).unwrap();
+
+        // Serialize the entire facet to JSON
+        let serialized = serde_json::to_string(&facet).unwrap();
+
+        // Parse the JSON to extract cell and vertex components
+        let json: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        let cell_json = serde_json::to_string(&json["cell"]).unwrap();
+        let vertex_json = serde_json::to_string(&json["vertex"]).unwrap();
+
+        (cell_json, vertex_json)
+    }
+
+    #[test]
+    fn facet_deserialization_with_extra_field() {
+        // Create a Facet JSON snippet with additional "extra" field
+        let (cell_json, vertex_json) = create_facet_json_components();
+        let json_with_extra = format!(
+            "{{ \"cell\": {cell_json}, \"vertex\": {vertex_json}, \"extra\": \"ignored\" }}"
+        );
+
+        // Deserialize and test that it succeeds, ignoring the extra field
+        let result: Result<Facet<f64, Option<()>, Option<()>, 2>, _> =
+            serde_json::from_str(&json_with_extra);
+
+        // Should succeed - extra fields are ignored
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_facet_json_components() {
+        let (cell_json, vertex_json) = create_facet_json_components();
+
+        // Verify that we can extract valid JSON components
+        println!("Cell JSON: {cell_json}");
+        println!("Vertex JSON: {vertex_json}");
+
+        // Basic validation that the components contain expected data
+        assert!(cell_json.contains("vertices"));
+        assert!(cell_json.contains("uuid"));
+        assert!(vertex_json.contains("[0.0,0.0]")); // The opposite vertex coordinates
+
+        // Verify the components can be parsed back as JSON
+        let _: serde_json::Value = serde_json::from_str(&cell_json).unwrap();
+        let _: serde_json::Value = serde_json::from_str(&vertex_json).unwrap();
+    }
+
     #[test]
     fn facet_to_json() {
         let vertex1 = vertex!([0.0, 0.0, 0.0]);
@@ -521,6 +643,79 @@ mod tests {
 
         // Human readable output for cargo test -- --nocapture
         println!("Serialized = {serialized:?}");
+    }
+
+    #[test]
+    fn test_facet_deserialization_duplicate_vertex_field() {
+        let (cell_json, vertex_json) = create_facet_json_components();
+        let json_with_duplicate_vertex = format!(
+            "{{ \"cell\": {cell_json}, \"vertex\": {vertex_json}, \"vertex\": {vertex_json} }}"
+        );
+
+        let result: Result<Facet<f64, Option<()>, Option<()>, 2>, _> =
+            serde_json::from_str(&json_with_duplicate_vertex);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("duplicate field `vertex`"));
+    }
+
+    #[test]
+    fn test_facet_deserialization_duplicate_cell_field_v2() {
+        let (cell_json, vertex_json) = create_facet_json_components();
+        let json_with_duplicate_cell = format!(
+            "{{ \"cell\": {cell_json}, \"vertex\": {vertex_json}, \"cell\": {cell_json} }}"
+        );
+
+        let result: Result<Facet<f64, Option<()>, Option<()>, 2>, _> =
+            serde_json::from_str(&json_with_duplicate_cell);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("duplicate field `cell`"));
+    }
+
+    #[test]
+    fn test_missing_cell_field_error() {
+        // Step 5: Test missing `cell` field error
+        // Construct JSON with only the `vertex` field: `{\"vertex\":<v>}`
+        let (_, vertex_json) = create_facet_json_components();
+        let json_with_only_vertex = format!("{{ \"vertex\": {vertex_json} }}");
+
+        // Attempt to deserialize and assert the error message contains `missing field \"cell\"`
+        let result: Result<Facet<f64, Option<()>, Option<()>, 2>, _> =
+            serde_json::from_str(&json_with_only_vertex);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("missing field `cell`"));
+    }
+
+    #[test]
+    fn test_empty_json_object_missing_cell_field() {
+        // Step 7: Test empty JSON object error
+        // Attempt to deserialize the string `{}` into `Facet<...>` and assert it errors out
+        // with `missing field "cell"`, covering the very first missing-field path.
+        let empty_json = "{}";
+
+        let result: Result<Facet<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(empty_json);
+        assert!(result.is_err());
+
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("missing field `cell`"));
+
+        // Human readable output for cargo test -- --nocapture
+        println!("Empty JSON deserialization error: {error_message}");
+    }
+
+    #[test]
+    fn test_facet_deserialization_expecting_formatter() {
+        // Test the expecting formatter method
+        let invalid_json = r#"["not", "a", "facet", "object"]"#;
+        let result: Result<Facet<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(invalid_json);
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+        // The error should mention that it expected a Facet struct
+        assert!(error_message.contains("Facet") || error_message.to_lowercase().contains("struct"));
     }
 
     // =============================================================================
@@ -674,41 +869,6 @@ mod tests {
     // =============================================================================
     // ERROR HANDLING TESTS
     // =============================================================================
-
-    #[test]
-    fn facet_error_cell_does_not_contain_vertex() {
-        let vertex1 = vertex!([0.0, 0.0, 0.0]);
-        let vertex2 = vertex!([1.0, 0.0, 0.0]);
-        let vertex3 = vertex!([0.0, 1.0, 0.0]);
-        let vertex_not_in_cell = vertex!([2.0, 2.0, 2.0]);
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
-
-        let result = Facet::new(cell, vertex_not_in_cell);
-        assert!(result.is_err());
-
-        let error = result.unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("The cell does not contain the vertex!")
-        );
-    }
-
-    #[test]
-    fn facet_error_cell_is_zero_simplex() {
-        let vertex1 = vertex!([0.0, 0.0, 0.0]);
-        let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1]);
-
-        let result = Facet::new(cell, vertex1);
-        assert!(result.is_err());
-
-        let error = result.unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("The cell is a 0-simplex with no facet!")
-        );
-    }
 
     #[test]
     fn facet_error_display() {
@@ -868,45 +1028,6 @@ mod tests {
     }
 
     #[test]
-    fn facet_eq_same_cells_same_vertices() {
-        let vertex1 = vertex!([0.0, 0.0, 0.0]);
-        let vertex2 = vertex!([1.0, 0.0, 0.0]);
-        let vertex3 = vertex!([0.0, 1.0, 0.0]);
-
-        // Use the same vertices for both cells
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
-
-        let facet1 = Facet::new(cell1, vertex1).unwrap();
-        let facet2 = Facet::new(cell2, vertex1).unwrap();
-
-        // Facets should be equal because cells have the same vertices
-        // (same UUIDs, same coordinates) and same opposite vertex
-        assert_eq!(facet1, facet2);
-    }
-
-    #[test]
-    fn facet_ne_different_vertices() {
-        let vertex1 = vertex!([0.0, 0.0, 0.0]);
-        let vertex2 = vertex!([1.0, 0.0, 0.0]);
-        let vertex3 = vertex!([0.0, 1.0, 0.0]);
-
-        // Create completely different vertices with different coordinates
-        let vertex4 = vertex!([2.0, 0.0, 0.0]);
-        let vertex5 = vertex!([3.0, 0.0, 0.0]);
-        let vertex6 = vertex!([2.0, 1.0, 0.0]);
-
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
-        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex4, vertex5, vertex6]);
-
-        let facet1 = Facet::new(cell1, vertex1).unwrap();
-        let facet2 = Facet::new(cell2, vertex4).unwrap();
-
-        // Facets should be different because cells have completely different vertices
-        assert_ne!(facet1, facet2);
-    }
-
-    #[test]
     fn facet_hash() {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -939,5 +1060,48 @@ mod tests {
 
         // Test that different facets hash to different values
         assert_ne!(get_hash(&facet1), get_hash(&facet3));
+    }
+
+    #[test]
+    fn facet_missing_vertex_field_error() {
+        // Test deserialization with missing "vertex" field
+        // Construct JSON with only the "cell" field
+        let json_with_only_cell = r#"{
+            "cell": {
+                "vertices": [
+                    {
+                        "point": [0.0, 0.0, 0.0],
+                        "uuid": "550e8400-e29b-41d4-a716-446655440000",
+                        "data": null
+                    },
+                    {
+                        "point": [1.0, 0.0, 0.0],
+                        "uuid": "550e8400-e29b-41d4-a716-446655440001",
+                        "data": null
+                    },
+                    {
+                        "point": [0.0, 1.0, 0.0],  
+                        "uuid": "550e8400-e29b-41d4-a716-446655440002",
+                        "data": null
+                    }
+                ],
+                "uuid": "550e8400-e29b-41d4-a716-446655440003",
+                "neighbors": null,
+                "data": null
+            }
+        }"#;
+
+        // Attempt to deserialize - this should fail with missing field "vertex" error
+        let result: Result<Facet<f64, Option<()>, Option<()>, 3>, _> =
+            serde_json::from_str(json_with_only_cell);
+
+        assert!(result.is_err());
+        let error_message = result.unwrap_err().to_string();
+
+        // Assert the error message contains `missing field "vertex"`
+        assert!(error_message.contains("missing field"));
+        assert!(error_message.contains("vertex"));
+
+        println!("✓ Correctly detected missing vertex field: {error_message}");
     }
 }
