@@ -1,6 +1,6 @@
 [package]
 name = "d-delaunay"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 rust-version = "1.85.0"
 description = "A d-dimensional Delaunay triangulation library with generic coordinate support"
