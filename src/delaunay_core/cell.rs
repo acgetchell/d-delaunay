@@ -13,29 +13,27 @@
 //! - **Neighbor Tracking**: Maintains references to neighboring cells
 //! - **Optional Data Storage**: Supports attaching arbitrary user data of type `V`
 //! - **Serialization Support**: Full serde support for persistence
-//! - **Builder Pattern**: Convenient cell construction using `CellBuilder`
+//! - **Macro-based Construction**: Convenient cell creation using the `cell!` macro.
 //!
 //! # Examples
 //!
 //! ```rust
-//! use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-//! use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+//! use d_delaunay::delaunay_core::cell::Cell;
+//! use d_delaunay::delaunay_core::vertex::Vertex;
 //! use d_delaunay::geometry::point::Point;
 //! use d_delaunay::geometry::traits::coordinate::Coordinate;
+//! use d_delaunay::{cell, vertex};
 //!
 //! // Create vertices for a tetrahedron
 //! let vertices = vec![
-//!     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
-//!     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
-//!     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
-//!     VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(),
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
 //! ];
 //!
 //! // Create a 3D cell (tetrahedron)
-//! let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-//!     .vertices(vertices)
-//!     .build()
-//!     .unwrap();
+//! let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
 //! ```
 
 #![allow(clippy::similar_names)]
@@ -777,7 +775,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::vertex::{VertexBuilder, vertex};
+    use crate::delaunay_core::vertex::vertex;
     use crate::geometry::point::Point;
     use crate::geometry::predicates::{
         circumcenter, circumradius, circumradius_with_center, insphere, insphere_distance,
@@ -1067,10 +1065,8 @@ mod tests {
         let vertex3 = vertex!([1.0, 0.0, 0.0]);
 
         // Create two cells with same vertices but different neighbors
-        let mut cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let mut cell1: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3]);
         let mut cell2 = cell1.clone();
 
         // Set different neighbors
@@ -1745,10 +1741,8 @@ mod tests {
         let vertex3 = vertex!([0.0, 1.0, 0.0]);
         let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
-        let original_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let original_cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         // Create a facet by removing vertex4
         let facet = Facet::new(original_cell, vertex4).unwrap();
@@ -1777,10 +1771,8 @@ mod tests {
         let vertex2_f32 = vertex!([1.0f32, 0.0f32]);
         let vertex3_f32 = vertex!([0.0f32, 1.0f32]);
 
-        let cell_f32: Cell<f32, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1_f32, vertex2_f32, vertex3_f32])
-            .build()
-            .unwrap();
+        let cell_f32: Cell<f32, Option<()>, Option<()>, 2> =
+            cell!(vec![vertex1_f32, vertex2_f32, vertex3_f32]);
         assert_eq!(cell_f32.number_of_vertices(), 3);
         assert_eq!(cell_f32.dim(), 2);
     }
@@ -1795,10 +1787,8 @@ mod tests {
         let vertex5 = vertex!([0.0, 0.0, 0.0, 1.0, 0.0]);
         let vertex6 = vertex!([0.0, 0.0, 0.0, 0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 5> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 5> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6]);
 
         assert_eq!(cell.number_of_vertices(), 6);
         assert_eq!(cell.dim(), 5);
@@ -1812,11 +1802,7 @@ mod tests {
         let vertex2 = vertex!([1.0, 0.0, 0.0], 2);
         let vertex3 = vertex!([0.0, 1.0, 0.0], 3);
 
-        let cell: Cell<f64, i32, u32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .data(42u32)
-            .build()
-            .unwrap();
+        let cell: Cell<f64, i32, u32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42u32);
 
         assert_eq!(cell.vertices()[0].data.unwrap(), 1);
         assert_eq!(cell.vertices()[1].data.unwrap(), 2);
@@ -1831,10 +1817,7 @@ mod tests {
         let vertex2 = vertex!([1.0, 0.0]);
         let vertex3 = vertex!([0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![vertex1, vertex2, vertex3]);
 
         // Test that the methods run without error
         let test_point: Vertex<f64, Option<()>, 2> = vertex!([0.5, 0.5]);
@@ -1886,15 +1869,12 @@ mod tests {
         let vertex_valid1 = vertex!([0.0, 1.0, 0.0]);
         let vertex_valid2 = vertex!([1.0, 0.0, 0.0]);
         let vertex_valid3 = vertex!([0.0, 0.0, 1.0]);
-        let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![
-                vertex_invalid,
-                vertex_valid1,
-                vertex_valid2,
-                vertex_valid3,
-            ])
-            .build()
-            .unwrap();
+        let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![
+            vertex_invalid,
+            vertex_valid1,
+            vertex_valid2,
+            vertex_valid3,
+        ]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Invalid Cell: {invalid_cell:?}");
@@ -1922,10 +1902,8 @@ mod tests {
         let vertex2 = vertex!([0.0, 1.0, 0.0]);
         let vertex3 = vertex!([1.0, 0.0, 0.0]);
         let vertex4 = vertex!([0.0, 0.0, 0.0]);
-        let mut invalid_uuid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let mut invalid_uuid_cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         // Manually set the UUID to nil to trigger the InvalidUuid error
         invalid_uuid_cell.uuid = uuid::Uuid::nil();
@@ -1950,27 +1928,15 @@ mod tests {
     #[test]
     fn cell_is_valid_duplicate_vertices_error() {
         // Test cell is_valid with duplicate vertices
-        let vertex_dup = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex_distinct1 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex_distinct2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![
-                vertex_dup,
-                vertex_dup,
-                vertex_distinct1,
-                vertex_distinct2,
-            ])
-            .build()
-            .unwrap();
+        let vertex_dup = vertex!([0.0, 0.0, 1.0]);
+        let vertex_distinct1 = vertex!([1.0, 0.0, 0.0]);
+        let vertex_distinct2 = vertex!([0.0, 1.0, 0.0]);
+        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![
+            vertex_dup,
+            vertex_dup,
+            vertex_distinct1,
+            vertex_distinct2,
+        ]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Duplicate Vertices Cell: {duplicate_cell:?}");
@@ -1994,20 +1960,8 @@ mod tests {
     #[test]
     fn cell_is_valid_insufficient_vertices_error() {
         // Test cell is_valid with insufficient vertices (wrong vertex count)
-        let insufficient_vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-        ];
-        let insufficient_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(insufficient_vertices)
-            .build()
-            .unwrap();
+        let insufficient_vertices = vec![vertex!([0.0, 0.0, 1.0]), vertex!([0.0, 1.0, 0.0])];
+        let insufficient_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(insufficient_vertices);
 
         let insufficient_result = insufficient_cell.is_valid();
         assert!(insufficient_result.is_err());

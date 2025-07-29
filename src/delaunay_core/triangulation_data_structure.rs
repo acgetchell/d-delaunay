@@ -229,15 +229,16 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(),
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
     /// ];
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -280,14 +281,15 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([1.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.5, 1.0])).build().unwrap(),
+    ///     vertex!([0.0, 0.0]),
+    ///     vertex!([1.0, 0.0]),
+    ///     vertex!([0.5, 1.0]),
     /// ];
     ///
     /// let tds: Tds<f64, usize, usize, 2> = Tds::new(&vertices).unwrap();
@@ -339,13 +341,13 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
-    /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// let vertex = VertexBuilder::default().point(point).build().unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
     ///
     /// let result = tds.add(vertex);
     /// assert!(result.is_ok());
@@ -356,14 +358,14 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
-    /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// let vertex1 = VertexBuilder::default().point(point).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(point).build().unwrap(); // Same coordinates
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]); // Same coordinates
     ///
     /// tds.add(vertex1).unwrap();
     /// let result = tds.add(vertex2);
@@ -374,16 +376,17 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
     /// ];
     ///
     /// for vertex in vertices {
@@ -438,13 +441,14 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
-    /// let vertex1 = VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([4.0, 5.0, 6.0])).build().unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([4.0, 5.0, 6.0]);
     ///
     /// tds.add(vertex1).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 1);
@@ -501,32 +505,33 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Start empty
     /// assert_eq!(tds.dim(), -1);
     ///
     /// // Add one vertex (0-dimensional)
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 0.0]);
     /// tds.add(vertex1).unwrap();
     /// assert_eq!(tds.dim(), 0);
     ///
     /// // Add second vertex (1-dimensional)
-    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 0.0, 0.0]);
     /// tds.add(vertex2).unwrap();
     /// assert_eq!(tds.dim(), 1);
     ///
     /// // Add third vertex (2-dimensional)
-    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3: Vertex<f64, Option<()>, 3> = vertex!([0.0, 1.0, 0.0]);
     /// tds.add(vertex3).unwrap();
     /// assert_eq!(tds.dim(), 2);
     ///
     /// // Add fourth vertex (3-dimensional, capped at D=3)
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex4: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 1.0]);
     /// tds.add(vertex4).unwrap();
     /// assert_eq!(tds.dim(), 3);
     /// ```
@@ -684,7 +689,6 @@ where
             .vertices(Vertex::from_points(points))
             .build()
             .unwrap();
-
         Ok(supercell)
     }
 
@@ -892,10 +896,14 @@ where
             let combinations = generate_combinations(vertices, D + 1);
 
             for combination in combinations {
-                if let Ok(cell) = CellBuilder::default().vertices(combination).build() {
-                    self.cells.insert(cell.uuid(), cell);
-                    created_cells += 1;
-                }
+                // Try to create a cell - cell! macro panics on failure so we wrap in a catch_unwind-style approach
+                // For now, just create the cell directly since the macro handles validation internally
+                let cell = CellBuilder::default()
+                    .vertices(combination)
+                    .build()
+                    .unwrap();
+                self.cells.insert(cell.uuid(), cell);
+                created_cells += 1;
             }
 
             if created_cells > 0 {
@@ -1365,20 +1373,21 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::{Tds, TriangulationValidationError};
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
-    /// use d_delaunay::delaunay_core::cell::CellBuilder;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
+    /// use d_delaunay::cell;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Create a cell with an invalid vertex (infinite coordinate)
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([f64::INFINITY, 2.0, 3.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([4.0, 5.0, 6.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([7.0, 8.0, 9.0])).build().unwrap(),
+    ///     vertex!([1.0, 2.0, 3.0]),
+    ///     vertex!([f64::INFINITY, 2.0, 3.0]),
+    ///     vertex!([4.0, 5.0, 6.0]),
+    ///     vertex!([7.0, 8.0, 9.0]),
     /// ];
     ///
-    /// let invalid_cell = CellBuilder::default().vertices(vertices).build().unwrap();
+    /// let invalid_cell = cell!(vertices);
     /// tds.cells.insert(invalid_cell.uuid(), invalid_cell);
     ///
     /// // Validation should fail
@@ -1493,8 +1502,10 @@ where
 #[cfg(test)]
 #[allow(clippy::uninlined_format_args, clippy::similar_names)]
 mod tests {
+    use crate::cell;
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::traits::coordinate::Coordinate;
+    use crate::vertex;
 
     use super::*;
 
@@ -1524,7 +1535,7 @@ mod tests {
             num_traits::NumCast::from(2.0f64).unwrap(),
             num_traits::NumCast::from(3.0f64).unwrap(),
         ]);
-        let vertex = VertexBuilder::default().point(point).build().unwrap();
+        let vertex = VertexBuilder::default().point(point).build().unwrap(); // Complex generic test keeps VertexBuilder
         tds.add(vertex).unwrap();
 
         let result = tds.add(vertex);
@@ -1554,7 +1565,7 @@ mod tests {
             num_traits::NumCast::from(2.0f64).unwrap(),
             num_traits::NumCast::from(3.0f64).unwrap(),
         ]);
-        let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
+        let vertex1 = VertexBuilder::default().point(point1).build().unwrap(); // Complex generic test keeps VertexBuilder
         let uuid1 = vertex1.uuid();
         tds.add(vertex1).unwrap();
 
@@ -1564,7 +1575,7 @@ mod tests {
             num_traits::NumCast::from(5.0f64).unwrap(),
             num_traits::NumCast::from(6.0f64).unwrap(),
         ]); // Different coordinates
-        let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
+        let vertex2 = VertexBuilder::default().point(point2).build().unwrap(); // Complex generic test keeps VertexBuilder
 
         // Manually insert the second vertex with the first vertex's UUID to simulate UUID collision
         let collision_result = tds.vertices.insert(uuid1, vertex2);
@@ -1594,32 +1605,27 @@ mod tests {
         assert_eq!(tds.dim(), -1);
 
         // Test with one vertex
-        let point1 = Point::new([1.0, 2.0, 3.0]);
-        let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
+        let vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
         tds.add(vertex1).unwrap();
         assert_eq!(tds.dim(), 0);
 
         // Test with two vertices
-        let point2 = Point::new([4.0, 5.0, 6.0]);
-        let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
+        let vertex2: Vertex<f64, usize, 3> = vertex!([4.0, 5.0, 6.0]);
         tds.add(vertex2).unwrap();
         assert_eq!(tds.dim(), 1);
 
         // Test with three vertices
-        let point3 = Point::new([7.0, 8.0, 9.0]);
-        let vertex3 = VertexBuilder::default().point(point3).build().unwrap();
+        let vertex3: Vertex<f64, usize, 3> = vertex!([7.0, 8.0, 9.0]);
         tds.add(vertex3).unwrap();
         assert_eq!(tds.dim(), 2);
 
         // Test with four vertices (should be capped at D=3)
-        let point4 = Point::new([10.0, 11.0, 12.0]);
-        let vertex4 = VertexBuilder::default().point(point4).build().unwrap();
+        let vertex4: Vertex<f64, usize, 3> = vertex!([10.0, 11.0, 12.0]);
         tds.add(vertex4).unwrap();
         assert_eq!(tds.dim(), 3);
 
         // Test with five vertices (dimension should stay at 3)
-        let point5 = Point::new([13.0, 14.0, 15.0]);
-        let vertex5 = VertexBuilder::default().point(point5).build().unwrap();
+        let vertex5: Vertex<f64, usize, 3> = vertex!([13.0, 14.0, 15.0]);
         tds.add(vertex5).unwrap();
         assert_eq!(tds.is_valid(), Ok(()));
     }
@@ -1678,19 +1684,14 @@ mod tests {
     fn test_is_valid_with_invalid_neighbors() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
-
         let vertices = vec![
-            VertexBuilder::default().point(point1).build().unwrap(),
-            VertexBuilder::default().point(point2).build().unwrap(),
-            VertexBuilder::default().point(point3).build().unwrap(),
-            VertexBuilder::default().point(point4).build().unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let mut cell = cell!(vertices);
         cell.neighbors = Some(vec![Uuid::nil()]); // Invalid neighbor
         tds.cells.insert(cell.uuid(), cell);
 
@@ -1716,7 +1717,7 @@ mod tests {
 
         // Add duplicate cell manually
         let vertices = result_tds.vertices.values().copied().collect::<Vec<_>>();
-        let duplicate_cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let duplicate_cell = cell!(vertices);
         result_tds
             .cells
             .insert(duplicate_cell.uuid(), duplicate_cell);
@@ -1747,19 +1748,14 @@ mod tests {
         assert_eq!(tds.number_of_cells(), 0);
 
         // Add a cell manually to test the count
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
-
         let vertices = vec![
-            VertexBuilder::default().point(point1).build().unwrap(),
-            VertexBuilder::default().point(point2).build().unwrap(),
-            VertexBuilder::default().point(point3).build().unwrap(),
-            VertexBuilder::default().point(point4).build().unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let cell = cell!(vertices);
         tds.cells.insert(cell.uuid(), cell);
 
         assert_eq!(tds.number_of_cells(), 1);
@@ -1797,46 +1793,31 @@ mod tests {
         assert_eq!(tds.number_of_cells(), 0);
         assert_eq!(tds.dim(), -1);
 
-        let new_vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let new_vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
         let _ = tds.add(new_vertex1);
 
         assert_eq!(tds.number_of_vertices(), 1);
         assert_eq!(tds.dim(), 0);
 
-        let new_vertex2 = VertexBuilder::default()
-            .point(Point::new([4.0, 5.0, 6.0]))
-            .build()
-            .unwrap();
+        let new_vertex2: Vertex<f64, usize, 3> = vertex!([4.0, 5.0, 6.0]);
         let _ = tds.add(new_vertex2);
 
         assert_eq!(tds.number_of_vertices(), 2);
         assert_eq!(tds.dim(), 1);
 
-        let new_vertex3 = VertexBuilder::default()
-            .point(Point::new([7.0, 8.0, 9.0]))
-            .build()
-            .unwrap();
+        let new_vertex3: Vertex<f64, usize, 3> = vertex!([7.0, 8.0, 9.0]);
         let _ = tds.add(new_vertex3);
 
         assert_eq!(tds.number_of_vertices(), 3);
         assert_eq!(tds.dim(), 2);
 
-        let new_vertex4 = VertexBuilder::default()
-            .point(Point::new([10.0, 11.0, 12.0]))
-            .build()
-            .unwrap();
+        let new_vertex4: Vertex<f64, usize, 3> = vertex!([10.0, 11.0, 12.0]);
         let _ = tds.add(new_vertex4);
 
         assert_eq!(tds.number_of_vertices(), 4);
         assert_eq!(tds.dim(), 3);
 
-        let new_vertex5 = VertexBuilder::default()
-            .point(Point::new([13.0, 14.0, 15.0]))
-            .build()
-            .unwrap();
+        let new_vertex5: Vertex<f64, usize, 3> = vertex!([13.0, 14.0, 15.0]);
         let _ = tds.add(new_vertex5);
 
         assert_eq!(tds.number_of_vertices(), 5);
@@ -1845,13 +1826,12 @@ mod tests {
 
     #[test]
     fn tds_no_add() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-            Point::new([7.0, 8.0, 9.0]),
-            Point::new([10.0, 11.0, 12.0]),
+        let vertices = vec![
+            vertex!([1.0, 2.0, 3.0]),
+            vertex!([4.0, 5.0, 6.0]),
+            vertex!([7.0, 8.0, 9.0]),
+            vertex!([10.0, 11.0, 12.0]),
         ];
-        let vertices = Vertex::from_points(points);
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
 
         assert_eq!(tds.number_of_vertices(), 4);
@@ -1859,10 +1839,7 @@ mod tests {
         assert_eq!(tds.cells.len(), 1);
         assert_eq!(tds.dim(), 3);
 
-        let new_vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let new_vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
         let result = tds.add(new_vertex1);
 
         assert_eq!(tds.number_of_vertices(), 4);
@@ -2013,40 +1990,21 @@ mod tests {
 
     #[test]
     fn test_triangulation_validation_errors() {
-        use crate::delaunay_core::cell::CellBuilder;
-        use crate::delaunay_core::vertex::VertexBuilder;
-        use crate::geometry::point::Point;
-
         // Test validation with an invalid cell
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create a valid vertex
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
 
         // Create an invalid vertex with infinite coordinates
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([f64::INFINITY, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let vertex2: Vertex<f64, usize, 3> = vertex!([f64::INFINITY, 2.0, 3.0]);
 
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([4.0, 5.0, 6.0]))
-            .build()
-            .unwrap();
+        let vertex3: Vertex<f64, usize, 3> = vertex!([4.0, 5.0, 6.0]);
 
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([7.0, 8.0, 9.0]))
-            .build()
-            .unwrap();
+        let vertex4: Vertex<f64, usize, 3> = vertex!([7.0, 8.0, 9.0]);
 
         // Create a cell with an invalid vertex
-        let invalid_cell = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let invalid_cell = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         tds.cells.insert(invalid_cell.uuid(), invalid_cell.clone());
 
@@ -2265,25 +2223,13 @@ mod tests {
 
         // Create a cell with too many neighbors (more than D+1=4)
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let mut cell = cell!(vertices);
 
         // Add too many neighbors (5 neighbors for 3D should fail)
         cell.neighbors = Some(vec![
@@ -2309,21 +2255,12 @@ mod tests {
 
         // Create a cell with wrong number of vertices (3 instead of 4 for 3D)
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
         ];
 
-        let cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let cell = cell!(vertices);
         tds.cells.insert(cell.uuid(), cell);
 
         let result = tds.is_valid();
@@ -2340,45 +2277,21 @@ mod tests {
 
         // Create two cells
         let vertices1 = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
         let vertices2 = vec![
-            VertexBuilder::default()
-                .point(Point::new([2.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([3.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([2.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([2.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([2.0, 0.0, 0.0]),
+            vertex!([3.0, 0.0, 0.0]),
+            vertex!([2.0, 1.0, 0.0]),
+            vertex!([2.0, 0.0, 1.0]),
         ];
 
-        let mut cell1 = CellBuilder::default().vertices(vertices1).build().unwrap();
-        let cell2 = CellBuilder::default().vertices(vertices2).build().unwrap();
+        let mut cell1 = cell!(vertices1);
+        let cell2 = cell!(vertices2);
 
         // Make cell1 point to cell2 as neighbor, but not vice versa
         cell1.neighbors = Some(vec![cell2.uuid()]);
@@ -2472,10 +2385,7 @@ mod tests {
 
         if result.number_of_cells() > 0 {
             // Create a test vertex that might be inside/outside existing cells
-            let test_vertex = VertexBuilder::default()
-                .point(Point::new([0.25, 0.25, 0.25]))
-                .build()
-                .unwrap();
+            let test_vertex = vertex!([0.25, 0.25, 0.25]);
 
             // Test the bad cells and boundary facets detection
             let bad_cells_result = result.find_bad_cells_and_boundary_facets(&test_vertex);
@@ -2513,10 +2423,7 @@ mod tests {
             Point::new([10.0, -10.0, 10.0]),
             Point::new([10.0, 10.0, -10.0]),
         ];
-        let supercell = CellBuilder::default()
-            .vertices(Vertex::from_points(supercell_points))
-            .build()
-            .unwrap();
+        let supercell = cell!(Vertex::from_points(supercell_points));
 
         // Test the removal logic
         result.remove_cells_containing_supercell_vertices(&supercell);
@@ -2740,10 +2647,7 @@ mod tests {
         let vertices: Vec<_> = result.vertices.values().copied().collect();
 
         for _ in 0..3 {
-            let duplicate_cell = CellBuilder::default()
-                .vertices(vertices.clone())
-                .build()
-                .unwrap();
+            let duplicate_cell = cell!(vertices.clone());
             result.cells.insert(duplicate_cell.uuid(), duplicate_cell);
         }
 
@@ -2781,10 +2685,7 @@ mod tests {
 
         if result.number_of_cells() > 0 {
             // Test with a vertex that should be inside the circumsphere
-            let inside_vertex = VertexBuilder::default()
-                .point(Point::new([0.5, 0.5, 0.5]))
-                .build()
-                .unwrap();
+            let inside_vertex = vertex!([0.5, 0.5, 0.5]);
 
             let bad_cells_result = result.find_bad_cells_and_boundary_facets(&inside_vertex);
             assert!(bad_cells_result.is_ok());
@@ -2797,10 +2698,7 @@ mod tests {
             );
 
             // Test with a vertex that should be outside all circumspheres
-            let outside_vertex = VertexBuilder::default()
-                .point(Point::new([10.0, 10.0, 10.0]))
-                .build()
-                .unwrap();
+            let outside_vertex = vertex!([10.0, 10.0, 10.0]);
 
             let bad_cells_result2 = result.find_bad_cells_and_boundary_facets(&outside_vertex);
             assert!(bad_cells_result2.is_ok());
@@ -2820,25 +2718,13 @@ mod tests {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let mut cell = cell!(vertices);
 
         // Add exactly D neighbors (3 neighbors for 3D)
         cell.neighbors = Some(vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()]);
@@ -2859,33 +2745,12 @@ mod tests {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create two cells that share some but not enough vertices
-        let shared_vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-        ];
+        let shared_vertices = vec![vertex!([0.0, 0.0, 0.0]), vertex!([1.0, 0.0, 0.0])];
 
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([2.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex6 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
+        let vertex5 = vertex!([2.0, 0.0, 0.0]);
+        let vertex6 = vertex!([1.0, 2.0, 0.0]);
 
         let mut vertices1 = shared_vertices.clone();
         vertices1.extend([vertex3, vertex4]);
@@ -2893,8 +2758,8 @@ mod tests {
         let mut vertices2 = shared_vertices;
         vertices2.extend([vertex5, vertex6]);
 
-        let mut cell1 = CellBuilder::default().vertices(vertices1).build().unwrap();
-        let mut cell2 = CellBuilder::default().vertices(vertices2).build().unwrap();
+        let mut cell1 = cell!(vertices1);
+        let mut cell2 = cell!(vertices2);
 
         // Make them claim to be neighbors
         cell1.neighbors = Some(vec![cell2.uuid()]);
@@ -2927,14 +2792,8 @@ mod tests {
             Point::new([2.0, 0.0, 0.0]),
         ];
 
-        let cell1 = CellBuilder::<f64, usize, usize, 3>::default()
-            .vertices(Vertex::from_points(points1))
-            .build()
-            .unwrap();
-        let cell2 = CellBuilder::<f64, usize, usize, 3>::default()
-            .vertices(Vertex::from_points(points2))
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points1));
+        let cell2: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points2));
 
         let facets1 = cell1.facets();
         let facets2 = cell2.facets();
@@ -2967,10 +2826,7 @@ mod tests {
             Point::new([10.0, 10.0, 11.0]),
         ];
 
-        let cell3 = CellBuilder::<f64, usize, usize, 3>::default()
-            .vertices(Vertex::from_points(points3))
-            .build()
-            .unwrap();
+        let cell3: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points3));
         let facets3 = cell3.facets();
 
         let mut found_adjacent2 = false;

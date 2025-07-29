@@ -233,21 +233,18 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex1 = vertex!([0.0, 0.0, 0.0]);
+    /// let vertex2 = vertex!([1.0, 0.0, 0.0]);
+    /// let vertex3 = vertex!([0.0, 1.0, 0.0]);
+    /// let vertex4 = vertex!([0.0, 0.0, 1.0]);
     ///
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-    ///     .build()
-    ///     .unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
     ///
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
     ///
@@ -274,21 +271,18 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
-    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex1 = vertex!([0.0, 0.0, 0.0]);
+    /// let vertex2 = vertex!([1.0, 0.0, 0.0]);
+    /// let vertex3 = vertex!([0.0, 1.0, 0.0]);
+    /// let vertex4 = vertex!([0.0, 0.0, 1.0]);
     ///
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-    ///     .build()
-    ///     .unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
     ///
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();
     ///
@@ -323,22 +317,19 @@ where
     /// # Example
     ///
     /// ```
-    /// use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
     /// use d_delaunay::delaunay_core::facet::Facet;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
     ///
     /// // Create a 3D tetrahedron with 4 vertices
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(); // origin
-    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(); // x-axis
-    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(); // y-axis
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(); // z-axis
+    /// let vertex1 = vertex!([0.0, 0.0, 0.0]); // origin
+    /// let vertex2 = vertex!([1.0, 0.0, 0.0]); // x-axis
+    /// let vertex3 = vertex!([0.0, 1.0, 0.0]); // y-axis
+    /// let vertex4 = vertex!([0.0, 0.0, 1.0]); // z-axis
     ///
-    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-    ///     .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-    ///     .build()
-    ///     .unwrap();
+    /// let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
     ///
     /// // Create a facet with vertex1 as the opposite vertex
     /// let facet = Facet::new(cell.clone(), vertex1).unwrap();

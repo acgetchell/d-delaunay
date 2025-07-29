@@ -126,9 +126,9 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
     use crate::geometry::traits::coordinate::Coordinate;
+    use crate::vertex;
     use approx::assert_relative_eq;
     use std::collections::HashMap;
 
@@ -289,13 +289,7 @@ mod tests {
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, i32, 3>> = points
             .into_iter()
             .enumerate()
-            .map(|(i, point)| {
-                VertexBuilder::default()
-                    .point(point)
-                    .data(i32::try_from(i).unwrap())
-                    .build()
-                    .unwrap()
-            })
+            .map(|(i, point)| vertex!(point.to_array(), i32::try_from(i).unwrap()))
             .collect();
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
 
