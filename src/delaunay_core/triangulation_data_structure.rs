@@ -143,6 +143,7 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::NumCast;
 use serde::{Serialize, de::DeserializeOwned};
+use slotmap::{SlotMap, new_key_type};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -150,6 +151,17 @@ use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
 use thiserror::Error;
 use uuid::Uuid;
+
+// Define key types for SlotMaps
+new_key_type! {
+    /// Key type for accessing vertices in SlotMap
+    pub struct VertexKey;
+}
+
+new_key_type! {
+    /// Key type for accessing cells in SlotMap
+    pub struct CellKey;
+}
 
 // =============================================================================
 // ERROR TYPES
@@ -191,6 +203,12 @@ pub enum TriangulationValidationError {
         cell1: Uuid,
         /// The second cell UUID.
         cell2: Uuid,
+    },
+    /// Vertex mapping inconsistency.
+    #[error("Vertex mapping inconsistency: {message}")]
+    MappingInconsistency {
+        /// Description of the mapping inconsistency.
+        message: String,
     },
 }
 
@@ -353,7 +371,7 @@ where
 // STRUCT DEFINITION
 // =============================================================================
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
 ///
@@ -413,18 +431,23 @@ where
     V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// A [`HashMap`] that stores [Vertex] objects with their corresponding [Uuid]s as
-    /// keys. Each [Vertex] has a [Point] of type T, vertex data of type U,
-    /// and a constant D representing the dimension.
-    pub vertices: HashMap<Uuid, Vertex<T, U, D>>,
+    /// `SlotMap` for storing vertices, allowing stable keys and efficient access.
+    pub vertices: SlotMap<VertexKey, Vertex<T, U, D>>,
 
-    /// A [`HashMap`] that stores [Cell] objects with their corresponding [Uuid]s as
-    /// keys.
-    /// Each [Cell] has one or more [Vertex] objects and cell data of type V.
-    /// Note the dimensionality of the cell may differ from D, though the [Tds]
-    /// only stores cells of maximal dimensionality D and infers other lower
-    /// dimensional cells from the maximal cells and their vertices.
-    pub cells: HashMap<Uuid, Cell<T, U, V, D>>,
+    /// `SlotMap` for storing cells, providing stable keys and efficient access.
+    pub cells: SlotMap<CellKey, Cell<T, U, V, D>>,
+
+    /// `HashMap` to map Vertex UUIDs to their `VertexKeys` in the `SlotMap`.
+    pub vertex_uuid_to_key: HashMap<Uuid, VertexKey>,
+
+    /// `HashMap` to map `VertexKeys` to their corresponding Vertex UUIDs.
+    pub vertex_key_to_uuid: HashMap<VertexKey, Uuid>,
+
+    /// `HashMap` to map Cell UUIDs to their `CellKeys` in the `SlotMap`.
+    pub cell_uuid_to_key: HashMap<Uuid, CellKey>,
+
+    /// `HashMap` to map `CellKeys` to their corresponding Cell UUIDs.
+    pub cell_key_to_uuid: HashMap<CellKey, Uuid>,
 }
 
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
@@ -499,7 +522,9 @@ where
     ///
     /// // Check that all vertices are associated with the cell
     /// for vertex in cell.vertices() {
-    ///     assert!(tds.vertices.contains_key(&vertex.uuid()), "Cell vertex should exist in triangulation");
+    ///     // Find the vertex key corresponding to this vertex UUID
+    ///     let vertex_key = tds.vertex_uuid_to_key.get(&vertex.uuid()).expect("Vertex UUID should map to a key");
+    ///     assert!(tds.vertices.contains_key(*vertex_key), "Cell vertex should exist in triangulation");
     /// }
     /// ```
     ///
@@ -540,16 +565,25 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         let mut tds = Self {
-            vertices: Vertex::into_hashmap(vertices.to_owned()),
-            cells: HashMap::new(),
+            vertices: SlotMap::with_key(),
+            cells: SlotMap::with_key(),
+            vertex_uuid_to_key: HashMap::new(),
+            vertex_key_to_uuid: HashMap::new(),
+            cell_uuid_to_key: HashMap::new(),
+            cell_key_to_uuid: HashMap::new(),
         };
 
+        // Add vertices to SlotMap and create bidirectional UUID-to-key mappings
+        for vertex in vertices {
+            let key = tds.vertices.insert(*vertex);
+            let uuid = vertex.uuid();
+            tds.vertex_uuid_to_key.insert(uuid, key);
+            tds.vertex_key_to_uuid.insert(key, uuid);
+        }
+
         // Initialize cells using Bowyer-Watson triangulation
-        let cells_vector = tds.bowyer_watson_logic(vertices)?;
-        tds.cells = cells_vector
-            .into_iter()
-            .map(|cell| (cell.uuid(), cell))
-            .collect();
+        // Note: bowyer_watson_logic now populates the SlotMaps internally
+        tds.bowyer_watson_logic()?;
 
         Ok(tds)
     }
@@ -575,8 +609,12 @@ where
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            vertices: HashMap::new(),
-            cells: HashMap::new(),
+            vertices: SlotMap::with_key(),
+            cells: SlotMap::with_key(),
+            vertex_uuid_to_key: HashMap::new(),
+            vertex_key_to_uuid: HashMap::new(),
+            cell_uuid_to_key: HashMap::new(),
+            cell_key_to_uuid: HashMap::new(),
         }
     }
 
@@ -661,7 +699,14 @@ where
     /// assert_eq!(tds.dim(), 2);
     /// ```
     pub fn add(&mut self, vertex: Vertex<T, U, D>) -> Result<(), &'static str> {
-        // Don't add if vertex with that point already exists
+        let uuid = vertex.uuid();
+
+        // Check if UUID already exists
+        if self.vertex_uuid_to_key.contains_key(&uuid) {
+            return Err("Uuid already exists!");
+        }
+
+        // Iterate over self.vertices.values() to check for coordinate duplicates
         for val in self.vertices.values() {
             let existing_coords: [T; D] = val.into();
             let new_coords: [T; D] = (&vertex).into();
@@ -670,15 +715,14 @@ where
             }
         }
 
-        // Hashmap::insert returns the old value if the key already exists and
-        // updates it with the new value
-        let result = self.vertices.insert(vertex.uuid(), vertex);
+        // Call self.vertices.insert(vertex) to get a VertexKey
+        let key = self.vertices.insert(vertex);
 
-        // Return an error if there is a uuid collision
-        match result {
-            Some(_) => Err("Uuid already exists!"),
-            None => Ok(()),
-        }
+        // Store vertex_uuid_to_key.insert(uuid, key) and vertex_key_to_uuid.insert(key, uuid)
+        self.vertex_uuid_to_key.insert(uuid, key);
+        self.vertex_key_to_uuid.insert(key, uuid);
+
+        Ok(())
     }
 
     /// The function returns the number of vertices in the triangulation
@@ -921,8 +965,14 @@ where
         }
 
         // Find the bounding box of all input vertices
-        let min_coords = find_extreme_coordinates(&self.vertices, Ordering::Less)?;
-        let max_coords = find_extreme_coordinates(&self.vertices, Ordering::Greater)?;
+        // Create a temporary HashMap for the find_extreme_coordinates function
+        let vertices_map: HashMap<Uuid, Vertex<T, U, D>> = self
+            .vertices
+            .iter()
+            .map(|(key, vertex)| (self.vertex_key_to_uuid[&key], *vertex))
+            .collect();
+        let min_coords = find_extreme_coordinates(&vertices_map, Ordering::Less)?;
+        let max_coords = find_extreme_coordinates(&vertices_map, Ordering::Greater)?;
 
         // Convert coordinates to f64 for calculations
         let mut center_f64 = [0.0f64; D];
@@ -1149,32 +1199,38 @@ where
     /// ```
     /// Private method that performs Bowyer-Watson triangulation on a set of vertices
     /// and returns a vector of cells
-    fn bowyer_watson_logic(
-        &mut self,
-        vertices: &[Vertex<T, U, D>],
-    ) -> Result<Vec<Cell<T, U, V, D>>, TriangulationValidationError>
+    fn bowyer_watson_logic(&mut self) -> Result<(), TriangulationValidationError>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
+        let vertices: Vec<_> = self.vertices.values().copied().collect();
         if vertices.is_empty() {
-            return Ok(vec![]);
+            return Ok(());
         }
 
-        // Store original vertices in self for use by helper methods
-        self.vertices = Vertex::into_hashmap(vertices.to_owned());
+        // Note: We don't clear existing vertices here since new() method
+        // already populates them before calling this method
 
         // For small vertex sets (≤ D+1), use a direct combinatorial approach
         // This creates valid boundary facets for simple cases
         if vertices.len() <= D + 1 {
             // For D+1 or fewer vertices, we can create a single simplex directly
             let cell = CellBuilder::default()
-                .vertices(vertices.to_vec())
+                .vertices(vertices)
                 .build()
                 .map_err(|e| TriangulationValidationError::FailedToCreateCell {
                     message: format!("Failed to create simplex from vertices: {e}"),
                 })?;
-            return Ok(vec![cell]);
+
+            // Insert the cell into SlotMaps and record mappings
+            let cell_key = self.cells.insert(cell);
+            let cell_uuid = self.cells[cell_key].uuid();
+            self.cell_uuid_to_key.insert(cell_uuid, cell_key);
+            self.cell_key_to_uuid.insert(cell_key, cell_uuid);
+
+            self.assign_incident_cells();
+            return Ok(());
         }
 
         // For larger vertex sets, use the full Bowyer-Watson algorithm
@@ -1187,7 +1243,11 @@ where
         let supercell_vertices: HashSet<Uuid> =
             supercell.vertices().iter().map(Vertex::uuid).collect();
 
-        self.cells.insert(supercell.uuid(), supercell);
+        // Insert supercell via SlotMap and record mapping
+        let supercell_key = self.cells.insert(supercell);
+        let supercell_uuid = self.cells[supercell_key].uuid();
+        self.cell_uuid_to_key.insert(supercell_uuid, supercell_key);
+        self.cell_key_to_uuid.insert(supercell_key, supercell_uuid);
 
         for vertex in vertices {
             if supercell_vertices.contains(&vertex.uuid()) {
@@ -1195,31 +1255,40 @@ where
             }
 
             let (bad_cells, boundary_facets) = self
-                .find_bad_cells_and_boundary_facets(vertex)
+                .find_bad_cells_and_boundary_facets(&vertex)
                 .map_err(|e| TriangulationValidationError::FailedToCreateCell {
                     message: format!("Error finding bad cells and boundary facets: {e}"),
                 })?;
 
-            for bad_cell_id in bad_cells {
-                self.cells.remove(&bad_cell_id);
+            // Remove bad cells and their mappings
+            for bad_cell_key in bad_cells {
+                if let Some(removed_cell) = self.cells.remove(bad_cell_key) {
+                    let uuid = removed_cell.uuid();
+                    self.cell_uuid_to_key.remove(&uuid);
+                    self.cell_key_to_uuid.remove(&bad_cell_key);
+                }
             }
 
+            // Add new cells and their mappings
             for facet in &boundary_facets {
-                let new_cell = Cell::from_facet_and_vertex(facet, *vertex).map_err(|e| {
+                let new_cell = Cell::from_facet_and_vertex(facet, vertex).map_err(|e| {
                     TriangulationValidationError::FailedToCreateCell {
                         message: format!("Error creating cell from facet and vertex: {e}"),
                     }
                 })?;
-                self.cells.insert(new_cell.uuid(), new_cell);
+                let new_cell_key = self.cells.insert(new_cell);
+                let new_cell_uuid = self.cells[new_cell_key].uuid();
+                self.cell_uuid_to_key.insert(new_cell_uuid, new_cell_key);
+                self.cell_key_to_uuid.insert(new_cell_key, new_cell_uuid);
             }
         }
 
         self.remove_cells_containing_supercell_vertices();
-        self.remove_duplicate_cells()?;
+        self.remove_duplicate_cells();
         self.assign_neighbors();
         self.assign_incident_cells();
 
-        Ok(self.cells.values().cloned().collect())
+        Ok(())
     }
 
     /// Create a Delaunay triangulation using the Bowyer-Watson algorithm
@@ -1244,14 +1313,7 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         // Simply use the existing triangulation logic
-        let vertices: Vec<_> = self.vertices.values().copied().collect();
-
-        // Use our internal logic to compute the triangulation
-        let cells = self.bowyer_watson_logic(&vertices)?;
-
-        // Update the cells in the TDS
-        self.cells = cells.into_iter().map(|cell| (cell.uuid(), cell)).collect();
-
+        self.bowyer_watson_logic()?;
         Ok(self)
     }
 
@@ -1259,7 +1321,7 @@ where
     fn find_bad_cells_and_boundary_facets(
         &self,
         vertex: &Vertex<T, U, D>,
-    ) -> Result<(Vec<Uuid>, Vec<Facet<T, U, V, D>>), anyhow::Error>
+    ) -> Result<(Vec<CellKey>, Vec<Facet<T, U, V, D>>), anyhow::Error>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -1268,25 +1330,25 @@ where
         let mut boundary_facets = Vec::new();
 
         // Find cells whose circumsphere contains the vertex
-        for (cell_id, cell) in &self.cells {
+        for (cell_key, cell) in &self.cells {
             // Re-use the existing slice, no allocation
             let vertex_points: Vec<Point<T, D>> =
                 cell.vertices().iter().map(|v| *v.point()).collect();
             let contains = insphere(&vertex_points, *vertex.point())?;
             if matches!(contains, InSphere::INSIDE) {
-                bad_cells.push(*cell_id);
+                bad_cells.push(cell_key);
             }
         }
 
         // Collect boundary facets - facets that are on the boundary of the bad cells cavity
-        for &bad_cell_id in &bad_cells {
-            if let Some(bad_cell) = self.cells.get(&bad_cell_id) {
+        for &bad_cell_key in &bad_cells {
+            if let Some(bad_cell) = self.cells.get(bad_cell_key) {
                 for facet in bad_cell.facets() {
                     // A facet is on the boundary if it's not shared with another bad cell
                     let mut is_boundary = true;
-                    for &other_bad_cell_id in &bad_cells {
-                        if other_bad_cell_id != bad_cell_id {
-                            if let Some(other_cell) = self.cells.get(&other_bad_cell_id) {
+                    for &other_bad_cell_key in &bad_cells {
+                        if other_bad_cell_key != bad_cell_key {
+                            if let Some(other_cell) = self.cells.get(other_bad_cell_key) {
                                 if other_cell.facets().contains(&facet) {
                                     is_boundary = false;
                                     break;
@@ -1310,33 +1372,39 @@ where
 
     fn assign_neighbors(&mut self) {
         // A map from facet keys to the cells that share that facet.
-        let mut facet_map: HashMap<u64, Vec<Uuid>> = HashMap::new();
-        for (cell_id, cell) in &self.cells {
+        let mut facet_map: HashMap<u64, Vec<CellKey>> = HashMap::new();
+        for (cell_key, cell) in &self.cells {
             for facet in cell.facets() {
-                facet_map.entry(facet.key()).or_default().push(*cell_id);
+                facet_map.entry(facet.key()).or_default().push(cell_key);
             }
         }
 
         // A map to build the neighbor lists for each cell.
-        let mut neighbor_map: HashMap<Uuid, HashSet<Uuid>> =
-            self.cells.keys().map(|id| (*id, HashSet::new())).collect();
+        let mut neighbor_map: HashMap<CellKey, HashSet<CellKey>> = self
+            .cells
+            .keys()
+            .map(|cell_key| (cell_key, HashSet::new()))
+            .collect();
 
         // For each facet that is shared by more than one cell, all those cells are neighbors.
-        for (_, cell_ids) in facet_map.into_iter().filter(|(_, ids)| ids.len() > 1) {
-            for i in 0..cell_ids.len() {
-                for j in (i + 1)..cell_ids.len() {
-                    let id1 = cell_ids[i];
-                    let id2 = cell_ids[j];
-                    neighbor_map.get_mut(&id1).unwrap().insert(id2);
-                    neighbor_map.get_mut(&id2).unwrap().insert(id1);
+        for (_, cell_keys) in facet_map.into_iter().filter(|(_, keys)| keys.len() > 1) {
+            for i in 0..cell_keys.len() {
+                for j in (i + 1)..cell_keys.len() {
+                    let key1 = cell_keys[i];
+                    let key2 = cell_keys[j];
+                    neighbor_map.get_mut(&key1).unwrap().insert(key2);
+                    neighbor_map.get_mut(&key2).unwrap().insert(key1);
                 }
             }
         }
 
         // Update the cells with their neighbor information.
-        for (cell_id, neighbors) in neighbor_map {
-            if let Some(cell) = self.cells.get_mut(&cell_id) {
-                let neighbor_vec: Vec<Uuid> = neighbors.into_iter().collect();
+        for (cell_key, neighbors) in neighbor_map {
+            if let Some(cell) = self.cells.get_mut(cell_key) {
+                let neighbor_vec: Vec<Uuid> = neighbors
+                    .into_iter()
+                    .map(|key| self.cell_key_to_uuid[&key])
+                    .collect();
                 if neighbor_vec.is_empty() {
                     cell.neighbors = None;
                 } else {
@@ -1347,33 +1415,29 @@ where
     }
 
     fn assign_incident_cells(&mut self) {
-        // Create a map from vertex UUID to incident cell UUIDs
-        let mut vertex_to_cells: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+        // Build vertex_to_cells: HashMap<VertexKey, Vec<CellKey>> by iterating for (cell_key, cell) in &self.cells
+        let mut vertex_to_cells: HashMap<VertexKey, Vec<CellKey>> = HashMap::new();
 
-        // Initialize the map with all vertices
-        for vertex_id in self.vertices.keys() {
-            vertex_to_cells.insert(*vertex_id, Vec::new());
-        }
-
-        // Find which cells contain each vertex
-        for (cell_id, cell) in &self.cells {
+        for (cell_key, cell) in &self.cells {
+            // For each vertex in cell.vertices(): look up its VertexKey via vertex_uuid_to_key and push cell_key
             for vertex in cell.vertices() {
-                if let Some(incident_cells) = vertex_to_cells.get_mut(&vertex.uuid()) {
-                    incident_cells.push(*cell_id);
+                if let Some(&vertex_key) = self.vertex_uuid_to_key.get(&vertex.uuid()) {
+                    vertex_to_cells
+                        .entry(vertex_key)
+                        .or_default()
+                        .push(cell_key);
                 }
             }
         }
 
-        // Update each vertex with its incident cell information
-        for (vertex_id, cell_ids) in vertex_to_cells {
-            if let Some(vertex) = self.vertices.get_mut(&vertex_id) {
-                if !cell_ids.is_empty() {
-                    // For now, just assign the first incident cell
-                    // In a full implementation, you might want to store all incident cells
-                    let mut updated_vertex = *vertex;
-                    updated_vertex.incident_cell = Some(cell_ids[0]);
-                    self.vertices.insert(vertex_id, updated_vertex);
-                }
+        // Iterate over for (vkey, cell_keys) in vertex_to_cells
+        for (vkey, cell_keys) in vertex_to_cells {
+            if !cell_keys.is_empty() {
+                // Convert cell_keys[0] to Uuid via cell_key_to_uuid
+                let cell_uuid = self.cell_key_to_uuid[&cell_keys[0]];
+
+                // Do self.vertices.get_mut(&vkey).unwrap().incident_cell = Some(cell_uuid)
+                self.vertices.get_mut(vkey).unwrap().incident_cell = Some(cell_uuid);
             }
         }
     }
@@ -1408,74 +1472,75 @@ where
     /// - Eliminate duplicate calls to `remove_duplicate_cells()` for better performance
     /// - Use more efficient filtering logic with `HashSet` operations
     fn remove_cells_containing_supercell_vertices(&mut self) {
-        // The goal is to remove supercell artifacts while preserving valid Delaunay cells
-        // We should only keep cells that are made entirely of input vertices
+        // The goal is to remove supercell artifacts while preserving valid Delaunay cells.
+        // We should only keep cells that are made entirely of input vertices.
 
-        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().copied().collect();
+        // Create a set of input vertex UUIDs for efficient lookup.
+        let input_uuid_set: HashSet<Uuid> = self
+            .vertices
+            .keys()
+            .map(|k| self.vertex_key_to_uuid[&k])
+            .collect();
 
-        let cells_to_remove: Vec<Uuid> = self
+        let cells_to_remove: Vec<CellKey> = self
             .cells
             .iter()
             .filter(|(_, cell)| {
-                let cell_vertex_uuids: HashSet<Uuid> =
-                    cell.vertices().iter().map(Vertex::uuid).collect();
-                let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
-
-                // Remove cells that don't consist entirely of input vertices
-                // Keep only cells that are made entirely of input vertices
-                !has_only_input_vertices
+                // A cell should be removed if any of its vertices are not in the input UUID set.
+                !cell
+                    .vertices()
+                    .iter()
+                    .all(|v| input_uuid_set.contains(&v.uuid()))
             })
-            .map(|(uuid, _)| *uuid)
+            .map(|(key, _)| key)
             .collect();
 
-        for cell_id in cells_to_remove {
-            self.cells.remove(&cell_id);
+        // Remove the identified cells and their corresponding UUID mappings.
+        for cell_key in cells_to_remove {
+            if let Some(removed_cell) = self.cells.remove(cell_key) {
+                self.cell_uuid_to_key.remove(&removed_cell.uuid());
+                self.cell_key_to_uuid.remove(&cell_key);
+            }
         }
     }
 
     /// Remove duplicate cells (cells with identical vertex sets)
     ///
-    /// Returns the number of duplicate cells that were removed, or an error if
-    /// all duplicate cells could not be successfully removed.
-    fn remove_duplicate_cells(&mut self) -> Result<usize, TriangulationValidationError> {
+    /// Returns the number of duplicate cells that were removed.
+    fn remove_duplicate_cells(&mut self) -> usize {
         let mut unique_cells = HashMap::new();
         let mut cells_to_remove = Vec::new();
 
         // First pass: identify duplicate cells
-        for (cell_id, cell) in &self.cells {
+        for (cell_key, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
+            let mut vertex_uuids: Vec<Uuid> = cell
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
             vertex_uuids.sort();
 
-            if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
+            if let Some(_existing_cell_key) = unique_cells.get(&vertex_uuids) {
                 // This is a duplicate cell - mark for removal
-                cells_to_remove.push(*cell_id);
+                cells_to_remove.push(cell_key);
             } else {
                 // This is a unique cell
-                unique_cells.insert(vertex_uuids, *cell_id);
+                unique_cells.insert(vertex_uuids, cell_key);
             }
         }
 
         let duplicate_count = cells_to_remove.len();
-        let mut removed_count = 0;
 
-        // Second pass: remove duplicate cells and count successful removals
-        for cell_id in cells_to_remove {
-            if self.cells.remove(&cell_id).is_some() {
-                removed_count += 1;
+        // Second pass: remove duplicate cells and their corresponding UUID mappings
+        for cell_key in &cells_to_remove {
+            if let Some(removed_cell) = self.cells.remove(*cell_key) {
+                self.cell_uuid_to_key.remove(&removed_cell.uuid());
+                self.cell_key_to_uuid.remove(cell_key);
             }
         }
 
-        // Verify all duplicates were successfully removed
-        if removed_count != duplicate_count {
-            return Err(TriangulationValidationError::DuplicateCells {
-                message: format!(
-                    "Failed to remove all duplicate cells: attempted to remove {duplicate_count}, actually removed {removed_count}"
-                ),
-            });
-        }
-
-        Ok(removed_count)
+        duplicate_count
     }
 
     // =============================================================================
@@ -1523,7 +1588,7 @@ where
     ///     println!("Facet key {} is contained in {} cell(s)", facet_key, cell_facet_pairs.len());
     ///     
     ///     for (cell_id, facet_index) in cell_facet_pairs {
-    ///         println!("  - Cell {} at facet index {}", cell_id, facet_index);
+    ///         println!("  - Cell {:?} at facet index {}", cell_id, facet_index);
     ///     }
     /// }
     /// ```
@@ -1534,8 +1599,8 @@ where
     /// number of facets per cell (typically D+1 for D-dimensional cells). The space
     /// complexity is O(T) where T is the total number of facets across all cells.
     #[must_use]
-    pub fn build_facet_to_cells_hashmap(&self) -> HashMap<u64, Vec<(Uuid, usize)>> {
-        let mut facet_to_cells: HashMap<u64, Vec<(Uuid, usize)>> = HashMap::new();
+    pub fn build_facet_to_cells_hashmap(&self) -> HashMap<u64, Vec<(CellKey, usize)>> {
+        let mut facet_to_cells: HashMap<u64, Vec<(CellKey, usize)>> = HashMap::new();
 
         // Iterate over all cells and their facets
         for (cell_id, cell) in &self.cells {
@@ -1550,7 +1615,7 @@ where
                 facet_to_cells
                     .entry(facet_key)
                     .or_default()
-                    .push((*cell_id, facet_index));
+                    .push((cell_id, facet_index));
             }
         }
 
@@ -1561,6 +1626,165 @@ where
     // VALIDATION
     // =============================================================================
 
+    /// Validates the consistency of vertex UUID-to-key mappings.
+    ///
+    /// This helper function ensures that:
+    /// 1. The number of entries in `vertex_uuid_to_key` matches the number of vertices
+    /// 2. The number of entries in `vertex_key_to_uuid` matches the number of vertices
+    /// 3. Every vertex UUID in the triangulation has a corresponding key mapping
+    /// 4. Every vertex key in the triangulation has a corresponding UUID mapping
+    /// 5. The mappings are bidirectional and consistent (UUID ↔ Key)
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if all vertex mappings are consistent, otherwise a `TriangulationValidationError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `TriangulationValidationError::MappingInconsistency` with a descriptive message if:
+    /// - The number of UUID-to-key mappings doesn't match the number of vertices
+    /// - The number of key-to-UUID mappings doesn't match the number of vertices
+    /// - A vertex exists without a corresponding UUID-to-key mapping
+    /// - A vertex exists without a corresponding key-to-UUID mapping
+    /// - The bidirectional mappings are inconsistent (UUID maps to key A, but key A maps to different UUID)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Validation should pass for a properly constructed triangulation
+    /// assert!(tds.validate_vertex_mappings().is_ok());
+    /// ```
+    #[allow(clippy::too_many_lines)]
+    pub fn validate_vertex_mappings(&self) -> Result<(), TriangulationValidationError> {
+        if self.vertex_uuid_to_key.len() != self.vertices.len() {
+            return Err(TriangulationValidationError::MappingInconsistency {
+                message: format!(
+                    "Number of UUID-to-key mappings ({}) doesn't match number of vertices ({})",
+                    self.vertex_uuid_to_key.len(),
+                    self.vertices.len()
+                ),
+            });
+        }
+        if self.vertex_key_to_uuid.len() != self.vertices.len() {
+            return Err(TriangulationValidationError::MappingInconsistency {
+                message: format!(
+                    "Number of key-to-UUID mappings ({}) doesn't match number of vertices ({})",
+                    self.vertex_key_to_uuid.len(),
+                    self.vertices.len()
+                ),
+            });
+        }
+
+        for (vertex_key, vertex) in &self.vertices {
+            let vertex_uuid = vertex.uuid();
+            if self.vertex_uuid_to_key.get(&vertex_uuid) != Some(&vertex_key) {
+                return Err(TriangulationValidationError::MappingInconsistency {
+                    message: format!(
+                        "Inconsistent or missing UUID-to-key mapping for vertex UUID {vertex_uuid:?}"
+                    ),
+                });
+            }
+            if self.vertex_key_to_uuid.get(&vertex_key) != Some(&vertex_uuid) {
+                return Err(TriangulationValidationError::MappingInconsistency {
+                    message: format!(
+                        "Inconsistent or missing key-to-UUID mapping for vertex key {vertex_key:?}"
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates the consistency of cell UUID-to-key mappings.
+    ///
+    /// This helper function ensures that:
+    /// 1. The number of entries in `cell_uuid_to_key` matches the number of cells
+    /// 2. The number of entries in `cell_key_to_uuid` matches the number of cells
+    /// 3. Every cell UUID in the triangulation has a corresponding key mapping
+    /// 4. Every cell key in the triangulation has a corresponding UUID mapping
+    /// 5. The mappings are bidirectional and consistent (UUID ↔ Key)
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` if all cell mappings are consistent, otherwise a `TriangulationValidationError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `TriangulationValidationError::MappingInconsistency` with a descriptive message if:
+    /// - The number of UUID-to-key mappings doesn't match the number of cells
+    /// - The number of key-to-UUID mappings doesn't match the number of cells
+    /// - A cell exists without a corresponding UUID-to-key mapping
+    /// - A cell exists without a corresponding key-to-UUID mapping
+    /// - The bidirectional mappings are inconsistent (UUID maps to key A, but key A maps to different UUID)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Validation should pass for a properly constructed triangulation
+    /// assert!(tds.validate_cell_mappings().is_ok());
+    /// ```
+    #[allow(clippy::too_many_lines)]
+    pub fn validate_cell_mappings(&self) -> Result<(), TriangulationValidationError> {
+        if self.cell_uuid_to_key.len() != self.cells.len() {
+            return Err(TriangulationValidationError::MappingInconsistency {
+                message: format!(
+                    "Number of cell UUID-to-key mappings ({}) doesn't match number of cells ({})",
+                    self.cell_uuid_to_key.len(),
+                    self.cells.len()
+                ),
+            });
+        }
+        if self.cell_key_to_uuid.len() != self.cells.len() {
+            return Err(TriangulationValidationError::MappingInconsistency {
+                message: format!(
+                    "Number of cell key-to-UUID mappings ({}) doesn't match number of cells ({})",
+                    self.cell_key_to_uuid.len(),
+                    self.cells.len()
+                ),
+            });
+        }
+
+        for (cell_key, cell) in &self.cells {
+            let cell_uuid = cell.uuid();
+            if self.cell_uuid_to_key.get(&cell_uuid) != Some(&cell_key) {
+                return Err(TriangulationValidationError::MappingInconsistency {
+                    message: format!(
+                        "Inconsistent or missing UUID-to-key mapping for cell UUID {cell_uuid:?}"
+                    ),
+                });
+            }
+            if self.cell_key_to_uuid.get(&cell_key) != Some(&cell_uuid) {
+                return Err(TriangulationValidationError::MappingInconsistency {
+                    message: format!(
+                        "Inconsistent or missing key-to-UUID mapping for cell key {cell_key:?}"
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Check for duplicate cells and return an error if any are found
     ///
     /// This is useful for validation where you want to detect duplicates
@@ -1569,17 +1793,17 @@ where
         let mut unique_cells = HashMap::new();
         let mut duplicates = Vec::new();
 
-        for (cell_id, cell) in &self.cells {
+        for (cell_key, cell) in &self.cells {
             // Create a sorted vector of vertex UUIDs as a key for uniqueness
             let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
             vertex_uuids.sort();
 
-            if let Some(existing_cell_id) = unique_cells.get(&vertex_uuids) {
+            if let Some(existing_cell_key) = unique_cells.get(&vertex_uuids) {
                 // This is a duplicate cell
-                duplicates.push((*cell_id, *existing_cell_id, vertex_uuids.clone()));
+                duplicates.push((cell_key, *existing_cell_key, vertex_uuids.clone()));
             } else {
                 // This is a unique cell
-                unique_cells.insert(vertex_uuids, *cell_id);
+                unique_cells.insert(vertex_uuids, cell_key);
             }
         }
 
@@ -1715,7 +1939,10 @@ where
     /// ];
     ///
     /// let invalid_cell = cell!(vertices);
-    /// tds.cells.insert(invalid_cell.uuid(), invalid_cell);
+    /// let cell_key = tds.cells.insert(invalid_cell);
+    /// let cell_uuid = tds.cells[cell_key].uuid();
+    /// tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+    /// tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
     ///
     /// // Validation should fail
     /// match tds.is_valid() {
@@ -1729,14 +1956,18 @@ where
     where
         [T; D]: DeserializeOwned + Serialize + Sized,
     {
-        // First, validate cell uniqueness (quick check for duplicate cells)
+        // First, validate mapping consistency
+        self.validate_vertex_mappings()?;
+        self.validate_cell_mappings()?;
+
+        // Then, validate cell uniqueness (quick check for duplicate cells)
         self.validate_no_duplicate_cells()?;
 
         // Then validate all cells
         for (cell_id, cell) in &self.cells {
             cell.is_valid()
                 .map_err(|source| TriangulationValidationError::InvalidCell {
-                    cell_id: *cell_id,
+                    cell_id: self.cell_key_to_uuid[&cell_id],
                     source,
                 })?;
         }
@@ -1792,7 +2023,7 @@ where
             if cells.len() == 1 {
                 let cell_id = cells[0].0;
                 let facet_index = cells[0].1;
-                if let Some(cell) = self.cells.get(&cell_id) {
+                if let Some(cell) = self.cells.get(cell_id) {
                     boundary_facets.push(cell.facets()[facet_index].clone());
                 }
             }
@@ -1913,15 +2144,19 @@ where
     /// - Efficient intersection counting without creating intermediate collections
     fn validate_neighbors_internal(&self) -> Result<(), TriangulationValidationError> {
         // Pre-compute vertex UUIDs for all cells to avoid repeated computation
-        let mut cell_vertices: HashMap<Uuid, HashSet<Uuid>> =
+        let mut cell_vertices: HashMap<CellKey, HashSet<VertexKey>> =
             HashMap::with_capacity(self.cells.len());
 
-        for (cell_id, cell) in &self.cells {
-            let vertices: HashSet<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
-            cell_vertices.insert(*cell_id, vertices);
+        for (cell_key, cell) in &self.cells {
+            let vertices: HashSet<VertexKey> = cell
+                .vertices()
+                .iter()
+                .map(|v| self.vertex_uuid_to_key[&v.uuid()])
+                .collect();
+            cell_vertices.insert(cell_key, vertices);
         }
 
-        for (cell_id, cell) in &self.cells {
+        for (cell_key, cell) in &self.cells {
             let Some(neighbors) = &cell.neighbors else {
                 continue; // Skip cells without neighbors
             };
@@ -1931,30 +2166,36 @@ where
                 return Err(TriangulationValidationError::InvalidNeighbors {
                     message: format!(
                         "Cell {:?} has too many neighbors: {}",
-                        cell_id,
+                        cell_key,
                         neighbors.len()
                     ),
                 });
             }
 
             // Get this cell's vertices from pre-computed map
-            let this_vertices = &cell_vertices[cell_id];
+            let this_vertices = &cell_vertices[&cell_key];
 
-            for neighbor_id in neighbors {
+            for neighbor_uuid in neighbors {
                 // Early termination: check if neighbor exists
-                let Some(neighbor_cell) = self.cells.get(neighbor_id) else {
+                let Some(&neighbor_key) = self.cell_uuid_to_key.get(neighbor_uuid) else {
                     return Err(TriangulationValidationError::InvalidNeighbors {
-                        message: format!("Neighbor cell {neighbor_id:?} not found"),
+                        message: format!("Neighbor cell {neighbor_uuid:?} not found"),
+                    });
+                };
+                let Some(neighbor_cell) = self.cells.get(neighbor_key) else {
+                    return Err(TriangulationValidationError::InvalidNeighbors {
+                        message: format!("Neighbor cell {neighbor_uuid:?} not found"),
                     });
                 };
 
                 // Early termination: mutual neighbor check using HashSet for O(1) lookup
                 if let Some(neighbor_neighbors) = &neighbor_cell.neighbors {
                     let neighbor_set: HashSet<_> = neighbor_neighbors.iter().collect();
-                    if !neighbor_set.contains(cell_id) {
+                    if !neighbor_set.contains(&cell.uuid()) {
                         return Err(TriangulationValidationError::InvalidNeighbors {
                             message: format!(
-                                "Neighbor relationship not mutual: {cell_id:?} → {neighbor_id:?}"
+                                "Neighbor relationship not mutual: {:?} → {neighbor_uuid:?}",
+                                cell.uuid()
                             ),
                         });
                     }
@@ -1962,20 +2203,21 @@ where
                     // Neighbor has no neighbors, so relationship cannot be mutual
                     return Err(TriangulationValidationError::InvalidNeighbors {
                         message: format!(
-                            "Neighbor relationship not mutual: {cell_id:?} → {neighbor_id:?}"
+                            "Neighbor relationship not mutual: {:?} → {neighbor_uuid:?}",
+                            cell.uuid()
                         ),
                     });
                 }
 
                 // Optimized shared facet check: count intersections without creating intermediate collections
-                let neighbor_vertices = &cell_vertices[neighbor_id];
+                let neighbor_vertices = &cell_vertices[&neighbor_key];
                 let shared_count = this_vertices.intersection(neighbor_vertices).count();
 
                 // Early termination: check shared vertex count
                 if shared_count != D {
                     return Err(TriangulationValidationError::NotNeighbors {
-                        cell1: *cell_id,
-                        cell2: *neighbor_id,
+                        cell1: cell.uuid(),
+                        cell2: *neighbor_uuid,
                     });
                 }
             }
@@ -2036,7 +2278,7 @@ mod tests {
         tds.add(vertex).unwrap();
 
         let result = tds.add(vertex);
-        assert_eq!(result, Err("Vertex already exists!"));
+        assert_eq!(result, Err("Uuid already exists!"));
     }
 
     #[test]
@@ -2066,24 +2308,33 @@ mod tests {
         let uuid1 = vertex1.uuid();
         tds.add(vertex1).unwrap();
 
-        // Create a new vertex with different coordinates but same UUID
+        // Create a new vertex with different coordinates but same UUID using struct initialization
         let point2 = Point::new([
             num_traits::NumCast::from(4.0f64).unwrap(),
             num_traits::NumCast::from(5.0f64).unwrap(),
             num_traits::NumCast::from(6.0f64).unwrap(),
         ]); // Different coordinates
-        let vertex2 = VertexBuilder::default().point(point2).build().unwrap(); // Complex generic test keeps VertexBuilder
 
-        // Manually insert the second vertex with the first vertex's UUID to simulate UUID collision
-        let collision_result = tds.vertices.insert(uuid1, vertex2);
-        assert!(collision_result.is_some()); // Should return the old value (vertex1)
+        // Create vertex2 with the SAME UUID as vertex1 using struct initialization
+        let vertex2 = Vertex {
+            point: point2,
+            uuid: uuid1, // Same UUID as vertex1 to create collision scenario
+            incident_cell: None,
+            data: None,
+        };
 
-        // Since we can't directly test the add() method's UUID collision path due to the coordinate check,
-        // let's test that the vertices HashMap correctly handles UUID collisions
-        assert_eq!(tds.vertices.len(), 1); // Should still have only 1 vertex
+        // Manually insert the second vertex to test SlotMap behavior with UUID collision
+        let key2 = tds.vertices.insert(vertex2);
+        // SlotMap insert returns a new key, so we should now have 2 vertices
+        assert_eq!(tds.vertices.len(), 2); // Should have 2 vertices now
 
-        // The vertex at uuid1 should now be vertex2 (the collision overwrote vertex1)
-        let stored_vertex = tds.vertices.get(&uuid1).unwrap();
+        // Update the UUID mappings for collision scenario
+        // The UUID-to-key mapping should now point to the more recent key
+        tds.vertex_uuid_to_key.insert(uuid1, key2);
+        tds.vertex_key_to_uuid.insert(key2, uuid1);
+
+        // Test that we can retrieve the second vertex using its key
+        let stored_vertex = tds.vertices.get(key2).unwrap();
         let stored_coords: [T; 3] = stored_vertex.into();
         // Convert to f64 for comparison
         let expected_coords = [
@@ -2092,6 +2343,10 @@ mod tests {
             num_traits::NumCast::from(6.0f64).unwrap(),
         ];
         assert_eq!(stored_coords, expected_coords); // Should be vertex2's coordinates
+
+        // Test that the UUID collision is handled - the mapping should point to the newer vertex
+        let looked_up_key = tds.vertex_uuid_to_key.get(&uuid1).unwrap();
+        assert_eq!(*looked_up_key, key2); // Should point to the second vertex's key
     }
 
     // =============================================================================
@@ -2196,9 +2451,19 @@ mod tests {
             vertex!([0.0, 0.0, 1.0]),
         ];
 
+        // Properly add vertices to the TDS vertex mapping
+        for vertex in &vertices {
+            let vertex_key = tds.vertices.insert(*vertex);
+            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
+            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+        }
+
         let mut cell = cell!(vertices);
         cell.neighbors = Some(vec![Uuid::nil()]); // Invalid neighbor
-        tds.cells.insert(cell.uuid(), cell);
+        let cell_key = tds.cells.insert(cell);
+        let cell_uuid = tds.cells[cell_key].uuid();
+        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2223,15 +2488,13 @@ mod tests {
         // Add duplicate cell manually
         let vertices = result_tds.vertices.values().copied().collect::<Vec<_>>();
         let duplicate_cell = cell!(vertices);
-        result_tds
-            .cells
-            .insert(duplicate_cell.uuid(), duplicate_cell);
+        result_tds.cells.insert(duplicate_cell);
 
         assert_eq!(result_tds.number_of_cells(), 2); // One original, one duplicate
 
         let dupes = result_tds.remove_duplicate_cells();
 
-        assert_eq!(dupes.unwrap(), 1);
+        assert_eq!(dupes, 1);
 
         assert_eq!(result_tds.number_of_cells(), 1); // Duplicates removed
     }
@@ -2261,7 +2524,10 @@ mod tests {
         ];
 
         let cell = cell!(vertices);
-        tds.cells.insert(cell.uuid(), cell);
+        let cell_key = tds.cells.insert(cell);
+        let cell_uuid = tds.cells[cell_key].uuid();
+        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
 
         assert_eq!(tds.number_of_cells(), 1);
     }
@@ -2511,7 +2777,10 @@ mod tests {
         // Create a cell with an invalid vertex
         let invalid_cell = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
-        tds.cells.insert(invalid_cell.uuid(), invalid_cell.clone());
+        let cell_key = tds.cells.insert(invalid_cell.clone());
+        let cell_uuid = tds.cells[cell_key].uuid();
+        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
 
         // Test that validation fails with InvalidCell error
         let validation_result = tds.is_valid();
@@ -2704,6 +2973,69 @@ mod tests {
     // =============================================================================
 
     #[test]
+    fn test_validate_vertex_mappings_valid() {
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+        ];
+        let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        assert!(tds.validate_vertex_mappings().is_ok());
+    }
+
+    #[test]
+    fn test_validate_vertex_mappings_count_mismatch() {
+        let vertices = vec![vertex!([0.0, 0.0, 0.0])];
+        let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Manually add an extra entry to create a count mismatch
+        tds.vertex_uuid_to_key
+            .insert(Uuid::new_v4(), VertexKey::default());
+
+        let result = tds.validate_vertex_mappings();
+        assert!(matches!(
+            result,
+            Err(TriangulationValidationError::MappingInconsistency { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_vertex_mappings_missing_uuid_to_key() {
+        let vertices = vec![vertex!([0.0, 0.0, 0.0])];
+        let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Manually remove a mapping to create an inconsistency
+        let vertex_uuid = tds.vertices.values().next().unwrap().uuid();
+        tds.vertex_uuid_to_key.remove(&vertex_uuid);
+
+        let result = tds.validate_vertex_mappings();
+        assert!(matches!(
+            result,
+            Err(TriangulationValidationError::MappingInconsistency { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_vertex_mappings_inconsistent_mapping() {
+        let vertices = vec![vertex!([0.0, 0.0, 0.0]), vertex!([1.0, 1.0, 1.0])];
+        let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Manually create an inconsistent mapping
+        let keys: Vec<VertexKey> = tds.vertices.keys().collect();
+        if keys.len() >= 2 {
+            let uuid1 = *tds.vertex_key_to_uuid.get(&keys[0]).unwrap();
+            // Point UUID1 to the wrong key
+            tds.vertex_uuid_to_key.insert(uuid1, keys[1]);
+        }
+
+        let result = tds.validate_vertex_mappings();
+        assert!(matches!(
+            result,
+            Err(TriangulationValidationError::MappingInconsistency { .. })
+        ));
+    }
+    #[test]
     fn test_validation_with_too_many_neighbors() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
@@ -2714,6 +3046,12 @@ mod tests {
             vertex!([0.0, 1.0, 0.0]),
             vertex!([0.0, 0.0, 1.0]),
         ];
+        // Properly add vertices to the TDS vertex mapping
+        for vertex in &vertices {
+            let vertex_key = tds.vertices.insert(*vertex);
+            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
+            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+        }
 
         let mut cell = cell!(vertices);
 
@@ -2726,7 +3064,10 @@ mod tests {
             Uuid::new_v4(),
         ]);
 
-        tds.cells.insert(cell.uuid(), cell);
+        let cell_key = tds.cells.insert(cell);
+        let cell_uuid = tds.cells[cell_key].uuid();
+        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2747,7 +3088,10 @@ mod tests {
         ];
 
         let cell = cell!(vertices);
-        tds.cells.insert(cell.uuid(), cell);
+        let cell_key = tds.cells.insert(cell);
+        let cell_uuid = tds.cells[cell_key].uuid();
+        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
 
         let result = tds.is_valid();
         // Should now get InvalidCell error because cell validation detects insufficient vertices
@@ -2768,6 +3112,12 @@ mod tests {
             vertex!([0.0, 1.0, 0.0]),
             vertex!([0.0, 0.0, 1.0]),
         ];
+        // Properly add vertices to the TDS vertex mapping
+        for vertex in &vertices1 {
+            let vertex_key = tds.vertices.insert(*vertex);
+            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
+            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+        }
 
         let vertices2 = vec![
             vertex!([2.0, 0.0, 0.0]),
@@ -2775,6 +3125,12 @@ mod tests {
             vertex!([2.0, 1.0, 0.0]),
             vertex!([2.0, 0.0, 1.0]),
         ];
+        // Properly add vertices to the TDS vertex mapping
+        for vertex in &vertices2 {
+            let vertex_key = tds.vertices.insert(*vertex);
+            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
+            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+        }
 
         let mut cell1 = cell!(vertices1);
         let cell2 = cell!(vertices2);
@@ -2782,8 +3138,15 @@ mod tests {
         // Make cell1 point to cell2 as neighbor, but not vice versa
         cell1.neighbors = Some(vec![cell2.uuid()]);
 
-        tds.cells.insert(cell1.uuid(), cell1);
-        tds.cells.insert(cell2.uuid(), cell2);
+        let cell1_key = tds.cells.insert(cell1);
+        let cell1_uuid = tds.cells[cell1_key].uuid();
+        tds.cell_uuid_to_key.insert(cell1_uuid, cell1_key);
+        tds.cell_key_to_uuid.insert(cell1_key, cell1_uuid);
+
+        let cell2_key = tds.cells.insert(cell2);
+        let cell2_uuid = tds.cells[cell2_key].uuid();
+        tds.cell_uuid_to_key.insert(cell2_uuid, cell2_key);
+        tds.cell_key_to_uuid.insert(cell2_key, cell2_uuid);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -3057,9 +3420,9 @@ mod tests {
         // let mut result = tds.bowyer_watson().unwrap();
 
         // Clear existing neighbors to test assignment logic
-        let cell_ids: Vec<Uuid> = result.cells.keys().copied().collect();
-        for cell_id in cell_ids {
-            if let Some(cell) = result.cells.get_mut(&cell_id) {
+        let cell_keys: Vec<CellKey> = result.cells.keys().collect();
+        for cell_key in cell_keys {
+            if let Some(cell) = result.cells.get_mut(cell_key) {
                 cell.neighbors = None;
             }
         }
@@ -3096,9 +3459,9 @@ mod tests {
         // let mut result = tds.bowyer_watson().unwrap();
 
         // Clear existing incident cells to test assignment logic
-        let vertex_ids: Vec<Uuid> = result.vertices.keys().copied().collect();
-        for vertex_id in vertex_ids {
-            if let Some(vertex) = result.vertices.get_mut(&vertex_id) {
+        let vertex_keys: Vec<VertexKey> = result.vertices.keys().collect();
+        for vertex_key in vertex_keys {
+            if let Some(vertex) = result.vertices.get_mut(vertex_key) {
                 vertex.incident_cell = None;
             }
         }
@@ -3139,15 +3502,13 @@ mod tests {
 
         for _ in 0..3 {
             let duplicate_cell = cell!(vertices.clone());
-            result.cells.insert(duplicate_cell.uuid(), duplicate_cell);
+            result.cells.insert(duplicate_cell);
         }
 
         assert_eq!(result.number_of_cells(), original_cell_count + 3);
 
         // Remove duplicates and capture the number removed
-        let duplicate_removal_result = result.remove_duplicate_cells();
-        assert!(duplicate_removal_result.is_ok());
-        let duplicates_removed = duplicate_removal_result.unwrap();
+        let duplicates_removed = result.remove_duplicate_cells();
 
         println!(
             "Successfully removed {} duplicate cells (original: {}, after adding: {}, final: {})",
@@ -3214,13 +3575,22 @@ mod tests {
             vertex!([0.0, 1.0, 0.0]),
             vertex!([0.0, 0.0, 1.0]),
         ];
+        // Properly add vertices to the TDS vertex mapping
+        for vertex in &vertices {
+            let vertex_key = tds.vertices.insert(*vertex);
+            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
+            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+        }
 
         let mut cell = cell!(vertices);
 
         // Add exactly D neighbors (3 neighbors for 3D)
         cell.neighbors = Some(vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()]);
 
-        tds.cells.insert(cell.uuid(), cell);
+        let cell_key = tds.cells.insert(cell);
+        let cell_uuid = tds.cells[cell_key].uuid();
+        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
+        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
 
         // This should pass validation (exactly D neighbors is valid)
         let result = tds.is_valid();
@@ -3235,19 +3605,25 @@ mod tests {
     fn test_validation_shared_facet_count() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
-        // Create two cells that share some but not enough vertices
-        let shared_vertices = vec![vertex!([0.0, 0.0, 0.0]), vertex!([1.0, 0.0, 0.0])];
-
+        // Create unique vertices (no duplicates)
+        let vertex1 = vertex!([0.0, 0.0, 0.0]);
+        let vertex2 = vertex!([1.0, 0.0, 0.0]);
         let vertex3 = vertex!([0.0, 1.0, 0.0]);
         let vertex4 = vertex!([0.0, 0.0, 1.0]);
         let vertex5 = vertex!([2.0, 0.0, 0.0]);
         let vertex6 = vertex!([1.0, 2.0, 0.0]);
 
-        let mut vertices1 = shared_vertices.clone();
-        vertices1.extend([vertex3, vertex4]);
+        // Create cells that share exactly 2 vertices (vertex1 and vertex2)
+        let vertices1 = vec![vertex1, vertex2, vertex3, vertex4];
+        let vertices2 = vec![vertex1, vertex2, vertex5, vertex6];
 
-        let mut vertices2 = shared_vertices;
-        vertices2.extend([vertex5, vertex6]);
+        // Add all unique vertices to the TDS vertex mapping
+        let all_vertices = [vertex1, vertex2, vertex3, vertex4, vertex5, vertex6];
+        for vertex in &all_vertices {
+            let vertex_key = tds.vertices.insert(*vertex);
+            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
+            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+        }
 
         let mut cell1 = cell!(vertices1);
         let mut cell2 = cell!(vertices2);
@@ -3256,14 +3632,104 @@ mod tests {
         cell1.neighbors = Some(vec![cell2.uuid()]);
         cell2.neighbors = Some(vec![cell1.uuid()]);
 
-        tds.cells.insert(cell1.uuid(), cell1);
-        tds.cells.insert(cell2.uuid(), cell2);
+        let cell1_key = tds.cells.insert(cell1);
+        let cell1_uuid = tds.cells[cell1_key].uuid();
+        tds.cell_uuid_to_key.insert(cell1_uuid, cell1_key);
+        tds.cell_key_to_uuid.insert(cell1_key, cell1_uuid);
+
+        let cell2_key = tds.cells.insert(cell2);
+        let cell2_uuid = tds.cells[cell2_key].uuid();
+        tds.cell_uuid_to_key.insert(cell2_uuid, cell2_key);
+        tds.cell_key_to_uuid.insert(cell2_key, cell2_uuid);
 
         // Should fail validation because they only share 2 vertices, not 3 (D=3)
         let result = tds.is_valid();
+        println!("Actual validation result: {:?}", result);
         assert!(matches!(
             result,
             Err(TriangulationValidationError::NotNeighbors { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_cell_mappings_valid() {
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        assert!(tds.validate_cell_mappings().is_ok());
+    }
+
+    #[test]
+    fn test_validate_cell_mappings_count_mismatch() {
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Manually add an extra entry to create a count mismatch
+        tds.cell_uuid_to_key
+            .insert(Uuid::new_v4(), CellKey::default());
+
+        let result = tds.validate_cell_mappings();
+        assert!(matches!(
+            result,
+            Err(TriangulationValidationError::MappingInconsistency { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_cell_mappings_missing_uuid_to_key() {
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Manually remove a mapping to create an inconsistency
+        let cell_uuid = tds.cells.values().next().unwrap().uuid();
+        tds.cell_uuid_to_key.remove(&cell_uuid);
+
+        let result = tds.validate_cell_mappings();
+        assert!(matches!(
+            result,
+            Err(TriangulationValidationError::MappingInconsistency { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_cell_mappings_inconsistent_mapping() {
+        // Use a simpler configuration to avoid degeneracy
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Create a fake cell key to create an inconsistent mapping
+        if let Some(first_cell_key) = tds.cells.keys().next() {
+            let first_cell_uuid = tds.cells[first_cell_key].uuid();
+
+            // Create a fake CellKey and insert inconsistent mapping
+            let fake_key = CellKey::default();
+            tds.cell_uuid_to_key.insert(first_cell_uuid, fake_key);
+        }
+
+        let result = tds.validate_cell_mappings();
+        assert!(matches!(
+            result,
+            Err(TriangulationValidationError::MappingInconsistency { .. })
         ));
     }
 
@@ -3387,6 +3853,18 @@ mod tests {
         ];
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        println!("Created triangulation with {} cells", tds.number_of_cells());
+        for (i, cell) in tds.cells.values().enumerate() {
+            println!(
+                "Cell {}: vertices = {:?}",
+                i,
+                cell.vertices()
+                    .iter()
+                    .map(|v| v.point().to_array())
+                    .collect::<Vec<_>>()
+            );
+        }
 
         assert_eq!(tds.number_of_cells(), 2, "Should have exactly two cells");
 

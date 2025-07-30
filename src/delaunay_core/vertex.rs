@@ -166,10 +166,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the vertex as a D-dimensional Point.
-    point: Point<T, D>,
+    pub(crate) point: Point<T, D>,
     /// A universally unique identifier for the vertex.
     #[builder(setter(skip), default = "make_uuid()")]
-    uuid: Uuid,
+    pub(crate) uuid: Uuid,
     /// The [Uuid] of the `Cell` that the vertex is incident to.
     #[builder(setter(skip), default = "None")]
     pub incident_cell: Option<Uuid>,
