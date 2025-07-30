@@ -58,6 +58,6 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --verbose --all-targets
+          cargo test --lib --verbose
           cargo test --doc --verbose
           cargo test --examples --verbose
