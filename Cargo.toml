@@ -34,6 +34,10 @@ criterion = { version = "0.7", features = ["html_reports"] }
 name = "circumsphere_containment"
 harness = false
 
+[[bench]]
+name = "triangulation_creation"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 dead_code = "warn"

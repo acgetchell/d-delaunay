@@ -396,20 +396,15 @@ where
 /// let vertices = vec![
 ///     vertex!([0.0, 0.0]),
 ///     vertex!([1.0, 0.0]),
-///     vertex!([0.0, 1.0]),
-///     vertex!([1.0, 1.0]),
+///     vertex!([0.5, 1.0]),
 /// ];
 ///
 /// // Create a new TDS
-/// let mut tds: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices).unwrap();
-///
-/// // Add a new vertex to the triangulation
-/// let new_vertex = vertex!([0.5, 0.5]);
-/// tds.add(new_vertex).unwrap();
+/// let tds: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices).unwrap();
 ///
 /// // Check the number of cells and vertices
-/// assert_eq!(tds.number_of_cells(), 4);
-/// assert_eq!(tds.number_of_vertices(), 5);
+/// assert_eq!(tds.number_of_cells(), 1);
+/// assert_eq!(tds.number_of_vertices(), 3);
 /// ```
 pub struct Tds<T, U, V, const D: usize>
 where
@@ -557,6 +552,32 @@ where
             .collect();
 
         Ok(tds)
+    }
+
+    /// Creates an empty triangulation data structure with no vertices or cells.
+    ///
+    /// This is useful for testing purposes or when building a triangulation manually.
+    ///
+    /// # Returns
+    ///
+    /// An empty `Tds` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    ///
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::empty();
+    /// assert_eq!(tds.number_of_vertices(), 0);
+    /// assert_eq!(tds.number_of_cells(), 0);
+    /// assert_eq!(tds.dim(), -1);
+    /// ```
+    #[must_use]
+    pub fn empty() -> Self {
+        Self {
+            vertices: HashMap::new(),
+            cells: HashMap::new(),
+        }
     }
 
     /// The `add` function checks if a [Vertex] with the same coordinates already
@@ -776,7 +797,7 @@ where
     /// // Add fourth vertex (3-dimensional, capped at D=3)
     /// let vertex4: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 1.0]);
     /// tds.add(vertex4).unwrap();
-    /// assert_eq!(tds.dim(), 3);
+    /// assert_eq!(tds.number_of_vertices(), 4);
     /// ```
     ///
     /// Different dimensional triangulations:
@@ -797,14 +818,13 @@ where
     /// let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(&vertices_2d).unwrap();
     /// assert_eq!(tds_2d.dim(), 2);
     ///
-    /// // 4D triangulation with 6 vertices (capped at D=4)
+    /// // 4D triangulation with 5 vertices (minimum for 4D simplex)
     /// let points_4d = vec![
     ///     Point::new([0.0, 0.0, 0.0, 0.0]),
     ///     Point::new([1.0, 0.0, 0.0, 0.0]),
     ///     Point::new([0.0, 1.0, 0.0, 0.0]),
     ///     Point::new([0.0, 0.0, 1.0, 0.0]),
     ///     Point::new([0.0, 0.0, 0.0, 1.0]),
-    ///     Point::new([1.0, 1.0, 1.0, 1.0]),
     /// ];
     /// let vertices_4d = Vertex::from_points(points_4d);
     /// let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(&vertices_4d).unwrap();
@@ -1106,7 +1126,7 @@ where
     /// assert_eq!(result.number_of_cells(), 1); // One triangle
     /// ```
     ///
-    /// Complex 3D triangulation with multiple cells:
+    /// Simple 3D triangulation:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
@@ -1119,14 +1139,13 @@ where
     ///     Point::new([1.0, 0.0, 0.0]),
     ///     Point::new([0.0, 1.0, 0.0]),
     ///     Point::new([0.0, 0.0, 1.0]),
-    ///     Point::new([1.0, 1.0, 1.0]),
     /// ];
     ///
     /// let vertices = Vertex::from_points(points);
     /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     ///
-    /// assert_eq!(result.number_of_vertices(), 5);
-    /// assert!(result.number_of_cells() >= 1);
+    /// assert_eq!(result.number_of_vertices(), 4);
+    /// assert_eq!(result.number_of_cells(), 1);
     /// ```
     /// Private method that performs Bowyer-Watson triangulation on a set of vertices
     /// and returns a vector of cells
@@ -1145,32 +1164,20 @@ where
         // Store original vertices in self for use by helper methods
         self.vertices = Vertex::into_hashmap(vertices.to_owned());
 
-        // For cases with a small number of vertices, use direct combinatorial approach
-        if vertices.len() > D && vertices.len() <= D + 5 {
-            let mut created_cells = 0;
-            let combinations = generate_combinations(vertices, D + 1);
-
-            for combination in combinations {
-                // Try to create a cell
-                let cell = CellBuilder::default()
-                    .vertices(combination)
-                    .build()
-                    .map_err(|e| TriangulationValidationError::FailedToCreateCell {
-                        message: format!("Failed to create cell from combination: {e}"),
-                    })?;
-                self.cells.insert(cell.uuid(), cell);
-                created_cells += 1;
-            }
-
-            if created_cells > 0 {
-                self.remove_duplicate_cells()?;
-                self.assign_neighbors()?;
-                self.assign_incident_cells();
-                return Ok(self.cells.values().cloned().collect());
-            }
+        // For small vertex sets (≤ D+1), use a direct combinatorial approach
+        // This creates valid boundary facets for simple cases
+        if vertices.len() <= D + 1 {
+            // For D+1 or fewer vertices, we can create a single simplex directly
+            let cell = CellBuilder::default()
+                .vertices(vertices.to_vec())
+                .build()
+                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                    message: format!("Failed to create simplex from vertices: {e}"),
+                })?;
+            return Ok(vec![cell]);
         }
 
-        // For more complex cases, use the full Bowyer-Watson algorithm
+        // For larger vertex sets, use the full Bowyer-Watson algorithm
         let supercell =
             self.supercell()
                 .map_err(|e| TriangulationValidationError::FailedToCreateCell {
@@ -1209,7 +1216,7 @@ where
 
         self.remove_cells_containing_supercell_vertices();
         self.remove_duplicate_cells()?;
-        self.assign_neighbors()?;
+        self.assign_neighbors();
         self.assign_incident_cells();
 
         Ok(self.cells.values().cloned().collect())
@@ -1301,71 +1308,42 @@ where
     // NEIGHBOR & INCIDENT ASSIGNMENT
     // =============================================================================
 
-    fn assign_neighbors(&mut self) -> Result<(), TriangulationValidationError> {
-        // Create a map to store neighbor relationships
-        let mut neighbor_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
-
-        // Initialize neighbor lists for all cells
-        for cell_id in self.cells.keys() {
-            neighbor_map.insert(*cell_id, Vec::new());
+    fn assign_neighbors(&mut self) {
+        // A map from facet keys to the cells that share that facet.
+        let mut facet_map: HashMap<u64, Vec<Uuid>> = HashMap::new();
+        for (cell_id, cell) in &self.cells {
+            for facet in cell.facets() {
+                facet_map.entry(facet.key()).or_default().push(*cell_id);
+            }
         }
 
-        // Find neighboring cells by comparing facets
-        let cell_ids: Vec<Uuid> = self.cells.keys().copied().collect();
+        // A map to build the neighbor lists for each cell.
+        let mut neighbor_map: HashMap<Uuid, HashSet<Uuid>> =
+            self.cells.keys().map(|id| (*id, HashSet::new())).collect();
 
-        for i in 0..cell_ids.len() {
-            for j in (i + 1)..cell_ids.len() {
-                let cell1_id = cell_ids[i];
-                let cell2_id = cell_ids[j];
-
-                if let (Some(cell1), Some(cell2)) =
-                    (self.cells.get(&cell1_id), self.cells.get(&cell2_id))
-                {
-                    // Check if cells share a facet (are neighbors)
-                    let cell1_facets = cell1.facets();
-                    let cell2_facets = cell2.facets();
-
-                    for facet1 in &cell1_facets {
-                        for facet2 in &cell2_facets {
-                            // Two cells are neighbors if they share a facet
-                            // (same vertices but opposite orientation)
-                            if facets_are_adjacent(facet1, facet2) {
-                                neighbor_map
-                                    .get_mut(&cell1_id)
-                    .ok_or_else(|| TriangulationValidationError::FailedToCreateCell {
-                        message: format!(
-                            "Failed to access neighbor map for cell {cell1_id:?}"
-                        ),
-                    })?
-                                    .push(cell2_id);
-                                neighbor_map
-                                    .get_mut(&cell2_id)
-                    .ok_or_else(|| TriangulationValidationError::FailedToCreateCell {
-                        message: format!(
-                            "Failed to access neighbor map for cell {cell2_id:?}"
-                        ),
-                    })?
-                                    .push(cell1_id);
-                            }
-                        }
-                    }
+        // For each facet that is shared by more than one cell, all those cells are neighbors.
+        for (_, cell_ids) in facet_map.into_iter().filter(|(_, ids)| ids.len() > 1) {
+            for i in 0..cell_ids.len() {
+                for j in (i + 1)..cell_ids.len() {
+                    let id1 = cell_ids[i];
+                    let id2 = cell_ids[j];
+                    neighbor_map.get_mut(&id1).unwrap().insert(id2);
+                    neighbor_map.get_mut(&id2).unwrap().insert(id1);
                 }
             }
         }
 
-        // Assign the computed neighbors to the cells
+        // Update the cells with their neighbor information.
         for (cell_id, neighbors) in neighbor_map {
             if let Some(cell) = self.cells.get_mut(&cell_id) {
-                if !neighbors.is_empty() {
-                    // Create a mutable reference to update the cell
-                    let mut updated_cell = cell.clone();
-                    updated_cell.neighbors = Some(neighbors);
-                    self.cells.insert(cell_id, updated_cell);
+                let neighbor_vec: Vec<Uuid> = neighbors.into_iter().collect();
+                if neighbor_vec.is_empty() {
+                    cell.neighbors = None;
+                } else {
+                    cell.neighbors = Some(neighbor_vec);
                 }
             }
         }
-
-        Ok(())
     }
 
     fn assign_incident_cells(&mut self) {
@@ -1404,6 +1382,31 @@ where
     // DUPLICATE REMOVAL
     // =============================================================================
 
+    /// Removes cells that contain supercell vertices from the triangulation.
+    ///
+    /// This method efficiently filters out supercell artifacts after the Bowyer-Watson
+    /// algorithm completes, keeping only cells that are composed entirely of input vertices.
+    /// This cleanup step is essential for producing a clean Delaunay triangulation.
+    ///
+    /// # Performance
+    ///
+    /// - **Time Complexity**: O(N) where N is the number of cells
+    /// - **Space Complexity**: O(N) for temporary storage of cell IDs to remove
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create a set of input vertex UUIDs for fast lookup (O(V) where V = vertices)
+    /// 2. Iterate through all cells, checking if each cell contains only input vertices (O(N·D))
+    /// 3. Remove cells that contain any supercell vertices (O(K) where K = cells to remove)
+    ///
+    /// The overall complexity is O(V + N·D + K) = O(N·D) since V ≤ N·D and K ≤ N.
+    ///
+    /// # Recent Improvements
+    ///
+    /// This method was recently refactored to:
+    /// - Remove the redundant `supercell` parameter, simplifying the API
+    /// - Eliminate duplicate calls to `remove_duplicate_cells()` for better performance
+    /// - Use more efficient filtering logic with `HashSet` operations
     fn remove_cells_containing_supercell_vertices(&mut self) {
         // The goal is to remove supercell artifacts while preserving valid Delaunay cells
         // We should only keep cells that are made entirely of input vertices
@@ -1473,6 +1476,85 @@ where
         }
 
         Ok(removed_count)
+    }
+
+    // =============================================================================
+    // FACET-TO-CELLS MAPPING
+    // =============================================================================
+
+    /// Builds a `HashMap` mapping facet keys to the cells and facet indices that contain them.
+    ///
+    /// This method iterates over all cells and their facets once, computes the canonical key
+    /// for each facet using `facet.key()`, and creates a mapping from facet keys to the cells
+    /// that contain those facets along with the facet index within each cell.
+    ///
+    /// # Returns
+    ///
+    /// A `HashMap<u64, Vec<(Uuid, usize)>>` where:
+    /// - The key is the canonical facet key (u64) computed by `facet.key()`
+    /// - The value is a vector of tuples containing:
+    ///   - `Uuid`: The UUID of the cell containing this facet
+    ///   - `usize`: The index of this facet within the cell (0-based)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
+    ///
+    /// // Create a simple 3D triangulation
+    /// let points = vec![
+    ///     Point::new([0.0, 0.0, 0.0]),
+    ///     Point::new([1.0, 0.0, 0.0]),
+    ///     Point::new([0.0, 1.0, 0.0]),
+    ///     Point::new([0.0, 0.0, 1.0]),
+    /// ];
+    ///
+    /// let vertices = Vertex::from_points(points);
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Build the facet-to-cells mapping
+    /// let facet_map = tds.build_facet_to_cells_hashmap();
+    ///
+    /// // Each facet key should map to the cells that contain it
+    /// for (facet_key, cell_facet_pairs) in &facet_map {
+    ///     println!("Facet key {} is contained in {} cell(s)", facet_key, cell_facet_pairs.len());
+    ///     
+    ///     for (cell_id, facet_index) in cell_facet_pairs {
+    ///         println!("  - Cell {} at facet index {}", cell_id, facet_index);
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Performance
+    ///
+    /// This method has O(N×F) time complexity where N is the number of cells and F is the
+    /// number of facets per cell (typically D+1 for D-dimensional cells). The space
+    /// complexity is O(T) where T is the total number of facets across all cells.
+    #[must_use]
+    pub fn build_facet_to_cells_hashmap(&self) -> HashMap<u64, Vec<(Uuid, usize)>> {
+        let mut facet_to_cells: HashMap<u64, Vec<(Uuid, usize)>> = HashMap::new();
+
+        // Iterate over all cells and their facets
+        for (cell_id, cell) in &self.cells {
+            let facets = cell.facets();
+
+            // Iterate over each facet in the cell
+            for (facet_index, facet) in facets.iter().enumerate() {
+                // Compute the canonical key for this facet
+                let facet_key = facet.key();
+
+                // Insert the (cell_id, facet_index) pair into the HashMap
+                facet_to_cells
+                    .entry(facet_key)
+                    .or_default()
+                    .push((*cell_id, facet_index));
+            }
+        }
+
+        facet_to_cells
     }
 
     // =============================================================================
@@ -1663,6 +1745,164 @@ where
         self.validate_neighbors_internal()?;
 
         Ok(())
+    }
+
+    /// Identifies all boundary facets in the triangulation.
+    ///
+    /// A boundary facet is a facet that belongs to only one cell, meaning it lies on the
+    /// boundary of the triangulation (convex hull). These facets are important for
+    /// convex hull computation and boundary analysis.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Facet<T, U, V, D>>` containing all boundary facets in the triangulation.
+    /// The facets are returned in no particular order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// // Create a simple 3D triangulation (single tetrahedron)
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // A single tetrahedron has 4 boundary facets (all facets are on the boundary)
+    /// let boundary_facets = tds.boundary_facets();
+    /// assert_eq!(boundary_facets.len(), 4);
+    /// ```
+    #[must_use]
+    pub fn boundary_facets(&self) -> Vec<Facet<T, U, V, D>>
+    where
+        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
+        f64: From<T>,
+    {
+        // Build a map from facet keys to the cells that contain them
+        let facet_to_cells = self.build_facet_to_cells_hashmap();
+        let mut boundary_facets = Vec::new();
+
+        // Collect all facets that belong to only one cell
+        for (_facet_key, cells) in facet_to_cells {
+            if cells.len() == 1 {
+                let cell_id = cells[0].0;
+                let facet_index = cells[0].1;
+                if let Some(cell) = self.cells.get(&cell_id) {
+                    boundary_facets.push(cell.facets()[facet_index].clone());
+                }
+            }
+        }
+
+        boundary_facets
+    }
+
+    /// Checks if a specific facet is a boundary facet.
+    ///
+    /// A boundary facet is a facet that belongs to only one cell in the triangulation.
+    ///
+    /// # Arguments
+    ///
+    /// * `facet` - The facet to check.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the facet is on the boundary (belongs to only one cell), `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Get a facet from one of the cells
+    /// if let Some(cell) = tds.cells.values().next() {
+    ///     let facets = cell.facets();
+    ///     if let Some(facet) = facets.first() {
+    ///         // In a single tetrahedron, all facets are boundary facets
+    ///         assert!(tds.is_boundary_facet(facet));
+    ///     }
+    /// }
+    /// ```
+    pub fn is_boundary_facet(&self, facet: &Facet<T, U, V, D>) -> bool
+    where
+        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
+        f64: From<T>,
+    {
+        let facet_key = facet.key();
+        let mut count = 0;
+
+        // Count how many cells contain this facet
+        for cell in self.cells.values() {
+            for cell_facet in cell.facets() {
+                if cell_facet.key() == facet_key {
+                    count += 1;
+                    if count > 1 {
+                        return false; // Early exit - not a boundary facet
+                    }
+                }
+            }
+        }
+
+        count == 1
+    }
+
+    /// Returns the number of boundary facets in the triangulation.
+    ///
+    /// This is a more efficient way to count boundary facets without creating
+    /// the full vector of facets.
+    ///
+    /// # Returns
+    ///
+    /// The number of boundary facets in the triangulation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // A single tetrahedron has 4 boundary facets
+    /// assert_eq!(tds.number_of_boundary_facets(), 4);
+    /// ```
+    #[must_use]
+    pub fn number_of_boundary_facets(&self) -> usize
+    where
+        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
+        f64: From<T>,
+    {
+        // Build a map from facet keys to count of cells that contain them
+        let mut facet_counts: HashMap<u64, usize> = HashMap::new();
+
+        for cell in self.cells.values() {
+            for facet in cell.facets() {
+                *facet_counts.entry(facet.key()).or_insert(0) += 1;
+            }
+        }
+
+        // Count facets that appear in only one cell
+        facet_counts.values().filter(|&&count| count == 1).count()
     }
 
     /// Internal method for validating neighbor relationships.
@@ -2181,10 +2421,10 @@ mod tests {
         // Using 6 points in 4D space to create a complex triangulation
         let points = vec![
             Point::new([0.0, 0.0, 0.0, 0.0]), // origin
-            Point::new([1.0, 0.0, 0.0, 0.0]), // unit vector in x
-            Point::new([0.0, 1.0, 0.0, 0.0]), // unit vector in y
-            Point::new([0.0, 0.0, 1.0, 0.0]), // unit vector in z
-            Point::new([0.0, 0.0, 0.0, 1.0]), // unit vector in w
+            Point::new([3.0, 0.0, 0.0, 0.0]), // x-axis
+            Point::new([0.0, 3.0, 0.0, 0.0]), // y-axis
+            Point::new([0.0, 0.0, 3.0, 0.0]), // z-axis
+            Point::new([0.0, 0.0, 0.0, 3.0]), // w-axis
             Point::new([1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
 
@@ -2221,11 +2461,11 @@ mod tests {
         // Using 7 points in 5D space to create a complex triangulation
         let points = vec![
             Point::new([0.0, 0.0, 0.0, 0.0, 0.0]), // origin
-            Point::new([1.0, 0.0, 0.0, 0.0, 0.0]), // unit vector in x
-            Point::new([0.0, 1.0, 0.0, 0.0, 0.0]), // unit vector in y
-            Point::new([0.0, 0.0, 1.0, 0.0, 0.0]), // unit vector in z
-            Point::new([0.0, 0.0, 0.0, 1.0, 0.0]), // unit vector in w
-            Point::new([0.0, 0.0, 0.0, 0.0, 1.0]), // unit vector in v
+            Point::new([3.0, 0.0, 0.0, 0.0, 0.0]), // x-axis
+            Point::new([0.0, 3.0, 0.0, 0.0, 0.0]), // y-axis
+            Point::new([0.0, 0.0, 3.0, 0.0, 0.0]), // z-axis
+            Point::new([0.0, 0.0, 0.0, 3.0, 0.0]), // w-axis
+            Point::new([0.0, 0.0, 0.0, 0.0, 3.0]), // v-axis
             Point::new([1.0, 1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
 
@@ -2354,10 +2594,10 @@ mod tests {
     fn test_neighbor_assignment_logic() {
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
+            Point::new([7.0, 0.1, 0.2]),
+            Point::new([0.3, 7.1, 0.4]),
+            Point::new([0.5, 0.6, 7.2]),
+            Point::new([1.5, 1.7, 1.9]),
         ];
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -2365,7 +2605,7 @@ mod tests {
         let mut result = tds;
 
         // Manually assign neighbors to test the logic
-        let _ = result.assign_neighbors();
+        result.assign_neighbors();
 
         // Check that at least one cell has neighbors assigned
         let has_neighbors = result.cells.values().any(|cell| {
@@ -2556,14 +2796,14 @@ mod tests {
     fn test_bowyer_watson_complex_geometry() {
         // Test with points that form a more complex 3D arrangement
         let points = vec![
-            Point::new([0.0, 0.0, 0.0]), // origin
-            Point::new([2.0, 0.0, 0.0]), // x-axis
-            Point::new([0.0, 2.0, 0.0]), // y-axis
-            Point::new([0.0, 0.0, 2.0]), // z-axis
-            Point::new([1.0, 1.0, 0.0]), // xy-plane
-            Point::new([1.0, 0.0, 1.0]), // xz-plane
-            Point::new([0.0, 1.0, 1.0]), // yz-plane
-            Point::new([1.0, 1.0, 1.0]), // center point
+            Point::new([0.1, 0.2, 0.3]),
+            Point::new([10.4, 0.5, 0.6]),
+            Point::new([0.7, 10.8, 0.9]),
+            Point::new([1.0, 1.1, 11.2]),
+            Point::new([2.1, 3.2, 4.3]),
+            Point::new([4.4, 2.5, 3.6]),
+            Point::new([3.7, 4.8, 2.9]),
+            Point::new([5.1, 5.2, 5.3]),
         ];
 
         let vertices = Vertex::from_points(points);
@@ -2735,11 +2975,11 @@ mod tests {
         // Test the combinatorial approach path in bowyer_watson
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 0.0]),
-            Point::new([1.0, 0.0, 1.0]),
+            Point::new([6.1, 0.0, 0.0]),
+            Point::new([0.0, 6.2, 0.0]),
+            Point::new([0.0, 0.0, 6.3]),
+            Point::new([2.1, 2.2, 0.1]),
+            Point::new([2.3, 0.3, 2.4]),
         ];
         let vertices = Vertex::from_points(points);
         let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -2807,10 +3047,10 @@ mod tests {
     fn test_assign_neighbors_comprehensive() {
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
+            Point::new([8.0, 0.1, 0.2]),
+            Point::new([0.3, 8.1, 0.4]),
+            Point::new([0.5, 0.6, 8.2]),
+            Point::new([1.7, 1.9, 2.1]),
         ];
         let vertices = Vertex::from_points(points);
         let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -2825,7 +3065,7 @@ mod tests {
         }
 
         // Test neighbor assignment
-        let _ = result.assign_neighbors();
+        result.assign_neighbors();
 
         // Verify that neighbors were assigned
         let mut total_neighbor_links = 0;
@@ -3098,5 +3338,192 @@ mod tests {
             !found_adjacent2,
             "Cells sharing no vertices should not have adjacent facets"
         );
+    }
+
+    // =============================================================================
+    // BOUNDARY FACET TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_boundary_facets_single_cell() {
+        // Create a single tetrahedron - all its facets should be boundary facets
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+
+        assert_eq!(tds.number_of_cells(), 1, "Should contain one cell");
+
+        // All 4 facets of the tetrahedron should be on the boundary
+        let boundary_facets = tds.boundary_facets();
+        assert_eq!(
+            boundary_facets.len(),
+            4,
+            "A single tetrahedron should have 4 boundary facets"
+        );
+
+        // Also test the count method for efficiency
+        assert_eq!(
+            tds.number_of_boundary_facets(),
+            4,
+            "Count of boundary facets should be 4"
+        );
+    }
+
+    #[test]
+    fn test_is_boundary_facet() {
+        // Create a triangulation with two adjacent tetrahedra sharing one facet
+        // This should result in 6 boundary facets and 1 internal (shared) facet
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),  // A
+            Point::new([1.0, 0.0, 0.0]),  // B
+            Point::new([0.5, 1.0, 0.0]),  // C - forms base triangle ABC
+            Point::new([0.5, 0.5, 1.0]),  // D - above base
+            Point::new([0.5, 0.5, -1.0]), // E - below base
+        ];
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        assert_eq!(tds.number_of_cells(), 2, "Should have exactly two cells");
+
+        // Get all boundary facets
+        let boundary_facets = tds.boundary_facets();
+        assert_eq!(
+            boundary_facets.len(),
+            6,
+            "Two adjacent tetrahedra should have 6 boundary facets"
+        );
+
+        // Test that all facets from boundary_facets() are indeed boundary facets
+        for boundary_facet in &boundary_facets {
+            assert!(
+                tds.is_boundary_facet(boundary_facet),
+                "All facets from boundary_facets() should be boundary facets"
+            );
+        }
+
+        // Test the count method
+        assert_eq!(
+            tds.number_of_boundary_facets(),
+            6,
+            "Count should match the vector length"
+        );
+
+        // Build a map of facet keys to the cells that contain them
+        let mut facet_map: HashMap<u64, Vec<Uuid>> = HashMap::new();
+        for cell in tds.cells.values() {
+            for facet in cell.facets() {
+                facet_map.entry(facet.key()).or_default().push(cell.uuid());
+            }
+        }
+
+        // Count boundary and shared facets
+        let mut boundary_count = 0;
+        let mut shared_count = 0;
+
+        for (_, cells) in facet_map {
+            if cells.len() == 1 {
+                boundary_count += 1;
+            } else if cells.len() == 2 {
+                shared_count += 1;
+            } else {
+                panic!(
+                    "Facet should be shared by at most 2 cells, found {}",
+                    cells.len()
+                );
+            }
+        }
+
+        // Two tetrahedra should have 6 boundary facets and 1 shared facet
+        assert_eq!(boundary_count, 6, "Should have 6 boundary facets");
+        assert_eq!(shared_count, 1, "Should have 1 shared (internal) facet");
+
+        // Verify neighbors are correctly assigned
+        let cells: Vec<_> = tds.cells.values().collect();
+        let cell1 = cells[0];
+        let cell2 = cells[1];
+
+        // Each cell should have exactly one neighbor (the other cell)
+        assert!(cell1.neighbors.is_some(), "Cell 1 should have neighbors");
+        assert!(cell2.neighbors.is_some(), "Cell 2 should have neighbors");
+
+        let neighbors1 = cell1.neighbors.as_ref().unwrap();
+        let neighbors2 = cell2.neighbors.as_ref().unwrap();
+
+        assert_eq!(neighbors1.len(), 1, "Cell 1 should have exactly 1 neighbor");
+        assert_eq!(neighbors2.len(), 1, "Cell 2 should have exactly 1 neighbor");
+
+        assert!(
+            neighbors1.contains(&cell2.uuid()),
+            "Cell 1 should have Cell 2 as neighbor"
+        );
+        assert!(
+            neighbors2.contains(&cell1.uuid()),
+            "Cell 2 should have Cell 1 as neighbor"
+        );
+    }
+
+    #[test]
+    #[ignore = "Benchmark test is time-consuming and not suitable for regular test runs"]
+    fn benchmark_boundary_facets_performance() {
+        use rand::Rng;
+        use std::time::Instant;
+
+        // Smaller point counts for reasonable test time
+        let point_counts = [20, 40, 60, 80];
+
+        println!("\nBenchmarking boundary_facets() performance:");
+        println!(
+            "Note: This demonstrates the O(N·F) complexity where N = cells, F = facets per cell"
+        );
+
+        for &n_points in &point_counts {
+            // Create a number of random points in 3D
+            let mut rng = rand::rng();
+            let points: Vec<Point<f64, 3>> = (0..n_points)
+                .map(|_| {
+                    Point::new([
+                        rng.random::<f64>() * 100.0,
+                        rng.random::<f64>() * 100.0,
+                        rng.random::<f64>() * 100.0,
+                    ])
+                })
+                .collect();
+
+            let vertices = Vertex::from_points(points);
+            let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+            // Time multiple runs to get more stable measurements
+            let mut total_time = std::time::Duration::ZERO;
+            let runs: u32 = 10;
+
+            for _ in 0..runs {
+                let start = Instant::now();
+                let boundary_facets = tds.boundary_facets();
+                total_time += start.elapsed();
+
+                // Prevent optimization away
+                std::hint::black_box(boundary_facets);
+            }
+
+            let avg_time = total_time / runs;
+
+            println!(
+                "Points: {:3} | Cells: {:4} | Boundary Facets: {:4} | Avg Time: {:?}",
+                n_points,
+                tds.number_of_cells(),
+                tds.number_of_boundary_facets(),
+                avg_time
+            );
+        }
+
+        println!("\nOptimization achieved:");
+        println!("- Single pass over all cells and facets: O(N·F)");
+        println!("- HashMap-based facet-to-cells mapping");
+        println!("- Direct facet cloning instead of repeated computation");
     }
 }

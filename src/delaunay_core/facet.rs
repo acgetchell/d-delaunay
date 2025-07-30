@@ -46,6 +46,7 @@ use super::{cell::Cell, vertex::Vertex};
 use crate::delaunay_core::traits::data::DataType;
 use crate::geometry::traits::coordinate::CoordinateScalar;
 use serde::{Serialize, de::DeserializeOwned};
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
@@ -388,6 +389,24 @@ where
             .filter(|v| **v != self.vertex)
             .copied()
             .collect()
+    }
+
+    /// Returns a canonical key for the facet.
+    ///
+    /// This key is a hash of the sorted vertex UUIDs, ensuring that any two facets
+    /// sharing the same vertices have the same key, regardless of vertex order.
+    ///
+    /// # Returns
+    ///
+    /// A `u64` hash value representing the canonical key of the facet.
+    pub fn key(&self) -> u64 {
+        let mut vertices = self.vertices();
+        vertices.sort_by_key(super::vertex::Vertex::uuid);
+        let mut hasher = DefaultHasher::new();
+        for vertex in vertices {
+            vertex.uuid().hash(&mut hasher);
+        }
+        hasher.finish()
     }
 }
 
@@ -889,6 +908,45 @@ mod tests {
     }
 
     #[test]
+    fn test_facet_key_consistency() {
+        let (cell, vertices) = create_tetrahedron();
+
+        // Create a facet with vertices[0] as opposite vertex
+        // This facet contains vertices[1], vertices[2], vertices[3]
+        let facet1 = Facet::new(cell.clone(), vertices[0]).unwrap();
+
+        // Create another cell with the same vertices but in different order
+        let reversed_vertices = {
+            let mut a = vertices.clone();
+            a.reverse();
+            a
+        };
+        let cell2: TestCell3D = cell!(reversed_vertices.clone());
+
+        // Create a facet from the reversed cell with reversed_vertices[3] (which is vertices[0]) as opposite
+        // This facet should contain the same vertices as facet1: vertices[1], vertices[2], vertices[3]
+        let facet2 = Facet::new(cell2, reversed_vertices[3]).unwrap();
+
+        // Both facets should have the same vertices (just in different order), so same key
+        assert_eq!(
+            facet1.key(),
+            facet2.key(),
+            "Keys should be consistent for facets with same vertices regardless of vertex order"
+        );
+
+        // Create a different facet from the original cell with vertices[1] as opposite
+        // This facet contains vertices[0], vertices[2], vertices[3] - different from facet1
+        let facet3 = Facet::new(cell, vertices[1]).unwrap();
+
+        // This should have a different key since it has different vertices
+        assert_ne!(
+            facet1.key(),
+            facet3.key(),
+            "Keys should be different for facets with different vertices"
+        );
+    }
+
+    #[test]
     fn facet_vertices_empty_cell() {
         // This tests the edge case where a cell might be empty
         // Although this shouldn't happen in practice due to validation
@@ -971,21 +1029,21 @@ mod tests {
         );
 
         // Verify cell vertices coordinates and data
-        for (orig_v, deser_v) in facet
+        for (orig_v, deserialized_v) in facet
             .cell()
             .vertices()
             .iter()
             .zip(deserialized.cell().vertices().iter())
         {
             let orig_coords: [f32; 2] = orig_v.into();
-            let deser_coords: [f32; 2] = deser_v.into();
+            let deserialized_coords: [f32; 2] = deserialized_v.into();
             assert_relative_eq!(
                 orig_coords.as_slice(),
-                deser_coords.as_slice(),
+                deserialized_coords.as_slice(),
                 epsilon = f32::EPSILON
             );
-            assert_eq!(orig_v.data, deser_v.data);
-            assert_eq!(orig_v.uuid(), deser_v.uuid());
+            assert_eq!(orig_v.data, deserialized_v.data);
+            assert_eq!(orig_v.uuid(), deserialized_v.uuid());
         }
 
         // Human readable output for cargo test -- --nocapture
