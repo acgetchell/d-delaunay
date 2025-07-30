@@ -897,7 +897,7 @@ where
     fn supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
         if self.vertices.is_empty() {
             // For empty input, create a default supercell
-            return Ok(Self::create_default_supercell());
+            return Self::create_default_supercell();
         }
 
         // Find the bounding box of all input vertices
@@ -935,12 +935,14 @@ where
         let supercell = CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap();
+            .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                message: format!("Failed to create supercell using Vertex::from_points: {e}"),
+            })?;
         Ok(supercell)
     }
 
     /// Creates a default supercell for empty input
-    fn create_default_supercell() -> Cell<T, U, V, D> {
+    fn create_default_supercell() -> Result<Cell<T, U, V, D>, anyhow::Error> {
         let center = [T::default(); D];
         let radius = NumCast::from(20.0f64).expect("Failed to convert radius"); // Default radius of 20.0
         let points = Self::create_supercell_simplex(&center, radius);
@@ -948,7 +950,13 @@ where
         CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap()
+            .map_err(|e| {
+                anyhow::Error::new(TriangulationValidationError::FailedToCreateCell {
+                    message: format!(
+                        "Failed to create default supercell using Vertex::from_points: {e}"
+                    ),
+                })
+            })
     }
 
     /// Creates a well-formed simplex centered at the given point with the given radius
@@ -1147,7 +1155,9 @@ where
                 let cell = CellBuilder::default()
                     .vertices(combination)
                     .build()
-                    .expect("Failed to create cell from combination");
+                    .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                        message: format!("Failed to create cell from combination: {e}"),
+                    })?;
                 self.cells.insert(cell.uuid(), cell);
                 created_cells += 1;
             }

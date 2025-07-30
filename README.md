@@ -65,6 +65,14 @@ The library's geometric predicates and algorithms are based on established compu
 - Preparata, Franco P., and Michael Ian Shamos. "Computational Geometry: An Introduction." Texts and Monographs in Computer Science. New York: Springer-Verlag, 1985.
 - Edelsbrunner, Herbert. "Algorithms in Combinatorial Geometry." EATCS Monographs on Theoretical Computer Science. Berlin: Springer-Verlag, 1987.
 
+### Triangulation Data Structures and Algorithms
+
+- [CGAL Triangulation Documentation](https://doc.cgal.org/latest/Triangulation/index.html)
+- Bowyer, A. "Computing Dirichlet tessellations." *The Computer Journal* 24, no. 2 (1981): 162-166. DOI: [10.1093/comjnl/24.2.162](https://doi.org/10.1093/comjnl/24.2.162)
+- Watson, D.F. "Computing the n-dimensional Delaunay tessellation with application to Voronoi polytopes." *The Computer Journal* 24, no. 2 (1981):
+  167-172. DOI: [10.1093/comjnl/24.2.167](https://doi.org/10.1093/comjnl/24.2.167)
+- de Berg, M., et al. "Computational Geometry: Algorithms and Applications." 3rd ed. Berlin: Springer-Verlag, 2008. DOI: [10.1007/978-3-540-77974-2](https://doi.org/10.1007/978-3-540-77974-2)
+
 [Rust]: https://rust-lang.org
 [CGAL]: https://www.cgal.org/
 [C++]: https://isocpp.org
