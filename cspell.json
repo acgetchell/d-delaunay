@@ -8,6 +8,7 @@
         "argjson",
         "autobuild",
         "autocfg",
+        "bimap",
         "bindgen",
         "bitflags",
         "bumpalo",

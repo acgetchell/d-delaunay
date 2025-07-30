@@ -139,10 +139,11 @@ use crate::geometry::{
 };
 
 // External crate imports
+use bimap::BiMap;
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::NumCast;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use slotmap::{SlotMap, new_key_type};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
@@ -425,9 +426,9 @@ where
 /// ```
 pub struct Tds<T, U, V, const D: usize>
 where
-    T: CoordinateScalar,
-    U: DataType,
-    V: DataType,
+    T: CoordinateScalar + DeserializeOwned,
+    U: DataType + DeserializeOwned,
+    V: DataType + DeserializeOwned,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// `SlotMap` for storing vertices, allowing stable keys and efficient access.
@@ -436,17 +437,19 @@ where
     /// `SlotMap` for storing cells, providing stable keys and efficient access.
     pub cells: SlotMap<CellKey, Cell<T, U, V, D>>,
 
-    /// `HashMap` to map Vertex UUIDs to their `VertexKeys` in the `SlotMap`.
-    pub vertex_uuid_to_key: HashMap<Uuid, VertexKey>,
+    /// `BiMap` to map Vertex UUIDs to their `VertexKeys` in the `SlotMap` and vice versa.
+    #[serde(
+        serialize_with = "serialize_bimap",
+        deserialize_with = "deserialize_bimap"
+    )]
+    pub vertex_bimap: BiMap<Uuid, VertexKey>,
 
-    /// `HashMap` to map `VertexKeys` to their corresponding Vertex UUIDs.
-    pub vertex_key_to_uuid: HashMap<VertexKey, Uuid>,
-
-    /// `HashMap` to map Cell UUIDs to their `CellKeys` in the `SlotMap`.
-    pub cell_uuid_to_key: HashMap<Uuid, CellKey>,
-
-    /// `HashMap` to map `CellKeys` to their corresponding Cell UUIDs.
-    pub cell_key_to_uuid: HashMap<CellKey, Uuid>,
+    /// `BiMap` to map Cell UUIDs to their `CellKeys` in the `SlotMap` and vice versa.
+    #[serde(
+        serialize_with = "serialize_cell_bimap",
+        deserialize_with = "deserialize_cell_bimap"
+    )]
+    pub cell_bimap: BiMap<Uuid, CellKey>,
 
     // Reusable buffers to minimize allocations during Bowyer-Watson algorithm
     // These are kept as part of the struct to avoid repeated allocations
@@ -533,7 +536,7 @@ where
     /// // Check that all vertices are associated with the cell
     /// for vertex in cell.vertices() {
     ///     // Find the vertex key corresponding to this vertex UUID
-    ///     let vertex_key = tds.vertex_uuid_to_key.get(&vertex.uuid()).expect("Vertex UUID should map to a key");
+    ///     let vertex_key = tds.vertex_bimap.get_by_left(&vertex.uuid()).expect("Vertex UUID should map to a key");
     ///     assert!(tds.vertices.contains_key(*vertex_key), "Cell vertex should exist in triangulation");
     /// }
     /// ```
@@ -577,10 +580,8 @@ where
         let mut tds = Self {
             vertices: SlotMap::with_key(),
             cells: SlotMap::with_key(),
-            vertex_uuid_to_key: HashMap::new(),
-            vertex_key_to_uuid: HashMap::new(),
-            cell_uuid_to_key: HashMap::new(),
-            cell_key_to_uuid: HashMap::new(),
+            vertex_bimap: BiMap::new(),
+            cell_bimap: BiMap::new(),
             // Initialize reusable buffers
             bad_cells_buffer: Vec::new(),
             boundary_facets_buffer: Vec::new(),
@@ -592,8 +593,7 @@ where
         for vertex in vertices {
             let key = tds.vertices.insert(*vertex);
             let uuid = vertex.uuid();
-            tds.vertex_uuid_to_key.insert(uuid, key);
-            tds.vertex_key_to_uuid.insert(key, uuid);
+            tds.vertex_bimap.insert(uuid, key);
         }
 
         // Initialize cells using Bowyer-Watson triangulation
@@ -626,10 +626,8 @@ where
         Self {
             vertices: SlotMap::with_key(),
             cells: SlotMap::with_key(),
-            vertex_uuid_to_key: HashMap::new(),
-            vertex_key_to_uuid: HashMap::new(),
-            cell_uuid_to_key: HashMap::new(),
-            cell_key_to_uuid: HashMap::new(),
+            vertex_bimap: BiMap::new(),
+            cell_bimap: BiMap::new(),
             // Initialize reusable buffers
             bad_cells_buffer: Vec::new(),
             boundary_facets_buffer: Vec::new(),
@@ -722,7 +720,7 @@ where
         let uuid = vertex.uuid();
 
         // Check if UUID already exists
-        if self.vertex_uuid_to_key.contains_key(&uuid) {
+        if self.vertex_bimap.contains_left(&uuid) {
             return Err("Uuid already exists!");
         }
 
@@ -739,8 +737,7 @@ where
         let key = self.vertices.insert(vertex);
 
         // Store vertex_uuid_to_key.insert(uuid, key) and vertex_key_to_uuid.insert(key, uuid)
-        self.vertex_uuid_to_key.insert(uuid, key);
-        self.vertex_key_to_uuid.insert(key, uuid);
+        self.vertex_bimap.insert(uuid, key);
 
         Ok(())
     }
@@ -1240,8 +1237,7 @@ where
             // Insert the cell into SlotMaps and record mappings
             let cell_key = self.cells.insert(cell);
             let cell_uuid = self.cells[cell_key].uuid();
-            self.cell_uuid_to_key.insert(cell_uuid, cell_key);
-            self.cell_key_to_uuid.insert(cell_key, cell_uuid);
+            self.cell_bimap.insert(cell_uuid, cell_key);
 
             self.assign_incident_cells();
             return Ok(());
@@ -1260,8 +1256,7 @@ where
         // Insert supercell via SlotMap and record mapping
         let supercell_key = self.cells.insert(supercell);
         let supercell_uuid = self.cells[supercell_key].uuid();
-        self.cell_uuid_to_key.insert(supercell_uuid, supercell_key);
-        self.cell_key_to_uuid.insert(supercell_key, supercell_uuid);
+        self.cell_bimap.insert(supercell_uuid, supercell_key);
 
         for vertex in vertices {
             if supercell_vertices.contains(&vertex.uuid()) {
@@ -1278,8 +1273,7 @@ where
             for bad_cell_key in bad_cells {
                 if let Some(removed_cell) = self.cells.remove(bad_cell_key) {
                     let uuid = removed_cell.uuid();
-                    self.cell_uuid_to_key.remove(&uuid);
-                    self.cell_key_to_uuid.remove(&bad_cell_key);
+                    self.cell_bimap.remove_by_left(&uuid);
                 }
             }
 
@@ -1292,8 +1286,7 @@ where
                 })?;
                 let new_cell_key = self.cells.insert(new_cell);
                 let new_cell_uuid = self.cells[new_cell_key].uuid();
-                self.cell_uuid_to_key.insert(new_cell_uuid, new_cell_key);
-                self.cell_key_to_uuid.insert(new_cell_key, new_cell_uuid);
+                self.cell_bimap.insert(new_cell_uuid, new_cell_key);
             }
         }
 
@@ -1497,7 +1490,9 @@ where
                     // Pre-allocate the neighbor vector with exact capacity
                     let mut neighbor_vec: Vec<Uuid> = Vec::with_capacity(neighbors.len());
                     for key in neighbors {
-                        neighbor_vec.push(self.cell_key_to_uuid[&key]);
+                        if let Some(uuid) = self.cell_bimap.get_by_right(&key) {
+                            neighbor_vec.push(*uuid);
+                        }
                     }
                     cell.neighbors = Some(neighbor_vec);
                 }
@@ -1512,7 +1507,7 @@ where
         for (cell_key, cell) in &self.cells {
             // For each vertex in cell.vertices(): look up its VertexKey via vertex_uuid_to_key and push cell_key
             for vertex in cell.vertices() {
-                if let Some(&vertex_key) = self.vertex_uuid_to_key.get(&vertex.uuid()) {
+                if let Some(&vertex_key) = self.vertex_bimap.get_by_left(&vertex.uuid()) {
                     vertex_to_cells
                         .entry(vertex_key)
                         .or_default()
@@ -1525,10 +1520,13 @@ where
         for (vertex_key, cell_keys) in vertex_to_cells {
             if !cell_keys.is_empty() {
                 // Convert cell_keys[0] to Uuid via cell_key_to_uuid
-                let cell_uuid = self.cell_key_to_uuid[&cell_keys[0]];
+                let cell_uuid = self
+                    .cell_bimap
+                    .get_by_right(&cell_keys[0])
+                    .expect("Cell key must have a corresponding UUID");
 
                 // Do self.vertices.get_mut(&vertex_key).unwrap().incident_cell = Some(cell_uuid)
-                self.vertices.get_mut(vertex_key).unwrap().incident_cell = Some(cell_uuid);
+                self.vertices.get_mut(vertex_key).unwrap().incident_cell = Some(*cell_uuid);
             }
         }
     }
@@ -1570,7 +1568,7 @@ where
         let input_uuid_set: HashSet<Uuid> = self
             .vertices
             .keys()
-            .map(|k| self.vertex_key_to_uuid[&k])
+            .filter_map(|k| self.vertex_bimap.get_by_right(&k).copied())
             .collect();
 
         let cells_to_remove: Vec<CellKey> = self
@@ -1589,8 +1587,7 @@ where
         // Remove the identified cells and their corresponding UUID mappings.
         for cell_key in cells_to_remove {
             if let Some(removed_cell) = self.cells.remove(cell_key) {
-                self.cell_uuid_to_key.remove(&removed_cell.uuid());
-                self.cell_key_to_uuid.remove(&cell_key);
+                self.cell_bimap.remove_by_left(&removed_cell.uuid());
             }
         }
     }
@@ -1626,8 +1623,7 @@ where
         // Second pass: remove duplicate cells and their corresponding UUID mappings
         for cell_key in &cells_to_remove {
             if let Some(removed_cell) = self.cells.remove(*cell_key) {
-                self.cell_uuid_to_key.remove(&removed_cell.uuid());
-                self.cell_key_to_uuid.remove(cell_key);
+                self.cell_bimap.remove_by_left(&removed_cell.uuid());
             }
         }
 
@@ -1757,20 +1753,11 @@ where
     /// ```
     #[allow(clippy::too_many_lines)]
     pub fn validate_vertex_mappings(&self) -> Result<(), TriangulationValidationError> {
-        if self.vertex_uuid_to_key.len() != self.vertices.len() {
+        if self.vertex_bimap.len() != self.vertices.len() {
             return Err(TriangulationValidationError::MappingInconsistency {
                 message: format!(
-                    "Number of UUID-to-key mappings ({}) doesn't match number of vertices ({})",
-                    self.vertex_uuid_to_key.len(),
-                    self.vertices.len()
-                ),
-            });
-        }
-        if self.vertex_key_to_uuid.len() != self.vertices.len() {
-            return Err(TriangulationValidationError::MappingInconsistency {
-                message: format!(
-                    "Number of key-to-UUID mappings ({}) doesn't match number of vertices ({})",
-                    self.vertex_key_to_uuid.len(),
+                    "Number of vertex bimap entries ({}) doesn't match number of vertices ({})",
+                    self.vertex_bimap.len(),
                     self.vertices.len()
                 ),
             });
@@ -1778,14 +1765,14 @@ where
 
         for (vertex_key, vertex) in &self.vertices {
             let vertex_uuid = vertex.uuid();
-            if self.vertex_uuid_to_key.get(&vertex_uuid) != Some(&vertex_key) {
+            if self.vertex_bimap.get_by_left(&vertex_uuid) != Some(&vertex_key) {
                 return Err(TriangulationValidationError::MappingInconsistency {
                     message: format!(
                         "Inconsistent or missing UUID-to-key mapping for vertex UUID {vertex_uuid:?}"
                     ),
                 });
             }
-            if self.vertex_key_to_uuid.get(&vertex_key) != Some(&vertex_uuid) {
+            if self.vertex_bimap.get_by_right(&vertex_key) != Some(&vertex_uuid) {
                 return Err(TriangulationValidationError::MappingInconsistency {
                     message: format!(
                         "Inconsistent or missing key-to-UUID mapping for vertex key {vertex_key:?}"
@@ -1837,20 +1824,11 @@ where
     /// ```
     #[allow(clippy::too_many_lines)]
     pub fn validate_cell_mappings(&self) -> Result<(), TriangulationValidationError> {
-        if self.cell_uuid_to_key.len() != self.cells.len() {
+        if self.cell_bimap.len() != self.cells.len() {
             return Err(TriangulationValidationError::MappingInconsistency {
                 message: format!(
-                    "Number of cell UUID-to-key mappings ({}) doesn't match number of cells ({})",
-                    self.cell_uuid_to_key.len(),
-                    self.cells.len()
-                ),
-            });
-        }
-        if self.cell_key_to_uuid.len() != self.cells.len() {
-            return Err(TriangulationValidationError::MappingInconsistency {
-                message: format!(
-                    "Number of cell key-to-UUID mappings ({}) doesn't match number of cells ({})",
-                    self.cell_key_to_uuid.len(),
+                    "Number of cell bimap mappings ({}) doesn't match number of cells ({})",
+                    self.cell_bimap.len(),
                     self.cells.len()
                 ),
             });
@@ -1858,14 +1836,14 @@ where
 
         for (cell_key, cell) in &self.cells {
             let cell_uuid = cell.uuid();
-            if self.cell_uuid_to_key.get(&cell_uuid) != Some(&cell_key) {
+            if self.cell_bimap.get_by_left(&cell_uuid) != Some(&cell_key) {
                 return Err(TriangulationValidationError::MappingInconsistency {
                     message: format!(
                         "Inconsistent or missing UUID-to-key mapping for cell UUID {cell_uuid:?}"
                     ),
                 });
             }
-            if self.cell_key_to_uuid.get(&cell_key) != Some(&cell_uuid) {
+            if self.cell_bimap.get_by_right(&cell_key) != Some(&cell_uuid) {
                 return Err(TriangulationValidationError::MappingInconsistency {
                     message: format!(
                         "Inconsistent or missing key-to-UUID mapping for cell key {cell_key:?}"
@@ -2032,8 +2010,7 @@ where
     /// let invalid_cell = cell!(vertices);
     /// let cell_key = tds.cells.insert(invalid_cell);
     /// let cell_uuid = tds.cells[cell_key].uuid();
-    /// tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-    /// tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+    /// tds.cell_bimap.insert(cell_uuid, cell_key);
     ///
     /// // Validation should fail
     /// match tds.is_valid() {
@@ -2043,6 +2020,11 @@ where
     ///     _ => panic!("Expected InvalidCell error"),
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if internal data structures are inconsistent (e.g., a cell key
+    /// doesn't have a corresponding UUID in the bimap).
     pub fn is_valid(&self) -> Result<(), TriangulationValidationError>
     where
         [T; D]: DeserializeOwned + Serialize + Sized,
@@ -2058,7 +2040,10 @@ where
         for (cell_id, cell) in &self.cells {
             cell.is_valid()
                 .map_err(|source| TriangulationValidationError::InvalidCell {
-                    cell_id: self.cell_key_to_uuid[&cell_id],
+                    cell_id: *self
+                        .cell_bimap
+                        .get_by_right(&cell_id)
+                        .expect("Cell key should have a corresponding UUID"),
                     source,
                 })?;
         }
@@ -2242,7 +2227,7 @@ where
             let vertices: HashSet<VertexKey> = cell
                 .vertices()
                 .iter()
-                .map(|v| self.vertex_uuid_to_key[&v.uuid()])
+                .filter_map(|v| self.vertex_bimap.get_by_left(&v.uuid()).copied())
                 .collect();
             cell_vertices.insert(cell_key, vertices);
         }
@@ -2268,7 +2253,7 @@ where
 
             for neighbor_uuid in neighbors {
                 // Early termination: check if neighbor exists
-                let Some(&neighbor_key) = self.cell_uuid_to_key.get(neighbor_uuid) else {
+                let Some(&neighbor_key) = self.cell_bimap.get_by_left(neighbor_uuid) else {
                     return Err(TriangulationValidationError::InvalidNeighbors {
                         message: format!("Neighbor cell {neighbor_uuid:?} not found"),
                     });
@@ -2315,6 +2300,183 @@ where
         }
         Ok(())
     }
+}
+
+// =============================================================================
+// MANUAL DESERIALIZE IMPLEMENTATION
+// =============================================================================
+
+/// Manual implementation of Deserialize for Tds to handle trait bound conflicts
+impl<'de, T, U, V, const D: usize> Deserialize<'de> for Tds<T, U, V, D>
+where
+    T: CoordinateScalar + DeserializeOwned,
+    U: DataType + DeserializeOwned,
+    V: DataType + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn deserialize<D2>(deserializer: D2) -> Result<Self, D2::Error>
+    where
+        D2: Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+        use std::fmt;
+        use std::marker::PhantomData;
+
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "snake_case")]
+        enum Field {
+            Vertices,
+            Cells,
+            VertexBimap,
+            CellBimap,
+        }
+
+        struct TdsVisitor<T, U, V, const D: usize>(PhantomData<(T, U, V)>);
+
+        impl<'de, T, U, V, const D: usize> Visitor<'de> for TdsVisitor<T, U, V, D>
+        where
+            T: CoordinateScalar + DeserializeOwned,
+            U: DataType + DeserializeOwned,
+            V: DataType + DeserializeOwned,
+            [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+        {
+            type Value = Tds<T, U, V, D>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct Tds")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut vertices = None;
+                let mut cells = None;
+                let mut vertex_bimap = None;
+                let mut cell_bimap = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Vertices => {
+                            if vertices.is_some() {
+                                return Err(de::Error::duplicate_field("vertices"));
+                            }
+                            vertices = Some(map.next_value()?);
+                        }
+                        Field::Cells => {
+                            if cells.is_some() {
+                                return Err(de::Error::duplicate_field("cells"));
+                            }
+                            cells = Some(map.next_value()?);
+                        }
+                        Field::VertexBimap => {
+                            if vertex_bimap.is_some() {
+                                return Err(de::Error::duplicate_field("vertex_bimap"));
+                            }
+                            // Use the custom deserialize function for BiMap
+                            let vertex_bimap_deserializer =
+                                map.next_value::<serde_json::Value>()?;
+                            vertex_bimap = Some(
+                                deserialize_bimap(vertex_bimap_deserializer)
+                                    .map_err(de::Error::custom)?,
+                            );
+                        }
+                        Field::CellBimap => {
+                            if cell_bimap.is_some() {
+                                return Err(de::Error::duplicate_field("cell_bimap"));
+                            }
+                            // Use the custom deserialize function for BiMap
+                            let cell_bimap_deserializer = map.next_value::<serde_json::Value>()?;
+                            cell_bimap = Some(
+                                deserialize_cell_bimap(cell_bimap_deserializer)
+                                    .map_err(de::Error::custom)?,
+                            );
+                        }
+                    }
+                }
+
+                let vertices = vertices.ok_or_else(|| de::Error::missing_field("vertices"))?;
+                let cells = cells.ok_or_else(|| de::Error::missing_field("cells"))?;
+                let vertex_bimap =
+                    vertex_bimap.ok_or_else(|| de::Error::missing_field("vertex_bimap"))?;
+                let cell_bimap =
+                    cell_bimap.ok_or_else(|| de::Error::missing_field("cell_bimap"))?;
+
+                Ok(Tds {
+                    vertices,
+                    cells,
+                    vertex_bimap,
+                    cell_bimap,
+                    // Initialize reusable buffers (these are marked with #[serde(skip)])
+                    bad_cells_buffer: Vec::new(),
+                    boundary_facets_buffer: Vec::new(),
+                    vertex_points_buffer: Vec::new(),
+                    bad_cell_facets_buffer: HashMap::new(),
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["vertices", "cells", "vertex_bimap", "cell_bimap"];
+        deserializer.deserialize_struct("Tds", FIELDS, TdsVisitor(PhantomData))
+    }
+}
+
+// =============================================================================
+// CUSTOM SERDE FUNCTIONS
+// =============================================================================
+
+/// Custom serialization function for `BiMap<Uuid, VertexKey>`
+fn serialize_bimap<S>(bimap: &BiMap<Uuid, VertexKey>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(Some(bimap.len()))?;
+    for (uuid, vertex_key) in bimap {
+        map.serialize_entry(uuid, vertex_key)?;
+    }
+    map.end()
+}
+
+/// Custom deserialization function for `BiMap<Uuid, VertexKey>`
+fn deserialize_bimap<'de, D>(deserializer: D) -> Result<BiMap<Uuid, VertexKey>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use std::collections::HashMap;
+    let map: HashMap<Uuid, VertexKey> = HashMap::deserialize(deserializer)?;
+    let mut bimap = BiMap::new();
+    for (uuid, vertex_key) in map {
+        bimap.insert(uuid, vertex_key);
+    }
+    Ok(bimap)
+}
+
+/// Custom serialization function for `BiMap<Uuid, CellKey>`
+fn serialize_cell_bimap<S>(bimap: &BiMap<Uuid, CellKey>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(Some(bimap.len()))?;
+    for (uuid, cell_key) in bimap {
+        map.serialize_entry(uuid, cell_key)?;
+    }
+    map.end()
+}
+
+/// Custom deserialization function for `BiMap<Uuid, CellKey>`
+fn deserialize_cell_bimap<'de, D>(deserializer: D) -> Result<BiMap<Uuid, CellKey>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use std::collections::HashMap;
+    let map: HashMap<Uuid, CellKey> = HashMap::deserialize(deserializer)?;
+    let mut bimap = BiMap::new();
+    for (uuid, cell_key) in map {
+        bimap.insert(uuid, cell_key);
+    }
+    Ok(bimap)
 }
 
 // =============================================================================
@@ -2421,8 +2583,7 @@ mod tests {
 
         // Update the UUID mappings for collision scenario
         // The UUID-to-key mapping should now point to the more recent key
-        tds.vertex_uuid_to_key.insert(uuid1, key2);
-        tds.vertex_key_to_uuid.insert(key2, uuid1);
+        tds.vertex_bimap.insert(uuid1, key2);
 
         // Test that we can retrieve the second vertex using its key
         let stored_vertex = tds.vertices.get(key2).unwrap();
@@ -2436,7 +2597,7 @@ mod tests {
         assert_eq!(stored_coords, expected_coords); // Should be vertex2's coordinates
 
         // Test that the UUID collision is handled - the mapping should point to the newer vertex
-        let looked_up_key = tds.vertex_uuid_to_key.get(&uuid1).unwrap();
+        let looked_up_key = tds.vertex_bimap.get_by_left(&uuid1).unwrap();
         assert_eq!(*looked_up_key, key2); // Should point to the second vertex's key
     }
 
@@ -2545,16 +2706,14 @@ mod tests {
         // Properly add vertices to the TDS vertex mapping
         for vertex in &vertices {
             let vertex_key = tds.vertices.insert(*vertex);
-            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
-            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+            tds.vertex_bimap.insert(vertex.uuid(), vertex_key);
         }
 
         let mut cell = cell!(vertices);
         cell.neighbors = Some(vec![Uuid::nil()]); // Invalid neighbor
         let cell_key = tds.cells.insert(cell);
         let cell_uuid = tds.cells[cell_key].uuid();
-        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+        tds.cell_bimap.insert(cell_uuid, cell_key);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -2617,8 +2776,7 @@ mod tests {
         let cell = cell!(vertices);
         let cell_key = tds.cells.insert(cell);
         let cell_uuid = tds.cells[cell_key].uuid();
-        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+        tds.cell_bimap.insert(cell_uuid, cell_key);
 
         assert_eq!(tds.number_of_cells(), 1);
     }
@@ -2870,8 +3028,7 @@ mod tests {
 
         let cell_key = tds.cells.insert(invalid_cell.clone());
         let cell_uuid = tds.cells[cell_key].uuid();
-        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+        tds.cell_bimap.insert(cell_uuid, cell_key);
 
         // Test that validation fails with InvalidCell error
         let validation_result = tds.is_valid();
@@ -3080,7 +3237,7 @@ mod tests {
         let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
 
         // Manually add an extra entry to create a count mismatch
-        tds.vertex_uuid_to_key
+        tds.vertex_bimap
             .insert(Uuid::new_v4(), VertexKey::default());
 
         let result = tds.validate_vertex_mappings();
@@ -3097,7 +3254,7 @@ mod tests {
 
         // Manually remove a mapping to create an inconsistency
         let vertex_uuid = tds.vertices.values().next().unwrap().uuid();
-        tds.vertex_uuid_to_key.remove(&vertex_uuid);
+        tds.vertex_bimap.remove_by_left(&vertex_uuid);
 
         let result = tds.validate_vertex_mappings();
         assert!(matches!(
@@ -3114,9 +3271,9 @@ mod tests {
         // Manually create an inconsistent mapping
         let keys: Vec<VertexKey> = tds.vertices.keys().collect();
         if keys.len() >= 2 {
-            let uuid1 = *tds.vertex_key_to_uuid.get(&keys[0]).unwrap();
+            let uuid1 = *tds.vertex_bimap.get_by_right(&keys[0]).unwrap();
             // Point UUID1 to the wrong key
-            tds.vertex_uuid_to_key.insert(uuid1, keys[1]);
+            tds.vertex_bimap.insert(uuid1, keys[1]);
         }
 
         let result = tds.validate_vertex_mappings();
@@ -3139,8 +3296,7 @@ mod tests {
         // Properly add vertices to the TDS vertex mapping
         for vertex in &vertices {
             let vertex_key = tds.vertices.insert(*vertex);
-            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
-            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+            tds.vertex_bimap.insert(vertex.uuid(), vertex_key);
         }
 
         let mut cell = cell!(vertices);
@@ -3156,8 +3312,7 @@ mod tests {
 
         let cell_key = tds.cells.insert(cell);
         let cell_uuid = tds.cells[cell_key].uuid();
-        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+        tds.cell_bimap.insert(cell_uuid, cell_key);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -3180,8 +3335,7 @@ mod tests {
         let cell = cell!(vertices);
         let cell_key = tds.cells.insert(cell);
         let cell_uuid = tds.cells[cell_key].uuid();
-        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+        tds.cell_bimap.insert(cell_uuid, cell_key);
 
         let result = tds.is_valid();
         // Should now get InvalidCell error because cell validation detects insufficient vertices
@@ -3205,8 +3359,7 @@ mod tests {
         // Properly add vertices to the TDS vertex mapping
         for vertex in &vertices1 {
             let vertex_key = tds.vertices.insert(*vertex);
-            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
-            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+            tds.vertex_bimap.insert(vertex.uuid(), vertex_key);
         }
 
         let vertices2 = vec![
@@ -3218,8 +3371,7 @@ mod tests {
         // Properly add vertices to the TDS vertex mapping
         for vertex in &vertices2 {
             let vertex_key = tds.vertices.insert(*vertex);
-            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
-            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+            tds.vertex_bimap.insert(vertex.uuid(), vertex_key);
         }
 
         let mut cell1 = cell!(vertices1);
@@ -3230,13 +3382,11 @@ mod tests {
 
         let cell1_key = tds.cells.insert(cell1);
         let cell1_uuid = tds.cells[cell1_key].uuid();
-        tds.cell_uuid_to_key.insert(cell1_uuid, cell1_key);
-        tds.cell_key_to_uuid.insert(cell1_key, cell1_uuid);
+        tds.cell_bimap.insert(cell1_uuid, cell1_key);
 
         let cell2_key = tds.cells.insert(cell2);
         let cell2_uuid = tds.cells[cell2_key].uuid();
-        tds.cell_uuid_to_key.insert(cell2_uuid, cell2_key);
-        tds.cell_key_to_uuid.insert(cell2_key, cell2_uuid);
+        tds.cell_bimap.insert(cell2_uuid, cell2_key);
 
         let result = tds.is_valid();
         assert!(matches!(
@@ -3668,8 +3818,7 @@ mod tests {
         // Properly add vertices to the TDS vertex mapping
         for vertex in &vertices {
             let vertex_key = tds.vertices.insert(*vertex);
-            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
-            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+            tds.vertex_bimap.insert(vertex.uuid(), vertex_key);
         }
 
         let mut cell = cell!(vertices);
@@ -3679,8 +3828,7 @@ mod tests {
 
         let cell_key = tds.cells.insert(cell);
         let cell_uuid = tds.cells[cell_key].uuid();
-        tds.cell_uuid_to_key.insert(cell_uuid, cell_key);
-        tds.cell_key_to_uuid.insert(cell_key, cell_uuid);
+        tds.cell_bimap.insert(cell_uuid, cell_key);
 
         // This should pass validation (exactly D neighbors is valid)
         let result = tds.is_valid();
@@ -3711,8 +3859,7 @@ mod tests {
         let all_vertices = [vertex1, vertex2, vertex3, vertex4, vertex5, vertex6];
         for vertex in &all_vertices {
             let vertex_key = tds.vertices.insert(*vertex);
-            tds.vertex_uuid_to_key.insert(vertex.uuid(), vertex_key);
-            tds.vertex_key_to_uuid.insert(vertex_key, vertex.uuid());
+            tds.vertex_bimap.insert(vertex.uuid(), vertex_key);
         }
 
         let mut cell1 = cell!(vertices1);
@@ -3724,13 +3871,11 @@ mod tests {
 
         let cell1_key = tds.cells.insert(cell1);
         let cell1_uuid = tds.cells[cell1_key].uuid();
-        tds.cell_uuid_to_key.insert(cell1_uuid, cell1_key);
-        tds.cell_key_to_uuid.insert(cell1_key, cell1_uuid);
+        tds.cell_bimap.insert(cell1_uuid, cell1_key);
 
         let cell2_key = tds.cells.insert(cell2);
         let cell2_uuid = tds.cells[cell2_key].uuid();
-        tds.cell_uuid_to_key.insert(cell2_uuid, cell2_key);
-        tds.cell_key_to_uuid.insert(cell2_key, cell2_uuid);
+        tds.cell_bimap.insert(cell2_uuid, cell2_key);
 
         // Should fail validation because they only share 2 vertices, not 3 (D=3)
         let result = tds.is_valid();
@@ -3765,8 +3910,7 @@ mod tests {
         let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
 
         // Manually add an extra entry to create a count mismatch
-        tds.cell_uuid_to_key
-            .insert(Uuid::new_v4(), CellKey::default());
+        tds.cell_bimap.insert(Uuid::new_v4(), CellKey::default());
 
         let result = tds.validate_cell_mappings();
         assert!(matches!(
@@ -3787,7 +3931,7 @@ mod tests {
 
         // Manually remove a mapping to create an inconsistency
         let cell_uuid = tds.cells.values().next().unwrap().uuid();
-        tds.cell_uuid_to_key.remove(&cell_uuid);
+        tds.cell_bimap.remove_by_left(&cell_uuid);
 
         let result = tds.validate_cell_mappings();
         assert!(matches!(
@@ -3813,7 +3957,7 @@ mod tests {
 
             // Create a fake CellKey and insert inconsistent mapping
             let fake_key = CellKey::default();
-            tds.cell_uuid_to_key.insert(first_cell_uuid, fake_key);
+            tds.cell_bimap.insert(first_cell_uuid, fake_key);
         }
 
         let result = tds.validate_cell_mappings();
@@ -4033,6 +4177,131 @@ mod tests {
             neighbors2.contains(&cell1.uuid()),
             "Cell 2 should have Cell 1 as neighbor"
         );
+    }
+
+    #[test]
+    fn test_tds_serialization_deserialization() {
+        // Create a triangulation with two adjacent tetrahedra sharing one facet
+        // This is the same setup as line 3957 in test_is_boundary_facet
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),  // A
+            Point::new([1.0, 0.0, 0.0]),  // B
+            Point::new([0.5, 1.0, 0.0]),  // C - forms base triangle ABC
+            Point::new([0.5, 0.5, 1.0]),  // D - above base
+            Point::new([0.5, 0.5, -1.0]), // E - below base
+        ];
+        let vertices = Vertex::from_points(points);
+        let original_tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        // Verify the original triangulation is valid
+        assert!(
+            original_tds.is_valid().is_ok(),
+            "Original TDS should be valid"
+        );
+        assert_eq!(original_tds.number_of_vertices(), 5);
+        assert_eq!(original_tds.number_of_cells(), 2);
+        assert_eq!(original_tds.number_of_boundary_facets(), 6);
+
+        // Serialize the TDS to JSON
+        let serialized =
+            serde_json::to_string(&original_tds).expect("Failed to serialize TDS to JSON");
+
+        println!("Serialized TDS JSON length: {} bytes", serialized.len());
+
+        // Deserialize the TDS from JSON
+        let deserialized_tds: Tds<f64, Option<()>, Option<()>, 3> =
+            serde_json::from_str(&serialized).expect("Failed to deserialize TDS from JSON");
+
+        // Verify the deserialized triangulation has the same properties
+        assert_eq!(
+            deserialized_tds.number_of_vertices(),
+            original_tds.number_of_vertices()
+        );
+        assert_eq!(
+            deserialized_tds.number_of_cells(),
+            original_tds.number_of_cells()
+        );
+        assert_eq!(deserialized_tds.dim(), original_tds.dim());
+        assert_eq!(
+            deserialized_tds.number_of_boundary_facets(),
+            original_tds.number_of_boundary_facets()
+        );
+
+        // Verify the deserialized triangulation is valid
+        assert!(
+            deserialized_tds.is_valid().is_ok(),
+            "Deserialized TDS should be valid"
+        );
+
+        // Verify vertices are preserved (check coordinates)
+        assert_eq!(deserialized_tds.vertices.len(), original_tds.vertices.len());
+        for (original_vertex, deserialized_vertex) in original_tds
+            .vertices
+            .values()
+            .zip(deserialized_tds.vertices.values())
+        {
+            let original_coords: [f64; 3] = original_vertex.into();
+            let deserialized_coords: [f64; 3] = deserialized_vertex.into();
+            #[allow(clippy::float_cmp)]
+            {
+                assert_eq!(
+                    original_coords, deserialized_coords,
+                    "Vertex coordinates should be preserved"
+                );
+            }
+        }
+
+        // Verify cells are preserved (check vertex count per cell)
+        assert_eq!(deserialized_tds.cells.len(), original_tds.cells.len());
+        for (original_cell, deserialized_cell) in original_tds
+            .cells
+            .values()
+            .zip(deserialized_tds.cells.values())
+        {
+            assert_eq!(
+                original_cell.vertices().len(),
+                deserialized_cell.vertices().len(),
+                "Cell vertex count should be preserved"
+            );
+        }
+
+        // Verify BiMap mappings work correctly after deserialization
+        for (vertex_key, vertex) in &deserialized_tds.vertices {
+            let vertex_uuid = vertex.uuid();
+            let mapped_key = deserialized_tds
+                .vertex_bimap
+                .get_by_left(&vertex_uuid)
+                .expect("Vertex UUID should map to a key");
+            assert_eq!(
+                *mapped_key, vertex_key,
+                "Vertex BiMap should be consistent after deserialization"
+            );
+        }
+
+        for (cell_key, cell) in &deserialized_tds.cells {
+            let cell_uuid = cell.uuid();
+            let mapped_key = deserialized_tds
+                .cell_bimap
+                .get_by_left(&cell_uuid)
+                .expect("Cell UUID should map to a key");
+            assert_eq!(
+                *mapped_key, cell_key,
+                "Cell BiMap should be consistent after deserialization"
+            );
+        }
+
+        println!("✓ TDS serialization/deserialization test passed!");
+        println!(
+            "  - Original: {} vertices, {} cells",
+            original_tds.number_of_vertices(),
+            original_tds.number_of_cells()
+        );
+        println!(
+            "  - Deserialized: {} vertices, {} cells",
+            deserialized_tds.number_of_vertices(),
+            deserialized_tds.number_of_cells()
+        );
+        println!("  - Both triangulations are valid and equivalent");
     }
 
     #[test]
