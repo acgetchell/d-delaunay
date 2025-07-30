@@ -17,8 +17,10 @@
 #[macro_use]
 extern crate derive_builder;
 
-/// The main module of the library. This module contains the public interface
-/// for the library.
+/// The `delaunay_core` module contains the primary data structures and algorithms for building and manipulating Delaunay triangulations.
+///
+/// It includes the `Tds` struct, which represents the triangulation, as well as `Cell`, `Facet`, and `Vertex` components.
+/// This module also provides traits for customizing vertex and cell data, and a `prelude` for convenient access to commonly used types.
 pub mod delaunay_core {
     pub mod cell;
     pub mod facet;
@@ -70,6 +72,27 @@ pub mod geometry {
     pub use point::*;
     pub use predicates::*;
     pub use traits::*;
+}
+
+/// A prelude module that re-exports commonly used types and macros.
+/// This makes it easier to import the most commonly used items from the crate.
+pub mod prelude {
+    // Re-export from delaunay_core
+    pub use crate::delaunay_core::{
+        cell::*, facet::*, traits::data::*, triangulation_data_structure::*, utilities::*,
+        vertex::*,
+    };
+
+    // Re-export from geometry
+    pub use crate::geometry::{
+        matrix::*,
+        point::*,
+        predicates::*,
+        traits::{coordinate::*, finitecheck::*, hashcoordinate::*, orderedeq::*},
+    };
+
+    // Convenience macros
+    pub use crate::{cell, vertex};
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.

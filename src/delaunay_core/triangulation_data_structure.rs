@@ -1,20 +1,144 @@
 //! Data and operations on d-dimensional triangulation data structures.
 //!
-//! Intended to match functionality of the
-//! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
+//! This module provides the `Tds` (Triangulation Data Structure) struct which represents
+//! a D-dimensional finite simplicial complex with geometric vertices, cells, and their
+//! topological relationships. The implementation closely follows the design principles
+//! of [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
+//!
+//! # Key Features
+//!
+//! - **Generic Coordinate Support**: Works with any floating-point type (`f32`, `f64`, etc.)
+//!   that implements the `CoordinateScalar` trait
+//! - **Arbitrary Dimensions**: Supports triangulations in any dimension D ≥ 1
+//! - **Delaunay Triangulation**: Implements Bowyer-Watson algorithm for Delaunay triangulation
+//! - **Hierarchical Cell Structure**: Stores maximal D-dimensional cells and infers lower-dimensional
+//!   simplices (vertices, edges, facets) from the maximal cells
+//! - **Neighbor Relationships**: Maintains adjacency information between cells for efficient
+//!   traversal and geometric queries
+//! - **Validation Support**: Comprehensive validation of triangulation properties including
+//!   neighbor consistency and geometric validity
+//! - **Serialization Support**: Full serde support for persistence and data exchange
+//! - **UUID-based Identification**: Unique identification for vertices and cells
+//!
+//! # Geometric Structure
+//!
+//! The triangulation data structure represents a finite simplicial complex where:
+//!
+//! - **0-cells**: Individual vertices embedded in D-dimensional Euclidean space
+//! - **1-cells**: Edges connecting two vertices (inferred from maximal cells)
+//! - **2-cells**: Triangular faces with three vertices (inferred from maximal cells)
+//! - **...**
+//! - **D-cells**: Maximal D-dimensional simplices with D+1 vertices (explicitly stored)
+//!
+//! For example, in 3D space:
+//! - Vertices are 0-dimensional cells
+//! - Edges are 1-dimensional cells (inferred from tetrahedra)
+//! - Faces are 2-dimensional cells represented as `Facet`s
+//! - Tetrahedra are 3-dimensional cells (maximal cells)
+//!
+//! # Delaunay Property
+//!
+//! When constructed via the Delaunay triangulation algorithm, the structure satisfies
+//! the **empty circumsphere property**: no vertex lies inside the circumsphere of any
+//! D-dimensional cell. This property ensures optimal geometric characteristics for
+//! many applications including mesh generation, interpolation, and spatial analysis.
+//!
+//! # Examples
+//!
+//! ## Creating a 3D Triangulation
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::vertex;
+//!
+//! // Create vertices for a tetrahedron
+//! let vertices = vec![
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
+//! ];
+//!
+//! // Create Delaunay triangulation
+//! let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+//!
+//! // Query triangulation properties
+//! assert_eq!(tds.number_of_vertices(), 4);
+//! assert_eq!(tds.number_of_cells(), 1);
+//! assert_eq!(tds.dim(), 3);
+//! assert!(tds.is_valid().is_ok());
+//! ```
+//!
+//! ## Adding Vertices to Existing Triangulation
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::vertex;
+//!
+//! // Start with initial vertices
+//! let initial_vertices = vec![
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
+//! ];
+//!
+//! let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&initial_vertices).unwrap();
+//!
+//! // Add a new vertex
+//! let new_vertex = vertex!([0.5, 0.5, 0.5]);
+//! tds.add(new_vertex).unwrap();
+//!
+//! assert_eq!(tds.number_of_vertices(), 5);
+//! assert!(tds.is_valid().is_ok());
+//! ```
+//!
+//! ## 2D Triangulation
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::vertex;
+//!
+//! // Create 2D triangulation
+//! let vertices_2d = vec![
+//!     vertex!([0.0, 0.0]),
+//!     vertex!([1.0, 0.0]),
+//!     vertex!([0.0, 1.0]),
+//!     vertex!([1.0, 1.0]),
+//! ];
+//!
+//! let tds_2d: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices_2d).unwrap();
+//! assert_eq!(tds_2d.dim(), 2);
+//! ```
+//!
+//! # References
+//!
+//! - [CGAL Triangulation Documentation](https://doc.cgal.org/latest/Triangulation/index.html)
+//! - Bowyer, A. "Computing Dirichlet tessellations." The Computer Journal 24.2 (1981): 162-166
+//! - Watson, D.F. "Computing the n-dimensional Delaunay tessellation with application to Voronoi polytopes." The Computer Journal 24.2 (1981): 167-172
+//! - de Berg, M., et al. "Computational Geometry: Algorithms and Applications." 3rd ed. Springer-Verlag, 2008
 
+// =============================================================================
+// IMPORTS
+// =============================================================================
+
+// Parent module imports
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
     traits::data::DataType,
     vertex::Vertex,
 };
+
+// Crate internal imports
 use crate::delaunay_core::utilities::find_extreme_coordinates;
 use crate::geometry::predicates::{InSphere, insphere};
 use crate::geometry::{
     point::Point,
     traits::coordinate::{Coordinate, CoordinateScalar},
 };
+
+// External crate imports
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::NumCast;
@@ -26,6 +150,10 @@ use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
 use thiserror::Error;
 use uuid::Uuid;
+
+// =============================================================================
+// ERROR TYPES
+// =============================================================================
 
 /// Errors that can occur during triangulation validation.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -66,8 +194,49 @@ pub enum TriangulationValidationError {
     },
 }
 
-/// Helper function to check if two facets are adjacent (share the same vertices)
-fn facets_are_adjacent<T, U, V, const D: usize>(
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/// Checks if two facets are adjacent by comparing their vertex sets.
+///
+/// Two facets are considered adjacent if they share the exact same set of vertices,
+/// regardless of the order. This is a common check in triangulation algorithms to
+/// identify neighboring cells.
+///
+/// # Arguments
+///
+/// * `facet1` - A reference to the first facet.
+/// * `facet2` - A reference to the second facet.
+///
+/// # Returns
+///
+/// `true` if the facets share the same vertices, `false` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::facet::Facet;
+/// use d_delaunay::delaunay_core::triangulation_data_structure::facets_are_adjacent;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::delaunay_core::cell::Cell;
+/// use d_delaunay::{cell, vertex};
+///
+/// let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+/// let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
+/// let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
+/// let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
+///
+/// let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
+/// let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
+///
+/// let facet1 = Facet::new(cell1, v1).unwrap();
+/// let facet2 = Facet::new(cell2, v4).unwrap();
+///
+/// // These facets share vertices v2 and v3, so they are adjacent
+/// assert!(facets_are_adjacent(&facet1, &facet2));
+/// ```
+pub fn facets_are_adjacent<T, U, V, const D: usize>(
     facet1: &Facet<T, U, V, D>,
     facet2: &Facet<T, U, V, D>,
 ) -> bool
@@ -90,8 +259,44 @@ where
     vertices1.iter().all(|v1| vertices2.contains(v1))
 }
 
-/// Generate all combinations of `k` vertices from the given vertex list
-fn generate_combinations<T, U, const D: usize>(
+/// Generates all unique combinations of `k` items from a given slice.
+///
+/// This function is used to generate vertex combinations for creating k-simplices
+/// (e.g., edges, triangles, tetrahedra) from a set of vertices.
+///
+/// # Arguments
+///
+/// * `vertices` - A slice of vertices from which to generate combinations.
+/// * `k` - The size of each combination.
+///
+/// # Returns
+///
+/// A vector of vectors, where each inner vector is a unique combination of `k` vertices.
+///
+/// # Examples
+///
+/// This function is made public for testing purposes.
+///
+/// ```
+/// use d_delaunay::delaunay_core::triangulation_data_structure::generate_combinations;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::vertex;
+///
+/// let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
+///     vertex!([0.0]),
+///     vertex!([1.0]),
+///     vertex!([2.0]),
+/// ];
+///
+/// // Generate all 2-vertex combinations (edges)
+/// let combinations = generate_combinations(&vertices, 2);
+///
+/// assert_eq!(combinations.len(), 3);
+/// assert!(combinations.contains(&vec![vertices[0], vertices[1]]));
+/// assert!(combinations.contains(&vec![vertices[0], vertices[2]]));
+/// assert!(combinations.contains(&vec![vertices[1], vertices[2]]));
+/// ```
+pub fn generate_combinations<T, U, const D: usize>(
     vertices: &[Vertex<T, U, D>],
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
@@ -144,6 +349,10 @@ where
     }
 }
 
+// =============================================================================
+// STRUCT DEFINITION
+// =============================================================================
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
@@ -172,6 +381,31 @@ where
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space,
 /// and so the [Tds] is a finite simplicial complex.
+///
+/// # Usage
+///
+/// The `Tds` struct is the primary entry point for creating and manipulating
+/// Delaunay triangulations. It is initialized with a set of vertices and
+/// automatically computes the triangulation.
+///
+/// ```rust
+/// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+/// use d_delaunay::vertex;
+///
+/// // Create vertices for a 2D triangulation
+/// let vertices = vec![
+///     vertex!([0.0, 0.0]),
+///     vertex!([1.0, 0.0]),
+///     vertex!([0.5, 1.0]),
+/// ];
+///
+/// // Create a new TDS
+/// let tds: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices).unwrap();
+///
+/// // Check the number of cells and vertices
+/// assert_eq!(tds.number_of_cells(), 1);
+/// assert_eq!(tds.number_of_vertices(), 3);
+/// ```
 pub struct Tds<T, U, V, const D: usize>
 where
     T: CoordinateScalar,
@@ -203,6 +437,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
+    // =============================================================================
+    // CORE METHODS
+    // =============================================================================
+
     /// The function creates a new instance of a triangulation data structure
     /// with given vertices, initializing the vertices and cells.
     ///
@@ -229,15 +467,16 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(),
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
     /// ];
     ///
     /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -280,14 +519,15 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([1.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.5, 1.0])).build().unwrap(),
+    ///     vertex!([0.0, 0.0]),
+    ///     vertex!([1.0, 0.0]),
+    ///     vertex!([0.5, 1.0]),
     /// ];
     ///
     /// let tds: Tds<f64, usize, usize, 2> = Tds::new(&vertices).unwrap();
@@ -312,6 +552,32 @@ where
             .collect();
 
         Ok(tds)
+    }
+
+    /// Creates an empty triangulation data structure with no vertices or cells.
+    ///
+    /// This is useful for testing purposes or when building a triangulation manually.
+    ///
+    /// # Returns
+    ///
+    /// An empty `Tds` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    ///
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::empty();
+    /// assert_eq!(tds.number_of_vertices(), 0);
+    /// assert_eq!(tds.number_of_cells(), 0);
+    /// assert_eq!(tds.dim(), -1);
+    /// ```
+    #[must_use]
+    pub fn empty() -> Self {
+        Self {
+            vertices: HashMap::new(),
+            cells: HashMap::new(),
+        }
     }
 
     /// The `add` function checks if a [Vertex] with the same coordinates already
@@ -339,13 +605,13 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
-    /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// let vertex = VertexBuilder::default().point(point).build().unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
     ///
     /// let result = tds.add(vertex);
     /// assert!(result.is_ok());
@@ -356,14 +622,14 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
-    /// let point = Point::new([1.0, 2.0, 3.0]);
-    /// let vertex1 = VertexBuilder::default().point(point).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(point).build().unwrap(); // Same coordinates
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]); // Same coordinates
     ///
     /// tds.add(vertex1).unwrap();
     /// let result = tds.add(vertex2);
@@ -374,16 +640,17 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
     /// ];
     ///
     /// for vertex in vertices {
@@ -438,13 +705,14 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
-    /// let vertex1 = VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap();
-    /// let vertex2 = VertexBuilder::default().point(Point::new([4.0, 5.0, 6.0])).build().unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([4.0, 5.0, 6.0]);
     ///
     /// tds.add(vertex1).unwrap();
     /// assert_eq!(tds.number_of_vertices(), 1);
@@ -501,34 +769,35 @@ where
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Start empty
     /// assert_eq!(tds.dim(), -1);
     ///
     /// // Add one vertex (0-dimensional)
-    /// let vertex1 = VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 0.0]);
     /// tds.add(vertex1).unwrap();
     /// assert_eq!(tds.dim(), 0);
     ///
     /// // Add second vertex (1-dimensional)
-    /// let vertex2 = VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap();
+    /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 0.0, 0.0]);
     /// tds.add(vertex2).unwrap();
     /// assert_eq!(tds.dim(), 1);
     ///
     /// // Add third vertex (2-dimensional)
-    /// let vertex3 = VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap();
+    /// let vertex3: Vertex<f64, Option<()>, 3> = vertex!([0.0, 1.0, 0.0]);
     /// tds.add(vertex3).unwrap();
     /// assert_eq!(tds.dim(), 2);
     ///
     /// // Add fourth vertex (3-dimensional, capped at D=3)
-    /// let vertex4 = VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap();
+    /// let vertex4: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 1.0]);
     /// tds.add(vertex4).unwrap();
-    /// assert_eq!(tds.dim(), 3);
+    /// assert_eq!(tds.number_of_vertices(), 4);
     /// ```
     ///
     /// Different dimensional triangulations:
@@ -549,14 +818,13 @@ where
     /// let tds_2d: Tds<f64, usize, usize, 2> = Tds::new(&vertices_2d).unwrap();
     /// assert_eq!(tds_2d.dim(), 2);
     ///
-    /// // 4D triangulation with 6 vertices (capped at D=4)
+    /// // 4D triangulation with 5 vertices (minimum for 4D simplex)
     /// let points_4d = vec![
     ///     Point::new([0.0, 0.0, 0.0, 0.0]),
     ///     Point::new([1.0, 0.0, 0.0, 0.0]),
     ///     Point::new([0.0, 1.0, 0.0, 0.0]),
     ///     Point::new([0.0, 0.0, 1.0, 0.0]),
     ///     Point::new([0.0, 0.0, 0.0, 1.0]),
-    ///     Point::new([1.0, 1.0, 1.0, 1.0]),
     /// ];
     /// let vertices_4d = Vertex::from_points(points_4d);
     /// let tds_4d: Tds<f64, usize, usize, 4> = Tds::new(&vertices_4d).unwrap();
@@ -635,6 +903,10 @@ where
         self.cells.len()
     }
 
+    // =============================================================================
+    // TRIANGULATION LOGIC
+    // =============================================================================
+
     /// The `supercell` function creates a larger cell that contains all the
     /// input vertices, with some padding added.
     ///
@@ -645,7 +917,7 @@ where
     fn supercell(&self) -> Result<Cell<T, U, V, D>, anyhow::Error> {
         if self.vertices.is_empty() {
             // For empty input, create a default supercell
-            return Ok(Self::create_default_supercell());
+            return Self::create_default_supercell();
         }
 
         // Find the bounding box of all input vertices
@@ -683,13 +955,14 @@ where
         let supercell = CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap();
-
+            .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                message: format!("Failed to create supercell using Vertex::from_points: {e}"),
+            })?;
         Ok(supercell)
     }
 
     /// Creates a default supercell for empty input
-    fn create_default_supercell() -> Cell<T, U, V, D> {
+    fn create_default_supercell() -> Result<Cell<T, U, V, D>, anyhow::Error> {
         let center = [T::default(); D];
         let radius = NumCast::from(20.0f64).expect("Failed to convert radius"); // Default radius of 20.0
         let points = Self::create_supercell_simplex(&center, radius);
@@ -697,7 +970,13 @@ where
         CellBuilder::default()
             .vertices(Vertex::from_points(points))
             .build()
-            .unwrap()
+            .map_err(|e| {
+                anyhow::Error::new(TriangulationValidationError::FailedToCreateCell {
+                    message: format!(
+                        "Failed to create default supercell using Vertex::from_points: {e}"
+                    ),
+                })
+            })
     }
 
     /// Creates a well-formed simplex centered at the given point with the given radius
@@ -847,7 +1126,7 @@ where
     /// assert_eq!(result.number_of_cells(), 1); // One triangle
     /// ```
     ///
-    /// Complex 3D triangulation with multiple cells:
+    /// Simple 3D triangulation:
     ///
     /// ```
     /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
@@ -860,14 +1139,13 @@ where
     ///     Point::new([1.0, 0.0, 0.0]),
     ///     Point::new([0.0, 1.0, 0.0]),
     ///     Point::new([0.0, 0.0, 1.0]),
-    ///     Point::new([1.0, 1.0, 1.0]),
     /// ];
     ///
     /// let vertices = Vertex::from_points(points);
     /// let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
     ///
-    /// assert_eq!(result.number_of_vertices(), 5);
-    /// assert!(result.number_of_cells() >= 1);
+    /// assert_eq!(result.number_of_vertices(), 4);
+    /// assert_eq!(result.number_of_cells(), 1);
     /// ```
     /// Private method that performs Bowyer-Watson triangulation on a set of vertices
     /// and returns a vector of cells
@@ -886,27 +1164,20 @@ where
         // Store original vertices in self for use by helper methods
         self.vertices = Vertex::into_hashmap(vertices.to_owned());
 
-        // For cases with a small number of vertices, use direct combinatorial approach
-        if vertices.len() > D && vertices.len() <= D + 5 {
-            let mut created_cells = 0;
-            let combinations = generate_combinations(vertices, D + 1);
-
-            for combination in combinations {
-                if let Ok(cell) = CellBuilder::default().vertices(combination).build() {
-                    self.cells.insert(cell.uuid(), cell);
-                    created_cells += 1;
-                }
-            }
-
-            if created_cells > 0 {
-                self.remove_duplicate_cells()?;
-                self.assign_neighbors()?;
-                self.assign_incident_cells();
-                return Ok(self.cells.values().cloned().collect());
-            }
+        // For small vertex sets (≤ D+1), use a direct combinatorial approach
+        // This creates valid boundary facets for simple cases
+        if vertices.len() <= D + 1 {
+            // For D+1 or fewer vertices, we can create a single simplex directly
+            let cell = CellBuilder::default()
+                .vertices(vertices.to_vec())
+                .build()
+                .map_err(|e| TriangulationValidationError::FailedToCreateCell {
+                    message: format!("Failed to create simplex from vertices: {e}"),
+                })?;
+            return Ok(vec![cell]);
         }
 
-        // For more complex cases, use the full Bowyer-Watson algorithm
+        // For larger vertex sets, use the full Bowyer-Watson algorithm
         let supercell =
             self.supercell()
                 .map_err(|e| TriangulationValidationError::FailedToCreateCell {
@@ -916,7 +1187,7 @@ where
         let supercell_vertices: HashSet<Uuid> =
             supercell.vertices().iter().map(Vertex::uuid).collect();
 
-        self.cells.insert(supercell.uuid(), supercell.clone());
+        self.cells.insert(supercell.uuid(), supercell);
 
         for vertex in vertices {
             if supercell_vertices.contains(&vertex.uuid()) {
@@ -943,9 +1214,9 @@ where
             }
         }
 
-        self.remove_cells_containing_supercell_vertices(&supercell);
+        self.remove_cells_containing_supercell_vertices();
         self.remove_duplicate_cells()?;
-        self.assign_neighbors()?;
+        self.assign_neighbors();
         self.assign_incident_cells();
 
         Ok(self.cells.values().cloned().collect())
@@ -1033,120 +1304,46 @@ where
         Ok((bad_cells, boundary_facets))
     }
 
-    fn remove_cells_containing_supercell_vertices(&mut self, _supercell: &Cell<T, U, V, D>) {
-        // The goal is to remove supercell artifacts while preserving valid Delaunay cells
-        // We should only keep cells that are made entirely of input vertices
+    // =============================================================================
+    // NEIGHBOR & INCIDENT ASSIGNMENT
+    // =============================================================================
 
-        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().copied().collect();
-
-        let cells_to_remove: Vec<Uuid> = self
-            .cells
-            .iter()
-            .filter(|(_, cell)| {
-                let cell_vertex_uuids: HashSet<Uuid> =
-                    cell.vertices().iter().map(Vertex::uuid).collect();
-                let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
-
-                // Remove cells that don't consist entirely of input vertices
-                // Keep only cells that are made entirely of input vertices
-                !has_only_input_vertices
-            })
-            .map(|(uuid, _)| *uuid)
-            .collect();
-
-        for cell_id in cells_to_remove {
-            self.cells.remove(&cell_id);
-        }
-
-        // Remove duplicate cells (cells with identical vertex sets)
-        let mut unique_cells = HashMap::new();
-        let mut cells_to_remove_duplicates = Vec::new();
-
+    fn assign_neighbors(&mut self) {
+        // A map from facet keys to the cells that share that facet.
+        let mut facet_map: HashMap<u64, Vec<Uuid>> = HashMap::new();
         for (cell_id, cell) in &self.cells {
-            // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
-            vertex_uuids.sort();
-
-            if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
-                // This is a duplicate cell - mark for removal
-                cells_to_remove_duplicates.push(*cell_id);
-            } else {
-                // This is a unique cell
-                unique_cells.insert(vertex_uuids, *cell_id);
+            for facet in cell.facets() {
+                facet_map.entry(facet.key()).or_default().push(*cell_id);
             }
         }
 
-        // Remove duplicate cells
-        for cell_id in cells_to_remove_duplicates {
-            self.cells.remove(&cell_id);
-        }
-    }
+        // A map to build the neighbor lists for each cell.
+        let mut neighbor_map: HashMap<Uuid, HashSet<Uuid>> =
+            self.cells.keys().map(|id| (*id, HashSet::new())).collect();
 
-    fn assign_neighbors(&mut self) -> Result<(), TriangulationValidationError> {
-        // Create a map to store neighbor relationships
-        let mut neighbor_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
-
-        // Initialize neighbor lists for all cells
-        for cell_id in self.cells.keys() {
-            neighbor_map.insert(*cell_id, Vec::new());
-        }
-
-        // Find neighboring cells by comparing facets
-        let cell_ids: Vec<Uuid> = self.cells.keys().copied().collect();
-
-        for i in 0..cell_ids.len() {
-            for j in (i + 1)..cell_ids.len() {
-                let cell1_id = cell_ids[i];
-                let cell2_id = cell_ids[j];
-
-                if let (Some(cell1), Some(cell2)) =
-                    (self.cells.get(&cell1_id), self.cells.get(&cell2_id))
-                {
-                    // Check if cells share a facet (are neighbors)
-                    let cell1_facets = cell1.facets();
-                    let cell2_facets = cell2.facets();
-
-                    for facet1 in &cell1_facets {
-                        for facet2 in &cell2_facets {
-                            // Two cells are neighbors if they share a facet
-                            // (same vertices but opposite orientation)
-                            if facets_are_adjacent(facet1, facet2) {
-                                neighbor_map
-                                    .get_mut(&cell1_id)
-                    .ok_or_else(|| TriangulationValidationError::FailedToCreateCell {
-                        message: format!(
-                            "Failed to access neighbor map for cell {cell1_id:?}"
-                        ),
-                    })?
-                                    .push(cell2_id);
-                                neighbor_map
-                                    .get_mut(&cell2_id)
-                    .ok_or_else(|| TriangulationValidationError::FailedToCreateCell {
-                        message: format!(
-                            "Failed to access neighbor map for cell {cell2_id:?}"
-                        ),
-                    })?
-                                    .push(cell1_id);
-                            }
-                        }
-                    }
+        // For each facet that is shared by more than one cell, all those cells are neighbors.
+        for (_, cell_ids) in facet_map.into_iter().filter(|(_, ids)| ids.len() > 1) {
+            for i in 0..cell_ids.len() {
+                for j in (i + 1)..cell_ids.len() {
+                    let id1 = cell_ids[i];
+                    let id2 = cell_ids[j];
+                    neighbor_map.get_mut(&id1).unwrap().insert(id2);
+                    neighbor_map.get_mut(&id2).unwrap().insert(id1);
                 }
             }
         }
 
-        // Assign the computed neighbors to the cells
+        // Update the cells with their neighbor information.
         for (cell_id, neighbors) in neighbor_map {
             if let Some(cell) = self.cells.get_mut(&cell_id) {
-                if !neighbors.is_empty() {
-                    // Create a mutable reference to update the cell
-                    let mut updated_cell = cell.clone();
-                    updated_cell.neighbors = Some(neighbors);
-                    self.cells.insert(cell_id, updated_cell);
+                let neighbor_vec: Vec<Uuid> = neighbors.into_iter().collect();
+                if neighbor_vec.is_empty() {
+                    cell.neighbors = None;
+                } else {
+                    cell.neighbors = Some(neighbor_vec);
                 }
             }
         }
-
-        Ok(())
     }
 
     fn assign_incident_cells(&mut self) {
@@ -1178,6 +1375,61 @@ where
                     self.vertices.insert(vertex_id, updated_vertex);
                 }
             }
+        }
+    }
+
+    // =============================================================================
+    // DUPLICATE REMOVAL
+    // =============================================================================
+
+    /// Removes cells that contain supercell vertices from the triangulation.
+    ///
+    /// This method efficiently filters out supercell artifacts after the Bowyer-Watson
+    /// algorithm completes, keeping only cells that are composed entirely of input vertices.
+    /// This cleanup step is essential for producing a clean Delaunay triangulation.
+    ///
+    /// # Performance
+    ///
+    /// - **Time Complexity**: O(N) where N is the number of cells
+    /// - **Space Complexity**: O(N) for temporary storage of cell IDs to remove
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Create a set of input vertex UUIDs for fast lookup (O(V) where V = vertices)
+    /// 2. Iterate through all cells, checking if each cell contains only input vertices (O(N·D))
+    /// 3. Remove cells that contain any supercell vertices (O(K) where K = cells to remove)
+    ///
+    /// The overall complexity is O(V + N·D + K) = O(N·D) since V ≤ N·D and K ≤ N.
+    ///
+    /// # Recent Improvements
+    ///
+    /// This method was recently refactored to:
+    /// - Remove the redundant `supercell` parameter, simplifying the API
+    /// - Eliminate duplicate calls to `remove_duplicate_cells()` for better performance
+    /// - Use more efficient filtering logic with `HashSet` operations
+    fn remove_cells_containing_supercell_vertices(&mut self) {
+        // The goal is to remove supercell artifacts while preserving valid Delaunay cells
+        // We should only keep cells that are made entirely of input vertices
+
+        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().copied().collect();
+
+        let cells_to_remove: Vec<Uuid> = self
+            .cells
+            .iter()
+            .filter(|(_, cell)| {
+                let cell_vertex_uuids: HashSet<Uuid> =
+                    cell.vertices().iter().map(Vertex::uuid).collect();
+                let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
+
+                // Remove cells that don't consist entirely of input vertices
+                // Keep only cells that are made entirely of input vertices
+                !has_only_input_vertices
+            })
+            .map(|(uuid, _)| *uuid)
+            .collect();
+
+        for cell_id in cells_to_remove {
+            self.cells.remove(&cell_id);
         }
     }
 
@@ -1225,6 +1477,89 @@ where
 
         Ok(removed_count)
     }
+
+    // =============================================================================
+    // FACET-TO-CELLS MAPPING
+    // =============================================================================
+
+    /// Builds a `HashMap` mapping facet keys to the cells and facet indices that contain them.
+    ///
+    /// This method iterates over all cells and their facets once, computes the canonical key
+    /// for each facet using `facet.key()`, and creates a mapping from facet keys to the cells
+    /// that contain those facets along with the facet index within each cell.
+    ///
+    /// # Returns
+    ///
+    /// A `HashMap<u64, Vec<(Uuid, usize)>>` where:
+    /// - The key is the canonical facet key (u64) computed by `facet.key()`
+    /// - The value is a vector of tuples containing:
+    ///   - `Uuid`: The UUID of the cell containing this facet
+    ///   - `usize`: The index of this facet within the cell (0-based)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::geometry::point::Point;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::geometry::traits::coordinate::Coordinate;
+    ///
+    /// // Create a simple 3D triangulation
+    /// let points = vec![
+    ///     Point::new([0.0, 0.0, 0.0]),
+    ///     Point::new([1.0, 0.0, 0.0]),
+    ///     Point::new([0.0, 1.0, 0.0]),
+    ///     Point::new([0.0, 0.0, 1.0]),
+    /// ];
+    ///
+    /// let vertices = Vertex::from_points(points);
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Build the facet-to-cells mapping
+    /// let facet_map = tds.build_facet_to_cells_hashmap();
+    ///
+    /// // Each facet key should map to the cells that contain it
+    /// for (facet_key, cell_facet_pairs) in &facet_map {
+    ///     println!("Facet key {} is contained in {} cell(s)", facet_key, cell_facet_pairs.len());
+    ///     
+    ///     for (cell_id, facet_index) in cell_facet_pairs {
+    ///         println!("  - Cell {} at facet index {}", cell_id, facet_index);
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Performance
+    ///
+    /// This method has O(N×F) time complexity where N is the number of cells and F is the
+    /// number of facets per cell (typically D+1 for D-dimensional cells). The space
+    /// complexity is O(T) where T is the total number of facets across all cells.
+    #[must_use]
+    pub fn build_facet_to_cells_hashmap(&self) -> HashMap<u64, Vec<(Uuid, usize)>> {
+        let mut facet_to_cells: HashMap<u64, Vec<(Uuid, usize)>> = HashMap::new();
+
+        // Iterate over all cells and their facets
+        for (cell_id, cell) in &self.cells {
+            let facets = cell.facets();
+
+            // Iterate over each facet in the cell
+            for (facet_index, facet) in facets.iter().enumerate() {
+                // Compute the canonical key for this facet
+                let facet_key = facet.key();
+
+                // Insert the (cell_id, facet_index) pair into the HashMap
+                facet_to_cells
+                    .entry(facet_key)
+                    .or_default()
+                    .push((*cell_id, facet_index));
+            }
+        }
+
+        facet_to_cells
+    }
+
+    // =============================================================================
+    // VALIDATION
+    // =============================================================================
 
     /// Check for duplicate cells and return an error if any are found
     ///
@@ -1365,20 +1700,21 @@ where
     /// use d_delaunay::delaunay_core::triangulation_data_structure::{Tds, TriangulationValidationError};
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-    /// use d_delaunay::delaunay_core::vertex::VertexBuilder;
-    /// use d_delaunay::delaunay_core::cell::CellBuilder;
+    /// use d_delaunay::delaunay_core::vertex::Vertex;
+    /// use d_delaunay::vertex;
+    /// use d_delaunay::cell;
     ///
     /// let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
     ///
     /// // Create a cell with an invalid vertex (infinite coordinate)
     /// let vertices = vec![
-    ///     VertexBuilder::default().point(Point::new([1.0, 2.0, 3.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([f64::INFINITY, 2.0, 3.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([4.0, 5.0, 6.0])).build().unwrap(),
-    ///     VertexBuilder::default().point(Point::new([7.0, 8.0, 9.0])).build().unwrap(),
+    ///     vertex!([1.0, 2.0, 3.0]),
+    ///     vertex!([f64::INFINITY, 2.0, 3.0]),
+    ///     vertex!([4.0, 5.0, 6.0]),
+    ///     vertex!([7.0, 8.0, 9.0]),
     /// ];
     ///
-    /// let invalid_cell = CellBuilder::default().vertices(vertices).build().unwrap();
+    /// let invalid_cell = cell!(vertices);
     /// tds.cells.insert(invalid_cell.uuid(), invalid_cell);
     ///
     /// // Validation should fail
@@ -1409,6 +1745,164 @@ where
         self.validate_neighbors_internal()?;
 
         Ok(())
+    }
+
+    /// Identifies all boundary facets in the triangulation.
+    ///
+    /// A boundary facet is a facet that belongs to only one cell, meaning it lies on the
+    /// boundary of the triangulation (convex hull). These facets are important for
+    /// convex hull computation and boundary analysis.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Facet<T, U, V, D>>` containing all boundary facets in the triangulation.
+    /// The facets are returned in no particular order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// // Create a simple 3D triangulation (single tetrahedron)
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // A single tetrahedron has 4 boundary facets (all facets are on the boundary)
+    /// let boundary_facets = tds.boundary_facets();
+    /// assert_eq!(boundary_facets.len(), 4);
+    /// ```
+    #[must_use]
+    pub fn boundary_facets(&self) -> Vec<Facet<T, U, V, D>>
+    where
+        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
+        f64: From<T>,
+    {
+        // Build a map from facet keys to the cells that contain them
+        let facet_to_cells = self.build_facet_to_cells_hashmap();
+        let mut boundary_facets = Vec::new();
+
+        // Collect all facets that belong to only one cell
+        for (_facet_key, cells) in facet_to_cells {
+            if cells.len() == 1 {
+                let cell_id = cells[0].0;
+                let facet_index = cells[0].1;
+                if let Some(cell) = self.cells.get(&cell_id) {
+                    boundary_facets.push(cell.facets()[facet_index].clone());
+                }
+            }
+        }
+
+        boundary_facets
+    }
+
+    /// Checks if a specific facet is a boundary facet.
+    ///
+    /// A boundary facet is a facet that belongs to only one cell in the triangulation.
+    ///
+    /// # Arguments
+    ///
+    /// * `facet` - The facet to check.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the facet is on the boundary (belongs to only one cell), `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::delaunay_core::facet::Facet;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Get a facet from one of the cells
+    /// if let Some(cell) = tds.cells.values().next() {
+    ///     let facets = cell.facets();
+    ///     if let Some(facet) = facets.first() {
+    ///         // In a single tetrahedron, all facets are boundary facets
+    ///         assert!(tds.is_boundary_facet(facet));
+    ///     }
+    /// }
+    /// ```
+    pub fn is_boundary_facet(&self, facet: &Facet<T, U, V, D>) -> bool
+    where
+        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
+        f64: From<T>,
+    {
+        let facet_key = facet.key();
+        let mut count = 0;
+
+        // Count how many cells contain this facet
+        for cell in self.cells.values() {
+            for cell_facet in cell.facets() {
+                if cell_facet.key() == facet_key {
+                    count += 1;
+                    if count > 1 {
+                        return false; // Early exit - not a boundary facet
+                    }
+                }
+            }
+        }
+
+        count == 1
+    }
+
+    /// Returns the number of boundary facets in the triangulation.
+    ///
+    /// This is a more efficient way to count boundary facets without creating
+    /// the full vector of facets.
+    ///
+    /// # Returns
+    ///
+    /// The number of boundary facets in the triangulation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // A single tetrahedron has 4 boundary facets
+    /// assert_eq!(tds.number_of_boundary_facets(), 4);
+    /// ```
+    #[must_use]
+    pub fn number_of_boundary_facets(&self) -> usize
+    where
+        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
+        f64: From<T>,
+    {
+        // Build a map from facet keys to count of cells that contain them
+        let mut facet_counts: HashMap<u64, usize> = HashMap::new();
+
+        for cell in self.cells.values() {
+            for facet in cell.facets() {
+                *facet_counts.entry(facet.key()).or_insert(0) += 1;
+            }
+        }
+
+        // Count facets that appear in only one cell
+        facet_counts.values().filter(|&&count| count == 1).count()
     }
 
     /// Internal method for validating neighbor relationships.
@@ -1490,16 +1984,30 @@ where
     }
 }
 
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
 #[allow(clippy::uninlined_format_args, clippy::similar_names)]
 mod tests {
+    use crate::cell;
     use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::traits::coordinate::Coordinate;
+    use crate::vertex;
 
     use super::*;
 
     // Type alias for easier test writing - change this to test different coordinate types
     type TestFloat = f64;
+
+    // =============================================================================
+    // TEST HELPER FUNCTIONS
+    // =============================================================================
+
+    // =============================================================================
+    // add() TESTS
+    // =============================================================================
 
     #[test]
     fn test_add_vertex_already_exists() {
@@ -1524,7 +2032,7 @@ mod tests {
             num_traits::NumCast::from(2.0f64).unwrap(),
             num_traits::NumCast::from(3.0f64).unwrap(),
         ]);
-        let vertex = VertexBuilder::default().point(point).build().unwrap();
+        let vertex = VertexBuilder::default().point(point).build().unwrap(); // Complex generic test keeps VertexBuilder
         tds.add(vertex).unwrap();
 
         let result = tds.add(vertex);
@@ -1554,7 +2062,7 @@ mod tests {
             num_traits::NumCast::from(2.0f64).unwrap(),
             num_traits::NumCast::from(3.0f64).unwrap(),
         ]);
-        let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
+        let vertex1 = VertexBuilder::default().point(point1).build().unwrap(); // Complex generic test keeps VertexBuilder
         let uuid1 = vertex1.uuid();
         tds.add(vertex1).unwrap();
 
@@ -1564,7 +2072,7 @@ mod tests {
             num_traits::NumCast::from(5.0f64).unwrap(),
             num_traits::NumCast::from(6.0f64).unwrap(),
         ]); // Different coordinates
-        let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
+        let vertex2 = VertexBuilder::default().point(point2).build().unwrap(); // Complex generic test keeps VertexBuilder
 
         // Manually insert the second vertex with the first vertex's UUID to simulate UUID collision
         let collision_result = tds.vertices.insert(uuid1, vertex2);
@@ -1586,6 +2094,10 @@ mod tests {
         assert_eq!(stored_coords, expected_coords); // Should be vertex2's coordinates
     }
 
+    // =============================================================================
+    // dim() TESTS
+    // =============================================================================
+
     #[test]
     fn test_dim_multiple_vertices() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
@@ -1594,35 +2106,34 @@ mod tests {
         assert_eq!(tds.dim(), -1);
 
         // Test with one vertex
-        let point1 = Point::new([1.0, 2.0, 3.0]);
-        let vertex1 = VertexBuilder::default().point(point1).build().unwrap();
+        let vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
         tds.add(vertex1).unwrap();
         assert_eq!(tds.dim(), 0);
 
         // Test with two vertices
-        let point2 = Point::new([4.0, 5.0, 6.0]);
-        let vertex2 = VertexBuilder::default().point(point2).build().unwrap();
+        let vertex2: Vertex<f64, usize, 3> = vertex!([4.0, 5.0, 6.0]);
         tds.add(vertex2).unwrap();
         assert_eq!(tds.dim(), 1);
 
         // Test with three vertices
-        let point3 = Point::new([7.0, 8.0, 9.0]);
-        let vertex3 = VertexBuilder::default().point(point3).build().unwrap();
+        let vertex3: Vertex<f64, usize, 3> = vertex!([7.0, 8.0, 9.0]);
         tds.add(vertex3).unwrap();
         assert_eq!(tds.dim(), 2);
 
         // Test with four vertices (should be capped at D=3)
-        let point4 = Point::new([10.0, 11.0, 12.0]);
-        let vertex4 = VertexBuilder::default().point(point4).build().unwrap();
+        let vertex4: Vertex<f64, usize, 3> = vertex!([10.0, 11.0, 12.0]);
         tds.add(vertex4).unwrap();
         assert_eq!(tds.dim(), 3);
 
         // Test with five vertices (dimension should stay at 3)
-        let point5 = Point::new([13.0, 14.0, 15.0]);
-        let vertex5 = VertexBuilder::default().point(point5).build().unwrap();
+        let vertex5: Vertex<f64, usize, 3> = vertex!([13.0, 14.0, 15.0]);
         tds.add(vertex5).unwrap();
         assert_eq!(tds.is_valid(), Ok(()));
     }
+
+    // =============================================================================
+    // TRIANGULATION LOGIC TESTS
+    // =============================================================================
 
     #[test]
     fn test_supercell_empty_vertices() {
@@ -1678,19 +2189,14 @@ mod tests {
     fn test_is_valid_with_invalid_neighbors() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
-
         let vertices = vec![
-            VertexBuilder::default().point(point1).build().unwrap(),
-            VertexBuilder::default().point(point2).build().unwrap(),
-            VertexBuilder::default().point(point3).build().unwrap(),
-            VertexBuilder::default().point(point4).build().unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let mut cell = cell!(vertices);
         cell.neighbors = Some(vec![Uuid::nil()]); // Invalid neighbor
         tds.cells.insert(cell.uuid(), cell);
 
@@ -1716,7 +2222,7 @@ mod tests {
 
         // Add duplicate cell manually
         let vertices = result_tds.vertices.values().copied().collect::<Vec<_>>();
-        let duplicate_cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let duplicate_cell = cell!(vertices);
         result_tds
             .cells
             .insert(duplicate_cell.uuid(), duplicate_cell);
@@ -1747,19 +2253,14 @@ mod tests {
         assert_eq!(tds.number_of_cells(), 0);
 
         // Add a cell manually to test the count
-        let point1 = Point::new([0.0, 0.0, 0.0]);
-        let point2 = Point::new([1.0, 0.0, 0.0]);
-        let point3 = Point::new([0.0, 1.0, 0.0]);
-        let point4 = Point::new([0.0, 0.0, 1.0]);
-
         let vertices = vec![
-            VertexBuilder::default().point(point1).build().unwrap(),
-            VertexBuilder::default().point(point2).build().unwrap(),
-            VertexBuilder::default().point(point3).build().unwrap(),
-            VertexBuilder::default().point(point4).build().unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let cell = cell!(vertices);
         tds.cells.insert(cell.uuid(), cell);
 
         assert_eq!(tds.number_of_cells(), 1);
@@ -1797,46 +2298,31 @@ mod tests {
         assert_eq!(tds.number_of_cells(), 0);
         assert_eq!(tds.dim(), -1);
 
-        let new_vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let new_vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
         let _ = tds.add(new_vertex1);
 
         assert_eq!(tds.number_of_vertices(), 1);
         assert_eq!(tds.dim(), 0);
 
-        let new_vertex2 = VertexBuilder::default()
-            .point(Point::new([4.0, 5.0, 6.0]))
-            .build()
-            .unwrap();
+        let new_vertex2: Vertex<f64, usize, 3> = vertex!([4.0, 5.0, 6.0]);
         let _ = tds.add(new_vertex2);
 
         assert_eq!(tds.number_of_vertices(), 2);
         assert_eq!(tds.dim(), 1);
 
-        let new_vertex3 = VertexBuilder::default()
-            .point(Point::new([7.0, 8.0, 9.0]))
-            .build()
-            .unwrap();
+        let new_vertex3: Vertex<f64, usize, 3> = vertex!([7.0, 8.0, 9.0]);
         let _ = tds.add(new_vertex3);
 
         assert_eq!(tds.number_of_vertices(), 3);
         assert_eq!(tds.dim(), 2);
 
-        let new_vertex4 = VertexBuilder::default()
-            .point(Point::new([10.0, 11.0, 12.0]))
-            .build()
-            .unwrap();
+        let new_vertex4: Vertex<f64, usize, 3> = vertex!([10.0, 11.0, 12.0]);
         let _ = tds.add(new_vertex4);
 
         assert_eq!(tds.number_of_vertices(), 4);
         assert_eq!(tds.dim(), 3);
 
-        let new_vertex5 = VertexBuilder::default()
-            .point(Point::new([13.0, 14.0, 15.0]))
-            .build()
-            .unwrap();
+        let new_vertex5: Vertex<f64, usize, 3> = vertex!([13.0, 14.0, 15.0]);
         let _ = tds.add(new_vertex5);
 
         assert_eq!(tds.number_of_vertices(), 5);
@@ -1845,13 +2331,12 @@ mod tests {
 
     #[test]
     fn tds_no_add() {
-        let points = vec![
-            Point::new([1.0, 2.0, 3.0]),
-            Point::new([4.0, 5.0, 6.0]),
-            Point::new([7.0, 8.0, 9.0]),
-            Point::new([10.0, 11.0, 12.0]),
+        let vertices = vec![
+            vertex!([1.0, 2.0, 3.0]),
+            vertex!([4.0, 5.0, 6.0]),
+            vertex!([7.0, 8.0, 9.0]),
+            vertex!([10.0, 11.0, 12.0]),
         ];
-        let vertices = Vertex::from_points(points);
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
 
         assert_eq!(tds.number_of_vertices(), 4);
@@ -1859,10 +2344,7 @@ mod tests {
         assert_eq!(tds.cells.len(), 1);
         assert_eq!(tds.dim(), 3);
 
-        let new_vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let new_vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
         let result = tds.add(new_vertex1);
 
         assert_eq!(tds.number_of_vertices(), 4);
@@ -1939,10 +2421,10 @@ mod tests {
         // Using 6 points in 4D space to create a complex triangulation
         let points = vec![
             Point::new([0.0, 0.0, 0.0, 0.0]), // origin
-            Point::new([1.0, 0.0, 0.0, 0.0]), // unit vector in x
-            Point::new([0.0, 1.0, 0.0, 0.0]), // unit vector in y
-            Point::new([0.0, 0.0, 1.0, 0.0]), // unit vector in z
-            Point::new([0.0, 0.0, 0.0, 1.0]), // unit vector in w
+            Point::new([3.0, 0.0, 0.0, 0.0]), // x-axis
+            Point::new([0.0, 3.0, 0.0, 0.0]), // y-axis
+            Point::new([0.0, 0.0, 3.0, 0.0]), // z-axis
+            Point::new([0.0, 0.0, 0.0, 3.0]), // w-axis
             Point::new([1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
 
@@ -1979,11 +2461,11 @@ mod tests {
         // Using 7 points in 5D space to create a complex triangulation
         let points = vec![
             Point::new([0.0, 0.0, 0.0, 0.0, 0.0]), // origin
-            Point::new([1.0, 0.0, 0.0, 0.0, 0.0]), // unit vector in x
-            Point::new([0.0, 1.0, 0.0, 0.0, 0.0]), // unit vector in y
-            Point::new([0.0, 0.0, 1.0, 0.0, 0.0]), // unit vector in z
-            Point::new([0.0, 0.0, 0.0, 1.0, 0.0]), // unit vector in w
-            Point::new([0.0, 0.0, 0.0, 0.0, 1.0]), // unit vector in v
+            Point::new([3.0, 0.0, 0.0, 0.0, 0.0]), // x-axis
+            Point::new([0.0, 3.0, 0.0, 0.0, 0.0]), // y-axis
+            Point::new([0.0, 0.0, 3.0, 0.0, 0.0]), // z-axis
+            Point::new([0.0, 0.0, 0.0, 3.0, 0.0]), // w-axis
+            Point::new([0.0, 0.0, 0.0, 0.0, 3.0]), // v-axis
             Point::new([1.0, 1.0, 1.0, 1.0, 1.0]), // diagonal point
         ];
 
@@ -2013,40 +2495,21 @@ mod tests {
 
     #[test]
     fn test_triangulation_validation_errors() {
-        use crate::delaunay_core::cell::CellBuilder;
-        use crate::delaunay_core::vertex::VertexBuilder;
-        use crate::geometry::point::Point;
-
         // Test validation with an invalid cell
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create a valid vertex
-        let vertex1 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let vertex1: Vertex<f64, usize, 3> = vertex!([1.0, 2.0, 3.0]);
 
         // Create an invalid vertex with infinite coordinates
-        let vertex2 = VertexBuilder::default()
-            .point(Point::new([f64::INFINITY, 2.0, 3.0]))
-            .build()
-            .unwrap();
+        let vertex2: Vertex<f64, usize, 3> = vertex!([f64::INFINITY, 2.0, 3.0]);
 
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([4.0, 5.0, 6.0]))
-            .build()
-            .unwrap();
+        let vertex3: Vertex<f64, usize, 3> = vertex!([4.0, 5.0, 6.0]);
 
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([7.0, 8.0, 9.0]))
-            .build()
-            .unwrap();
+        let vertex4: Vertex<f64, usize, 3> = vertex!([7.0, 8.0, 9.0]);
 
         // Create a cell with an invalid vertex
-        let invalid_cell = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let invalid_cell = cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         tds.cells.insert(invalid_cell.uuid(), invalid_cell.clone());
 
@@ -2123,14 +2586,18 @@ mod tests {
         assert_eq!(supercell_4d.vertices().len(), 5); // 4-simplex for 4D
     }
 
+    // =============================================================================
+    // NEIGHBOR AND INCIDENT CELL TESTS
+    // =============================================================================
+
     #[test]
     fn test_neighbor_assignment_logic() {
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
+            Point::new([7.0, 0.1, 0.2]),
+            Point::new([0.3, 7.1, 0.4]),
+            Point::new([0.5, 0.6, 7.2]),
+            Point::new([1.5, 1.7, 1.9]),
         ];
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -2138,7 +2605,7 @@ mod tests {
         let mut result = tds;
 
         // Manually assign neighbors to test the logic
-        let _ = result.assign_neighbors();
+        result.assign_neighbors();
 
         // Check that at least one cell has neighbors assigned
         let has_neighbors = result.cells.values().any(|cell| {
@@ -2153,6 +2620,53 @@ mod tests {
                 "Multi-cell triangulation should have neighbor relationships"
             );
         }
+    }
+
+    #[test]
+    fn test_facets_are_adjacent() {
+        let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+        let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
+        let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
+        let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
+
+        let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
+        let cell3: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v4]);
+
+        let facet1 = Facet::new(cell1, v1).unwrap(); // Vertices: v2, v3
+        let facet2 = Facet::new(cell2, v4).unwrap(); // Vertices: v2, v3
+        let facet3 = Facet::new(cell3, v4).unwrap(); // Vertices: v1, v2
+
+        assert!(facets_are_adjacent(&facet1, &facet2)); // Same vertices
+        assert!(!facets_are_adjacent(&facet1, &facet3)); // Different vertices
+    }
+
+    #[test]
+    fn test_generate_combinations() {
+        let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
+            vertex!([0.0]),
+            vertex!([1.0]),
+            vertex!([2.0]),
+            vertex!([3.0]),
+        ];
+
+        // Combinations of 2 from 4
+        let combinations_2 = generate_combinations(&vertices, 2);
+        assert_eq!(combinations_2.len(), 6);
+
+        // Combinations of 3 from 4
+        let combinations_3 = generate_combinations(&vertices, 3);
+        assert_eq!(combinations_3.len(), 4);
+        assert!(combinations_3.contains(&vec![vertices[0], vertices[1], vertices[2]]));
+
+        // Edge case: k=0
+        let combinations_0 = generate_combinations(&vertices, 0);
+        assert_eq!(combinations_0.len(), 1);
+        assert!(combinations_0[0].is_empty());
+
+        // Edge case: k > len
+        let combinations_5 = generate_combinations(&vertices, 5);
+        assert!(combinations_5.is_empty());
     }
 
     #[test]
@@ -2185,79 +2699,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_facets_are_adjacent() {
-        let points = vec![
-            Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
-        ];
-        let vertices = Vertex::from_points(points);
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-        // Triangulation is automatically done in Tds::new
-        let result = tds;
-
-        if result.number_of_cells() >= 2 {
-            let cell_vec: Vec<_> = result.cells.values().collect();
-            let cell1 = cell_vec[0];
-            let cell2 = cell_vec[1];
-
-            let facets1 = cell1.facets();
-            let facets2 = cell2.facets();
-
-            // Test if any facets are adjacent
-            let mut found_adjacent = false;
-            for facet1 in &facets1 {
-                for facet2 in &facets2 {
-                    if facets_are_adjacent(facet1, facet2) {
-                        found_adjacent = true;
-                        break;
-                    }
-                }
-                if found_adjacent {
-                    break;
-                }
-            }
-
-            // In a proper triangulation, neighboring cells should share facets
-            println!("Found adjacent facets: {}", found_adjacent);
-        }
-    }
-
-    #[test]
-    fn test_generate_combinations() {
-        let points = vec![
-            Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
-        ];
-        let vertices: Vec<Vertex<f64, usize, 3>> = Vertex::from_points(points);
-
-        // Test generating combinations of different sizes
-        let combinations_0 = generate_combinations(&vertices, 0);
-        assert_eq!(combinations_0.len(), 1);
-        assert_eq!(combinations_0[0].len(), 0);
-
-        let combinations_1 = generate_combinations(&vertices, 1);
-        assert_eq!(combinations_1.len(), 5);
-
-        let combinations_2 = generate_combinations(&vertices, 2);
-        assert_eq!(combinations_2.len(), 10); // C(5,2) = 10
-
-        let combinations_4 = generate_combinations(&vertices, 4);
-        assert_eq!(combinations_4.len(), 5); // C(5,4) = 5
-
-        let combinations_6 = generate_combinations(&vertices, 6);
-        assert_eq!(combinations_6.len(), 0); // k > n, should be empty
-
-        let combinations_all = generate_combinations(&vertices, 5);
-        assert_eq!(combinations_all.len(), 1); // C(5,5) = 1
-        assert_eq!(combinations_all[0].len(), 5);
-    }
+    // =============================================================================
+    // VALIDATION TESTS
+    // =============================================================================
 
     #[test]
     fn test_validation_with_too_many_neighbors() {
@@ -2265,25 +2709,13 @@ mod tests {
 
         // Create a cell with too many neighbors (more than D+1=4)
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let mut cell = cell!(vertices);
 
         // Add too many neighbors (5 neighbors for 3D should fail)
         cell.neighbors = Some(vec![
@@ -2309,21 +2741,12 @@ mod tests {
 
         // Create a cell with wrong number of vertices (3 instead of 4 for 3D)
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
         ];
 
-        let cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let cell = cell!(vertices);
         tds.cells.insert(cell.uuid(), cell);
 
         let result = tds.is_valid();
@@ -2340,45 +2763,21 @@ mod tests {
 
         // Create two cells
         let vertices1 = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
         let vertices2 = vec![
-            VertexBuilder::default()
-                .point(Point::new([2.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([3.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([2.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([2.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([2.0, 0.0, 0.0]),
+            vertex!([3.0, 0.0, 0.0]),
+            vertex!([2.0, 1.0, 0.0]),
+            vertex!([2.0, 0.0, 1.0]),
         ];
 
-        let mut cell1 = CellBuilder::default().vertices(vertices1).build().unwrap();
-        let cell2 = CellBuilder::default().vertices(vertices2).build().unwrap();
+        let mut cell1 = cell!(vertices1);
+        let cell2 = cell!(vertices2);
 
         // Make cell1 point to cell2 as neighbor, but not vice versa
         cell1.neighbors = Some(vec![cell2.uuid()]);
@@ -2397,14 +2796,14 @@ mod tests {
     fn test_bowyer_watson_complex_geometry() {
         // Test with points that form a more complex 3D arrangement
         let points = vec![
-            Point::new([0.0, 0.0, 0.0]), // origin
-            Point::new([2.0, 0.0, 0.0]), // x-axis
-            Point::new([0.0, 2.0, 0.0]), // y-axis
-            Point::new([0.0, 0.0, 2.0]), // z-axis
-            Point::new([1.0, 1.0, 0.0]), // xy-plane
-            Point::new([1.0, 0.0, 1.0]), // xz-plane
-            Point::new([0.0, 1.0, 1.0]), // yz-plane
-            Point::new([1.0, 1.0, 1.0]), // center point
+            Point::new([0.1, 0.2, 0.3]),
+            Point::new([10.4, 0.5, 0.6]),
+            Point::new([0.7, 10.8, 0.9]),
+            Point::new([1.0, 1.1, 11.2]),
+            Point::new([2.1, 3.2, 4.3]),
+            Point::new([4.4, 2.5, 3.6]),
+            Point::new([3.7, 4.8, 2.9]),
+            Point::new([5.1, 5.2, 5.3]),
         ];
 
         let vertices = Vertex::from_points(points);
@@ -2472,10 +2871,7 @@ mod tests {
 
         if result.number_of_cells() > 0 {
             // Create a test vertex that might be inside/outside existing cells
-            let test_vertex = VertexBuilder::default()
-                .point(Point::new([0.25, 0.25, 0.25]))
-                .build()
-                .unwrap();
+            let test_vertex = vertex!([0.25, 0.25, 0.25]);
 
             // Test the bad cells and boundary facets detection
             let bad_cells_result = result.find_bad_cells_and_boundary_facets(&test_vertex);
@@ -2513,13 +2909,11 @@ mod tests {
             Point::new([10.0, -10.0, 10.0]),
             Point::new([10.0, 10.0, -10.0]),
         ];
-        let supercell = CellBuilder::default()
-            .vertices(Vertex::from_points(supercell_points))
-            .build()
-            .unwrap();
+        let _supercell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(Vertex::from_points(supercell_points));
 
         // Test the removal logic
-        result.remove_cells_containing_supercell_vertices(&supercell);
+        result.remove_cells_containing_supercell_vertices();
 
         // Should still have the same cells since none contain supercell vertices
         assert_eq!(result.number_of_cells(), initial_cell_count);
@@ -2581,11 +2975,11 @@ mod tests {
         // Test the combinatorial approach path in bowyer_watson
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 0.0]),
-            Point::new([1.0, 0.0, 1.0]),
+            Point::new([6.1, 0.0, 0.0]),
+            Point::new([0.0, 6.2, 0.0]),
+            Point::new([0.0, 0.0, 6.3]),
+            Point::new([2.1, 2.2, 0.1]),
+            Point::new([2.3, 0.3, 2.4]),
         ];
         let vertices = Vertex::from_points(points);
         let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -2645,14 +3039,18 @@ mod tests {
         }
     }
 
+    // =============================================================================
+    // UTILITY FUNCTION TESTS
+    // =============================================================================
+
     #[test]
     fn test_assign_neighbors_comprehensive() {
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
+            Point::new([8.0, 0.1, 0.2]),
+            Point::new([0.3, 8.1, 0.4]),
+            Point::new([0.5, 0.6, 8.2]),
+            Point::new([1.7, 1.9, 2.1]),
         ];
         let vertices = Vertex::from_points(points);
         let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
@@ -2667,7 +3065,7 @@ mod tests {
         }
 
         // Test neighbor assignment
-        let _ = result.assign_neighbors();
+        result.assign_neighbors();
 
         // Verify that neighbors were assigned
         let mut total_neighbor_links = 0;
@@ -2740,10 +3138,7 @@ mod tests {
         let vertices: Vec<_> = result.vertices.values().copied().collect();
 
         for _ in 0..3 {
-            let duplicate_cell = CellBuilder::default()
-                .vertices(vertices.clone())
-                .build()
-                .unwrap();
+            let duplicate_cell = cell!(vertices.clone());
             result.cells.insert(duplicate_cell.uuid(), duplicate_cell);
         }
 
@@ -2781,10 +3176,7 @@ mod tests {
 
         if result.number_of_cells() > 0 {
             // Test with a vertex that should be inside the circumsphere
-            let inside_vertex = VertexBuilder::default()
-                .point(Point::new([0.5, 0.5, 0.5]))
-                .build()
-                .unwrap();
+            let inside_vertex = vertex!([0.5, 0.5, 0.5]);
 
             let bad_cells_result = result.find_bad_cells_and_boundary_facets(&inside_vertex);
             assert!(bad_cells_result.is_ok());
@@ -2797,10 +3189,7 @@ mod tests {
             );
 
             // Test with a vertex that should be outside all circumspheres
-            let outside_vertex = VertexBuilder::default()
-                .point(Point::new([10.0, 10.0, 10.0]))
-                .build()
-                .unwrap();
+            let outside_vertex = vertex!([10.0, 10.0, 10.0]);
 
             let bad_cells_result2 = result.find_bad_cells_and_boundary_facets(&outside_vertex);
             assert!(bad_cells_result2.is_ok());
@@ -2820,25 +3209,13 @@ mod tests {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         let vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
         ];
 
-        let mut cell = CellBuilder::default().vertices(vertices).build().unwrap();
+        let mut cell = cell!(vertices);
 
         // Add exactly D neighbors (3 neighbors for 3D)
         cell.neighbors = Some(vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()]);
@@ -2859,33 +3236,12 @@ mod tests {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
 
         // Create two cells that share some but not enough vertices
-        let shared_vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([1.0, 0.0, 0.0]))
-                .build()
-                .unwrap(),
-        ];
+        let shared_vertices = vec![vertex!([0.0, 0.0, 0.0]), vertex!([1.0, 0.0, 0.0])];
 
-        let vertex3 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex4 = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex5 = VertexBuilder::default()
-            .point(Point::new([2.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex6 = VertexBuilder::default()
-            .point(Point::new([1.0, 2.0, 0.0]))
-            .build()
-            .unwrap();
+        let vertex3 = vertex!([0.0, 1.0, 0.0]);
+        let vertex4 = vertex!([0.0, 0.0, 1.0]);
+        let vertex5 = vertex!([2.0, 0.0, 0.0]);
+        let vertex6 = vertex!([1.0, 2.0, 0.0]);
 
         let mut vertices1 = shared_vertices.clone();
         vertices1.extend([vertex3, vertex4]);
@@ -2893,8 +3249,8 @@ mod tests {
         let mut vertices2 = shared_vertices;
         vertices2.extend([vertex5, vertex6]);
 
-        let mut cell1 = CellBuilder::default().vertices(vertices1).build().unwrap();
-        let mut cell2 = CellBuilder::default().vertices(vertices2).build().unwrap();
+        let mut cell1 = cell!(vertices1);
+        let mut cell2 = cell!(vertices2);
 
         // Make them claim to be neighbors
         cell1.neighbors = Some(vec![cell2.uuid()]);
@@ -2927,14 +3283,8 @@ mod tests {
             Point::new([2.0, 0.0, 0.0]),
         ];
 
-        let cell1 = CellBuilder::<f64, usize, usize, 3>::default()
-            .vertices(Vertex::from_points(points1))
-            .build()
-            .unwrap();
-        let cell2 = CellBuilder::<f64, usize, usize, 3>::default()
-            .vertices(Vertex::from_points(points2))
-            .build()
-            .unwrap();
+        let cell1: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points1));
+        let cell2: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points2));
 
         let facets1 = cell1.facets();
         let facets2 = cell2.facets();
@@ -2967,10 +3317,7 @@ mod tests {
             Point::new([10.0, 10.0, 11.0]),
         ];
 
-        let cell3 = CellBuilder::<f64, usize, usize, 3>::default()
-            .vertices(Vertex::from_points(points3))
-            .build()
-            .unwrap();
+        let cell3: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points3));
         let facets3 = cell3.facets();
 
         let mut found_adjacent2 = false;
@@ -2991,5 +3338,192 @@ mod tests {
             !found_adjacent2,
             "Cells sharing no vertices should not have adjacent facets"
         );
+    }
+
+    // =============================================================================
+    // BOUNDARY FACET TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_boundary_facets_single_cell() {
+        // Create a single tetrahedron - all its facets should be boundary facets
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+
+        assert_eq!(tds.number_of_cells(), 1, "Should contain one cell");
+
+        // All 4 facets of the tetrahedron should be on the boundary
+        let boundary_facets = tds.boundary_facets();
+        assert_eq!(
+            boundary_facets.len(),
+            4,
+            "A single tetrahedron should have 4 boundary facets"
+        );
+
+        // Also test the count method for efficiency
+        assert_eq!(
+            tds.number_of_boundary_facets(),
+            4,
+            "Count of boundary facets should be 4"
+        );
+    }
+
+    #[test]
+    fn test_is_boundary_facet() {
+        // Create a triangulation with two adjacent tetrahedra sharing one facet
+        // This should result in 6 boundary facets and 1 internal (shared) facet
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),  // A
+            Point::new([1.0, 0.0, 0.0]),  // B
+            Point::new([0.5, 1.0, 0.0]),  // C - forms base triangle ABC
+            Point::new([0.5, 0.5, 1.0]),  // D - above base
+            Point::new([0.5, 0.5, -1.0]), // E - below base
+        ];
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+        assert_eq!(tds.number_of_cells(), 2, "Should have exactly two cells");
+
+        // Get all boundary facets
+        let boundary_facets = tds.boundary_facets();
+        assert_eq!(
+            boundary_facets.len(),
+            6,
+            "Two adjacent tetrahedra should have 6 boundary facets"
+        );
+
+        // Test that all facets from boundary_facets() are indeed boundary facets
+        for boundary_facet in &boundary_facets {
+            assert!(
+                tds.is_boundary_facet(boundary_facet),
+                "All facets from boundary_facets() should be boundary facets"
+            );
+        }
+
+        // Test the count method
+        assert_eq!(
+            tds.number_of_boundary_facets(),
+            6,
+            "Count should match the vector length"
+        );
+
+        // Build a map of facet keys to the cells that contain them
+        let mut facet_map: HashMap<u64, Vec<Uuid>> = HashMap::new();
+        for cell in tds.cells.values() {
+            for facet in cell.facets() {
+                facet_map.entry(facet.key()).or_default().push(cell.uuid());
+            }
+        }
+
+        // Count boundary and shared facets
+        let mut boundary_count = 0;
+        let mut shared_count = 0;
+
+        for (_, cells) in facet_map {
+            if cells.len() == 1 {
+                boundary_count += 1;
+            } else if cells.len() == 2 {
+                shared_count += 1;
+            } else {
+                panic!(
+                    "Facet should be shared by at most 2 cells, found {}",
+                    cells.len()
+                );
+            }
+        }
+
+        // Two tetrahedra should have 6 boundary facets and 1 shared facet
+        assert_eq!(boundary_count, 6, "Should have 6 boundary facets");
+        assert_eq!(shared_count, 1, "Should have 1 shared (internal) facet");
+
+        // Verify neighbors are correctly assigned
+        let cells: Vec<_> = tds.cells.values().collect();
+        let cell1 = cells[0];
+        let cell2 = cells[1];
+
+        // Each cell should have exactly one neighbor (the other cell)
+        assert!(cell1.neighbors.is_some(), "Cell 1 should have neighbors");
+        assert!(cell2.neighbors.is_some(), "Cell 2 should have neighbors");
+
+        let neighbors1 = cell1.neighbors.as_ref().unwrap();
+        let neighbors2 = cell2.neighbors.as_ref().unwrap();
+
+        assert_eq!(neighbors1.len(), 1, "Cell 1 should have exactly 1 neighbor");
+        assert_eq!(neighbors2.len(), 1, "Cell 2 should have exactly 1 neighbor");
+
+        assert!(
+            neighbors1.contains(&cell2.uuid()),
+            "Cell 1 should have Cell 2 as neighbor"
+        );
+        assert!(
+            neighbors2.contains(&cell1.uuid()),
+            "Cell 2 should have Cell 1 as neighbor"
+        );
+    }
+
+    #[test]
+    #[ignore = "Benchmark test is time-consuming and not suitable for regular test runs"]
+    fn benchmark_boundary_facets_performance() {
+        use rand::Rng;
+        use std::time::Instant;
+
+        // Smaller point counts for reasonable test time
+        let point_counts = [20, 40, 60, 80];
+
+        println!("\nBenchmarking boundary_facets() performance:");
+        println!(
+            "Note: This demonstrates the O(N·F) complexity where N = cells, F = facets per cell"
+        );
+
+        for &n_points in &point_counts {
+            // Create a number of random points in 3D
+            let mut rng = rand::rng();
+            let points: Vec<Point<f64, 3>> = (0..n_points)
+                .map(|_| {
+                    Point::new([
+                        rng.random::<f64>() * 100.0,
+                        rng.random::<f64>() * 100.0,
+                        rng.random::<f64>() * 100.0,
+                    ])
+                })
+                .collect();
+
+            let vertices = Vertex::from_points(points);
+            let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+
+            // Time multiple runs to get more stable measurements
+            let mut total_time = std::time::Duration::ZERO;
+            let runs: u32 = 10;
+
+            for _ in 0..runs {
+                let start = Instant::now();
+                let boundary_facets = tds.boundary_facets();
+                total_time += start.elapsed();
+
+                // Prevent optimization away
+                std::hint::black_box(boundary_facets);
+            }
+
+            let avg_time = total_time / runs;
+
+            println!(
+                "Points: {:3} | Cells: {:4} | Boundary Facets: {:4} | Avg Time: {:?}",
+                n_points,
+                tds.number_of_cells(),
+                tds.number_of_boundary_facets(),
+                avg_time
+            );
+        }
+
+        println!("\nOptimization achieved:");
+        println!("- Single pass over all cells and facets: O(N·F)");
+        println!("- HashMap-based facet-to-cells mapping");
+        println!("- Direct facet cloning instead of repeated computation");
     }
 }

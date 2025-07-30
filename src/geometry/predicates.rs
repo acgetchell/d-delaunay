@@ -4,9 +4,6 @@
 //! that operate on points and simplices, including circumcenter and circumradius
 //! calculations.
 
-use crate::geometry::matrix::invert;
-use crate::geometry::point::Point;
-use crate::geometry::traits::coordinate::{Coordinate, CoordinateScalar};
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::{Float, Zero};
@@ -14,6 +11,10 @@ use peroxide::fuga::{LinearAlgebra, MatrixTrait, anyhow, zeros};
 use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 use std::iter::Sum;
+
+use crate::geometry::matrix::invert;
+use crate::geometry::point::Point;
+use crate::geometry::traits::coordinate::{Coordinate, CoordinateScalar};
 
 /// Helper function to compute squared norm using generic arithmetic on T.
 ///

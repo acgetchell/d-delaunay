@@ -1,4 +1,8 @@
 name: CI
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 on:
@@ -58,6 +62,6 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --verbose --all-targets
+          cargo test --lib --verbose
           cargo test --doc --verbose
           cargo test --examples --verbose

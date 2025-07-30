@@ -1,13 +1,14 @@
 //! Utility functions
 
-use crate::delaunay_core::traits::data::DataType;
-use crate::delaunay_core::vertex::Vertex;
-use crate::geometry::traits::coordinate::CoordinateScalar;
 use anyhow::Error;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+use crate::delaunay_core::traits::data::DataType;
+use crate::delaunay_core::vertex::Vertex;
+use crate::geometry::traits::coordinate::CoordinateScalar;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
 ///
@@ -126,9 +127,9 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::delaunay_core::vertex::VertexBuilder;
     use crate::geometry::point::Point;
     use crate::geometry::traits::coordinate::Coordinate;
+    use crate::vertex;
     use approx::assert_relative_eq;
     use std::collections::HashMap;
 
@@ -290,11 +291,10 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(i, point)| {
-                VertexBuilder::default()
-                    .point(point)
-                    .data(i32::try_from(i).unwrap())
-                    .build()
-                    .unwrap()
+                vertex!(
+                    point.to_array(),
+                    i32::try_from(i).expect("Index out of bounds")
+                )
             })
             .collect();
         let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);

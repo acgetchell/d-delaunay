@@ -13,29 +13,27 @@
 //! - **Neighbor Tracking**: Maintains references to neighboring cells
 //! - **Optional Data Storage**: Supports attaching arbitrary user data of type `V`
 //! - **Serialization Support**: Full serde support for persistence
-//! - **Builder Pattern**: Convenient cell construction using `CellBuilder`
+//! - **Macro-based Construction**: Convenient cell creation using the `cell!` macro.
 //!
 //! # Examples
 //!
 //! ```rust
-//! use d_delaunay::delaunay_core::cell::{Cell, CellBuilder};
-//! use d_delaunay::delaunay_core::vertex::{Vertex, VertexBuilder};
+//! use d_delaunay::delaunay_core::cell::Cell;
+//! use d_delaunay::delaunay_core::vertex::Vertex;
 //! use d_delaunay::geometry::point::Point;
 //! use d_delaunay::geometry::traits::coordinate::Coordinate;
+//! use d_delaunay::{cell, vertex};
 //!
 //! // Create vertices for a tetrahedron
 //! let vertices = vec![
-//!     VertexBuilder::default().point(Point::new([0.0, 0.0, 0.0])).build().unwrap(),
-//!     VertexBuilder::default().point(Point::new([1.0, 0.0, 0.0])).build().unwrap(),
-//!     VertexBuilder::default().point(Point::new([0.0, 1.0, 0.0])).build().unwrap(),
-//!     VertexBuilder::default().point(Point::new([0.0, 0.0, 1.0])).build().unwrap(),
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
 //! ];
 //!
 //! // Create a 3D cell (tetrahedron)
-//! let cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-//!     .vertices(vertices)
-//!     .build()
-//!     .unwrap();
+//! let cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
 //! ```
 
 #![allow(clippy::similar_names)]
@@ -161,6 +159,21 @@ macro_rules! cell {
 
 // Re-export the macro at the crate level for convenience
 pub use crate::cell;
+
+/// Helper function to sort vertices for comparison and hashing
+fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    let mut sorted = vertices.to_vec();
+    sorted.sort_by(|a, b| {
+        a.partial_cmp(b)
+            .expect("Vertices must be comparable for sorting")
+    });
+    sorted
+}
 
 // =============================================================================
 // CELL STRUCT DEFINITION
@@ -560,8 +573,53 @@ where
         })
     }
 
-    /// The function `into_hashmap` converts a [Vec] of cells into a [`HashMap`],
-    /// using the [Cell] [Uuid]s as keys.
+    /// Converts a vector of cells into a `HashMap` indexed by their UUIDs.
+    ///
+    /// This utility function transforms a collection of cells into a hash map structure
+    /// for efficient lookups by UUID. Each cell's unique identifier becomes the key,
+    /// and the cell itself becomes the value in the resulting `HashMap`.
+    ///
+    /// # Arguments
+    ///
+    /// * `cells` - A vector of cells to be converted into a `HashMap`.
+    ///
+    /// # Returns
+    ///
+    /// A [`HashMap\u003cUuid, Self\u003e`] where each key is a cell's UUID and each value
+    /// is the corresponding cell. The `HashMap` provides O(1) average-case lookups
+    /// by UUID.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use uuid::Uuid;
+    ///
+    /// // Create some cells
+    /// let vertices1 = vec![vertex!([0.0, 0.0, 1.0]), vertex!([0.0, 1.0, 0.0])];
+    /// let vertices2 = vec![vertex!([1.0, 0.0, 0.0]), vertex!([1.0, 1.0, 1.0])];
+    /// let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
+    /// let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+    ///
+    /// let cells = vec![cell1.clone(), cell2.clone()];
+    /// let cell_map = Cell::into_hashmap(cells);
+    ///
+    /// // Access cells by their UUIDs
+    /// assert_eq!(cell_map.get(&cell1.uuid()), Some(&cell1));
+    /// assert_eq!(cell_map.get(&cell2.uuid()), Some(&cell2));
+    /// assert_eq!(cell_map.len(), 2);
+    /// ```
+    ///
+    /// ```
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// // Empty vector produces empty HashMap
+    /// let empty_cells: Vec<Cell<f64, Option<()>, Option<()>, 3>> = vec![];
+    /// let empty_map = Cell::into_hashmap(empty_cells);
+    /// assert!(empty_map.is_empty());
+    /// ```
     #[must_use]
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
         cells.into_iter().map(|c| (c.uuid, c)).collect()
@@ -652,14 +710,35 @@ where
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function `facets` returns the [Facet]s of the [Cell].
+    /// Returns all facets (faces) of the cell.
+    ///
+    /// A facet is a (D-1)-dimensional face of a D-dimensional cell. For example,
+    /// in a 3D tetrahedron, each facet is a 2D triangle. Each facet is created by
+    /// removing one vertex from the cell, resulting in a lower-dimensional simplex.
+    ///
+    /// The number of facets equals the number of vertices in the cell, as each
+    /// vertex defines one facet by its absence from the cell.
+    ///
+    /// # Type Parameters
+    ///
+    /// This method requires the coordinate type `T` to implement additional traits
+    /// beyond the basic `Cell` requirements:
+    /// - `Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum`: Required for
+    ///   geometric computations and facet creation.
+    /// - `f64: From<T>`: Enables conversion to `f64` for numerical operations.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Facet<T, U, V, D>>` containing all facets of the cell. Each facet
+    /// contains D vertices (one fewer than the original cell's D+1 vertices).
     ///
     /// # Panics
     ///
     /// Panics if `Facet::new()` fails for any vertex in the cell. This should not
-    /// happen under normal circumstances with valid cell data.
+    /// happen under normal circumstances with valid cell data, as facets are created
+    /// by removing each vertex in turn.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use d_delaunay::{cell, vertex};
@@ -667,13 +746,41 @@ where
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::delaunay_core::facet::Facet;
     ///
+    /// // Create a 3D tetrahedron (4 vertices)
     /// let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 1.0], 1);
     /// let vertex2: Vertex<f64, i32, 3> = vertex!([0.0, 1.0, 0.0], 1);
     /// let vertex3: Vertex<f64, i32, 3> = vertex!([1.0, 0.0, 0.0], 1);
     /// let vertex4: Vertex<f64, i32, 3> = vertex!([1.0, 1.0, 1.0], 2);
     /// let cell: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4], 42);
+    ///
     /// let facets = cell.facets();
-    /// assert_eq!(facets.len(), 4);
+    /// assert_eq!(facets.len(), 4); // 4 facets for tetrahedron
+    ///
+    /// // Each facet should have 3 vertices (triangular faces)
+    /// for facet in &facets {
+    ///     assert_eq!(facet.vertices().len(), 3);
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// // Create a 2D triangle (3 vertices)
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0]),
+    ///     vertex!([1.0, 0.0]),
+    ///     vertex!([0.0, 1.0]),
+    /// ];
+    /// let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices);
+    ///
+    /// let facets = cell.facets();
+    /// assert_eq!(facets.len(), 3); // 3 facets (edges) for triangle
+    ///
+    /// // Each facet should have 2 vertices (line segments)
+    /// for facet in &facets {
+    ///     assert_eq!(facet.vertices().len(), 2);
+    /// }
     /// ```
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
         self.vertices
@@ -681,22 +788,6 @@ where
             .map(|vertex| Facet::new(self.clone(), *vertex).unwrap())
             .collect()
     }
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/// Helper function to sort vertices for comparison and hashing
-fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
-where
-    T: CoordinateScalar,
-    U: DataType,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    let mut sorted = vertices.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    sorted
 }
 
 // =============================================================================
@@ -777,7 +868,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::delaunay_core::vertex::{VertexBuilder, vertex};
+    use crate::delaunay_core::vertex::vertex;
     use crate::geometry::point::Point;
     use crate::geometry::predicates::{
         circumcenter, circumradius, circumradius_with_center, insphere, insphere_distance,
@@ -1067,10 +1158,8 @@ mod tests {
         let vertex3 = vertex!([1.0, 0.0, 0.0]);
 
         // Create two cells with same vertices but different neighbors
-        let mut cell1: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let mut cell1: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3]);
         let mut cell2 = cell1.clone();
 
         // Set different neighbors
@@ -1745,10 +1834,8 @@ mod tests {
         let vertex3 = vertex!([0.0, 1.0, 0.0]);
         let vertex4 = vertex!([0.0, 0.0, 1.0]);
 
-        let original_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let original_cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         // Create a facet by removing vertex4
         let facet = Facet::new(original_cell, vertex4).unwrap();
@@ -1777,10 +1864,8 @@ mod tests {
         let vertex2_f32 = vertex!([1.0f32, 0.0f32]);
         let vertex3_f32 = vertex!([0.0f32, 1.0f32]);
 
-        let cell_f32: Cell<f32, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1_f32, vertex2_f32, vertex3_f32])
-            .build()
-            .unwrap();
+        let cell_f32: Cell<f32, Option<()>, Option<()>, 2> =
+            cell!(vec![vertex1_f32, vertex2_f32, vertex3_f32]);
         assert_eq!(cell_f32.number_of_vertices(), 3);
         assert_eq!(cell_f32.dim(), 2);
     }
@@ -1795,10 +1880,8 @@ mod tests {
         let vertex5 = vertex!([0.0, 0.0, 0.0, 1.0, 0.0]);
         let vertex6 = vertex!([0.0, 0.0, 0.0, 0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 5> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 5> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4, vertex5, vertex6]);
 
         assert_eq!(cell.number_of_vertices(), 6);
         assert_eq!(cell.dim(), 5);
@@ -1812,11 +1895,7 @@ mod tests {
         let vertex2 = vertex!([1.0, 0.0, 0.0], 2);
         let vertex3 = vertex!([0.0, 1.0, 0.0], 3);
 
-        let cell: Cell<f64, i32, u32, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .data(42u32)
-            .build()
-            .unwrap();
+        let cell: Cell<f64, i32, u32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42u32);
 
         assert_eq!(cell.vertices()[0].data.unwrap(), 1);
         assert_eq!(cell.vertices()[1].data.unwrap(), 2);
@@ -1831,10 +1910,7 @@ mod tests {
         let vertex2 = vertex!([1.0, 0.0]);
         let vertex3 = vertex!([0.0, 1.0]);
 
-        let cell: Cell<f64, Option<()>, Option<()>, 2> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3])
-            .build()
-            .unwrap();
+        let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![vertex1, vertex2, vertex3]);
 
         // Test that the methods run without error
         let test_point: Vertex<f64, Option<()>, 2> = vertex!([0.5, 0.5]);
@@ -1886,15 +1962,12 @@ mod tests {
         let vertex_valid1 = vertex!([0.0, 1.0, 0.0]);
         let vertex_valid2 = vertex!([1.0, 0.0, 0.0]);
         let vertex_valid3 = vertex!([0.0, 0.0, 1.0]);
-        let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![
-                vertex_invalid,
-                vertex_valid1,
-                vertex_valid2,
-                vertex_valid3,
-            ])
-            .build()
-            .unwrap();
+        let invalid_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![
+            vertex_invalid,
+            vertex_valid1,
+            vertex_valid2,
+            vertex_valid3,
+        ]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Invalid Cell: {invalid_cell:?}");
@@ -1922,10 +1995,8 @@ mod tests {
         let vertex2 = vertex!([0.0, 1.0, 0.0]);
         let vertex3 = vertex!([1.0, 0.0, 0.0]);
         let vertex4 = vertex!([0.0, 0.0, 0.0]);
-        let mut invalid_uuid_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![vertex1, vertex2, vertex3, vertex4])
-            .build()
-            .unwrap();
+        let mut invalid_uuid_cell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(vec![vertex1, vertex2, vertex3, vertex4]);
 
         // Manually set the UUID to nil to trigger the InvalidUuid error
         invalid_uuid_cell.uuid = uuid::Uuid::nil();
@@ -1950,27 +2021,15 @@ mod tests {
     #[test]
     fn cell_is_valid_duplicate_vertices_error() {
         // Test cell is_valid with duplicate vertices
-        let vertex_dup = VertexBuilder::default()
-            .point(Point::new([0.0, 0.0, 1.0]))
-            .build()
-            .unwrap();
-        let vertex_distinct1 = VertexBuilder::default()
-            .point(Point::new([1.0, 0.0, 0.0]))
-            .build()
-            .unwrap();
-        let vertex_distinct2 = VertexBuilder::default()
-            .point(Point::new([0.0, 1.0, 0.0]))
-            .build()
-            .unwrap();
-        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(vec![
-                vertex_dup,
-                vertex_dup,
-                vertex_distinct1,
-                vertex_distinct2,
-            ])
-            .build()
-            .unwrap();
+        let vertex_dup = vertex!([0.0, 0.0, 1.0]);
+        let vertex_distinct1 = vertex!([1.0, 0.0, 0.0]);
+        let vertex_distinct2 = vertex!([0.0, 1.0, 0.0]);
+        let duplicate_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![
+            vertex_dup,
+            vertex_dup,
+            vertex_distinct1,
+            vertex_distinct2,
+        ]);
 
         // Human readable output for cargo test -- --nocapture
         println!("Duplicate Vertices Cell: {duplicate_cell:?}");
@@ -1994,20 +2053,8 @@ mod tests {
     #[test]
     fn cell_is_valid_insufficient_vertices_error() {
         // Test cell is_valid with insufficient vertices (wrong vertex count)
-        let insufficient_vertices = vec![
-            VertexBuilder::default()
-                .point(Point::new([0.0, 0.0, 1.0]))
-                .build()
-                .unwrap(),
-            VertexBuilder::default()
-                .point(Point::new([0.0, 1.0, 0.0]))
-                .build()
-                .unwrap(),
-        ];
-        let insufficient_cell: Cell<f64, Option<()>, Option<()>, 3> = CellBuilder::default()
-            .vertices(insufficient_vertices)
-            .build()
-            .unwrap();
+        let insufficient_vertices = vec![vertex!([0.0, 0.0, 1.0]), vertex!([0.0, 1.0, 0.0])];
+        let insufficient_cell: Cell<f64, Option<()>, Option<()>, 3> = cell!(insufficient_vertices);
 
         let insufficient_result = insufficient_cell.is_valid();
         assert!(insufficient_result.is_err());

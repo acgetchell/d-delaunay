@@ -1,4 +1,8 @@
 name: Codecov
+concurrency:
+  # This concurrency group ensures that only one Codecov analysis runs at a time
+  group: codecov-${{ github.ref_name }}
+  cancel-in-progress: true
 
 on:
   push:

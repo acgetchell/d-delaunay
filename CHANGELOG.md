@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Prelude module for simplified imports
+  - Consolidates commonly used types and macros
+  - Reduces boilerplate in examples and user code
+  - Re-exports vertex! and cell! macros for convenience
+- Enhanced triangulation data structure documentation
+  - Comprehensive module-level documentation with examples
+  - Detailed complexity analysis for algorithms
+  - Usage examples for different dimensional triangulations
+
+### Changed
+
+- Streamlined supercell removal process
+  - Simplified `remove_cells_containing_supercell_vertices` method signature
+  - Removed redundant supercell parameter for cleaner API
+  - Eliminated duplicate calls to `remove_duplicate_cells` for better performance
+- Improved error handling in supercell creation
+  - Replaced unwrap() calls with proper error propagation
+  - Added informative error messages for triangulation failures
+  - Enhanced robustness during triangulation initialization
+- Triangulation data structure refactoring
+  - Cleaner separation of concerns in Bowyer-Watson algorithm
+  - Improved code organization and maintainability
+  - Enhanced documentation with algorithmic complexity analysis
+
+### Performance
+
+- Optimized supercell removal logic
+  - Reduced redundant operations in cleanup phase
+  - Streamlined cell filtering and removal process
+- Improved boundary facet detection algorithms
+  - Reduced complexity from O(N²·F²) to O(N·F) using HashMap-based approach
+  - Single-pass facet-to-cells mapping for efficient boundary identification
+  - Significant performance gains for large triangulations (2000+ cells)
+
+### Fixed
+
+- Eliminated unnecessary cloning in supercell insertion
+- Corrected method signatures for consistency
+- Improved memory efficiency in cell removal operations
+
 ## [0.3.2] - 2025-07-29
 
 ### Added

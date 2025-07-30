@@ -17,9 +17,7 @@
 #![allow(missing_docs)]
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use d_delaunay::geometry::point::Point;
-use d_delaunay::geometry::predicates::{insphere, insphere_distance, insphere_lifted};
-use d_delaunay::geometry::traits::coordinate::Coordinate;
+use d_delaunay::prelude::*;
 use rand::Rng;
 use std::hint::black_box;
 

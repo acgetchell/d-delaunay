@@ -9,14 +9,7 @@
 //! cargo run --example test_circumsphere [2d|3d|4d|all|help]
 //! ```
 
-use d_delaunay::delaunay_core::vertex::{Vertex, vertex};
-use d_delaunay::geometry::Point;
-use d_delaunay::geometry::predicates::{InSphere, Orientation};
-use d_delaunay::geometry::predicates::{
-    circumcenter, circumradius, insphere, insphere_distance, insphere_lifted, simplex_orientation,
-    squared_norm,
-};
-use d_delaunay::geometry::traits::coordinate::Coordinate;
+use d_delaunay::prelude::*;
 use nalgebra as na;
 use peroxide::fuga::{LinearAlgebra, zeros};
 use serde::{Serialize, de::DeserializeOwned};
