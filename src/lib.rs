@@ -19,7 +19,7 @@ extern crate derive_builder;
 
 /// The `delaunay_core` module contains the primary data structures and algorithms for building and manipulating Delaunay triangulations.
 ///
-/// It includes the `Tds` struct, which represents the triangulation, as well as `Cell`, `Facet`, and `Vertex` components. 
+/// It includes the `Tds` struct, which represents the triangulation, as well as `Cell`, `Facet`, and `Vertex` components.
 /// This module also provides traits for customizing vertex and cell data, and a `prelude` for convenient access to commonly used types.
 pub mod delaunay_core {
     pub mod cell;
