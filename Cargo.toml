@@ -1,6 +1,6 @@
 [package]
 name = "d-delaunay"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 rust-version = "1.85.0"
 description = "A d-dimensional Delaunay triangulation library with generic coordinate support"
@@ -37,6 +37,10 @@ harness = false
 
 [[bench]]
 name = "triangulation_creation"
+harness = false
+
+[[bench]]
+name = "microbenchmarks"
 harness = false
 
 [lints.rust]

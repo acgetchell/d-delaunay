@@ -1326,8 +1326,9 @@ where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
-        let mut bad_cells = Vec::new();
-        let mut boundary_facets = Vec::new();
+        // Pre-allocate with estimated capacity based on typical triangulation patterns
+        let mut bad_cells = Vec::with_capacity(self.cells.len() / 4);
+        let mut boundary_facets = Vec::with_capacity(bad_cells.capacity() * (D + 1));
 
         // Find cells whose circumsphere contains the vertex
         for (cell_key, cell) in &self.cells {
@@ -1340,25 +1341,34 @@ where
             }
         }
 
-        // Collect boundary facets - facets that are on the boundary of the bad cells cavity
+        // Early return if no bad cells found
+        if bad_cells.is_empty() {
+            return Ok((bad_cells, boundary_facets));
+        }
+
+        // Pre-compute facets for all bad cells to avoid repeated computation
+        let mut bad_cell_facets: HashMap<CellKey, Vec<Facet<T, U, V, D>>> =
+            HashMap::with_capacity(bad_cells.len());
+
         for &bad_cell_key in &bad_cells {
             if let Some(bad_cell) = self.cells.get(bad_cell_key) {
-                for facet in bad_cell.facets() {
-                    // A facet is on the boundary if it's not shared with another bad cell
-                    let mut is_boundary = true;
-                    for &other_bad_cell_key in &bad_cells {
-                        if other_bad_cell_key != bad_cell_key {
-                            if let Some(other_cell) = self.cells.get(other_bad_cell_key) {
-                                if other_cell.facets().contains(&facet) {
-                                    is_boundary = false;
-                                    break;
-                                }
-                            }
-                        }
+                bad_cell_facets.insert(bad_cell_key, bad_cell.facets());
+            }
+        }
+
+        // Collect boundary facets - facets that are on the boundary of the bad cells cavity
+        for (&bad_cell_key, facets) in &bad_cell_facets {
+            for facet in facets {
+                // A facet is on the boundary if it's not shared with another bad cell
+                let mut is_boundary = true;
+                for (&other_bad_cell_key, other_facets) in &bad_cell_facets {
+                    if other_bad_cell_key != bad_cell_key && other_facets.contains(facet) {
+                        is_boundary = false;
+                        break;
                     }
-                    if is_boundary {
-                        boundary_facets.push(facet);
-                    }
+                }
+                if is_boundary {
+                    boundary_facets.push(facet.clone());
                 }
             }
         }
@@ -1370,9 +1380,67 @@ where
     // NEIGHBOR & INCIDENT ASSIGNMENT
     // =============================================================================
 
-    fn assign_neighbors(&mut self) {
+    /// Assigns neighbor relationships between cells based on shared facets.
+    ///
+    /// This method builds neighbor relationships by identifying cells that share facets.
+    /// Two cells are considered neighbors if they share exactly one facet (which contains
+    /// D vertices for a D-dimensional triangulation).
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Creates a mapping from facet keys to the cells that contain those facets
+    /// 2. For each facet shared by exactly two cells, marks those cells as neighbors
+    /// 3. Updates each cell's neighbor list with the UUIDs of its neighboring cells
+    ///
+    /// # Performance
+    ///
+    /// - **Time Complexity**: O(N×F) where N is the number of cells and F is the number of facets per cell
+    /// - **Space Complexity**: O(N×F) for temporary storage of facet mappings
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the internal data structures are in an inconsistent state,
+    /// specifically if a cell key that was just inserted into the neighbor map cannot be found.
+    /// This should never happen in normal operation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// // Create a simple tetrahedron that avoids degeneracy
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    ///
+    /// let mut tds: Tds<f64, (), (), 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // For a single tetrahedron, no neighbor relationships exist
+    /// assert_eq!(tds.number_of_cells(), 1);
+    ///
+    /// // Clear existing neighbors to demonstrate assignment
+    /// for cell in tds.cells.values_mut() {
+    ///     cell.neighbors = None;
+    /// }
+    ///
+    /// // Assign neighbor relationships
+    /// tds.assign_neighbors();
+    ///
+    /// // Verify the assignment worked (a single cell has no neighbors)
+    /// for cell in tds.cells.values() {
+    ///     assert!(cell.neighbors.is_none() || cell.neighbors.as_ref().unwrap().is_empty());
+    /// }
+    /// ```
+    pub fn assign_neighbors(&mut self) {
         // A map from facet keys to the cells that share that facet.
-        let mut facet_map: HashMap<u64, Vec<CellKey>> = HashMap::new();
+        // Pre-allocate with estimated capacity: each cell has D+1 facets
+        let mut facet_map: HashMap<u64, Vec<CellKey>> =
+            HashMap::with_capacity(self.cells.len() * (D + 1));
+
         for (cell_key, cell) in &self.cells {
             for facet in cell.facets() {
                 facet_map.entry(facet.key()).or_default().push(cell_key);
@@ -1380,34 +1448,35 @@ where
         }
 
         // A map to build the neighbor lists for each cell.
-        let mut neighbor_map: HashMap<CellKey, HashSet<CellKey>> = self
-            .cells
-            .keys()
-            .map(|cell_key| (cell_key, HashSet::new()))
-            .collect();
+        // Pre-allocate with exact capacity and initialize with proper HashSet capacity
+        let mut neighbor_map: HashMap<CellKey, HashSet<CellKey>> =
+            HashMap::with_capacity(self.cells.len());
 
-        // For each facet that is shared by more than one cell, all those cells are neighbors.
-        for (_, cell_keys) in facet_map.into_iter().filter(|(_, keys)| keys.len() > 1) {
-            for i in 0..cell_keys.len() {
-                for j in (i + 1)..cell_keys.len() {
-                    let key1 = cell_keys[i];
-                    let key2 = cell_keys[j];
-                    neighbor_map.get_mut(&key1).unwrap().insert(key2);
-                    neighbor_map.get_mut(&key2).unwrap().insert(key1);
-                }
-            }
+        for cell_key in self.cells.keys() {
+            // Each cell can have at most D+1 neighbors (one for each facet)
+            neighbor_map.insert(cell_key, HashSet::with_capacity(D + 1));
+        }
+
+        // For each facet that is shared by exactly two cells, those cells are neighbors.
+        // In a valid Delaunay triangulation, each facet should be shared by at most 2 cells.
+        for (_, cell_keys) in facet_map.into_iter().filter(|(_, keys)| keys.len() == 2) {
+            let key1 = cell_keys[0];
+            let key2 = cell_keys[1];
+            neighbor_map.get_mut(&key1).unwrap().insert(key2);
+            neighbor_map.get_mut(&key2).unwrap().insert(key1);
         }
 
         // Update the cells with their neighbor information.
         for (cell_key, neighbors) in neighbor_map {
             if let Some(cell) = self.cells.get_mut(cell_key) {
-                let neighbor_vec: Vec<Uuid> = neighbors
-                    .into_iter()
-                    .map(|key| self.cell_key_to_uuid[&key])
-                    .collect();
-                if neighbor_vec.is_empty() {
+                if neighbors.is_empty() {
                     cell.neighbors = None;
                 } else {
+                    // Pre-allocate the neighbor vector with exact capacity
+                    let mut neighbor_vec: Vec<Uuid> = Vec::with_capacity(neighbors.len());
+                    for key in neighbors {
+                        neighbor_vec.push(self.cell_key_to_uuid[&key]);
+                    }
                     cell.neighbors = Some(neighbor_vec);
                 }
             }
@@ -1507,7 +1576,7 @@ where
     /// Remove duplicate cells (cells with identical vertex sets)
     ///
     /// Returns the number of duplicate cells that were removed.
-    fn remove_duplicate_cells(&mut self) -> usize {
+    pub fn remove_duplicate_cells(&mut self) -> usize {
         let mut unique_cells = HashMap::new();
         let mut cells_to_remove = Vec::new();
 
@@ -2799,13 +2868,12 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "This test can be slow due to the large number of points"]
-    fn tds_large_triangulation() {
+    fn tds_small_triangulation() {
         use rand::Rng;
 
-        // Create a large number of random points in 3D
+        // Create a small number of random points in 3D
         let mut rng = rand::rng();
-        let points: Vec<Point<f64, 3>> = (0..100)
+        let points: Vec<Point<f64, 3>> = (0..10)
             .map(|_| {
                 Point::new([
                     rng.random::<f64>() * 100.0,
@@ -2826,7 +2894,7 @@ mod tests {
             result.number_of_cells()
         );
 
-        assert!(result.number_of_vertices() >= 100);
+        assert!(result.number_of_vertices() >= 10);
         assert!(result.number_of_cells() > 0);
 
         // Validate the triangulation
