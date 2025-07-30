@@ -88,6 +88,9 @@ pub mod prelude {
         predicates::*,
         traits::{coordinate::*, finitecheck::*, hashcoordinate::*, orderedeq::*},
     };
+
+    // Convenience macros
+    pub use crate::{cell, vertex};
 }
 
 /// The function `is_normal` checks that structs implement `auto` traits.

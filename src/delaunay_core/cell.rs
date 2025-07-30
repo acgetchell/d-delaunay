@@ -168,7 +168,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     let mut sorted = vertices.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| {
+        a.partial_cmp(b)
+            .expect("Vertices must be comparable for sorting")
+    });
     sorted
 }
 

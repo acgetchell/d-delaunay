@@ -1143,12 +1143,11 @@ where
             let combinations = generate_combinations(vertices, D + 1);
 
             for combination in combinations {
-                // Try to create a cell - cell! macro panics on failure so we wrap in a catch_unwind-style approach
-                // For now, just create the cell directly since the macro handles validation internally
+                // Try to create a cell
                 let cell = CellBuilder::default()
                     .vertices(combination)
                     .build()
-                    .unwrap();
+                    .expect("Failed to create cell from combination");
                 self.cells.insert(cell.uuid(), cell);
                 created_cells += 1;
             }
@@ -1198,8 +1197,7 @@ where
             }
         }
 
-        self.remove_cells_containing_supercell_vertices(&supercell);
-        self.remove_duplicate_cells()?;
+        self.remove_cells_containing_supercell_vertices(&supercell)?;
         self.assign_neighbors()?;
         self.assign_incident_cells();
 
@@ -1395,7 +1393,10 @@ where
     // DUPLICATE REMOVAL
     // =============================================================================
 
-    fn remove_cells_containing_supercell_vertices(&mut self, _supercell: &Cell<T, U, V, D>) {
+    fn remove_cells_containing_supercell_vertices(
+        &mut self,
+        _supercell: &Cell<T, U, V, D>,
+    ) -> Result<(), TriangulationValidationError> {
         // The goal is to remove supercell artifacts while preserving valid Delaunay cells
         // We should only keep cells that are made entirely of input vertices
 
@@ -1420,28 +1421,10 @@ where
             self.cells.remove(&cell_id);
         }
 
-        // Remove duplicate cells (cells with identical vertex sets)
-        let mut unique_cells = HashMap::new();
-        let mut cells_to_remove_duplicates = Vec::new();
+        // After removing supercell-related cells, remove any duplicate cells that may have resulted
+        self.remove_duplicate_cells()?;
 
-        for (cell_id, cell) in &self.cells {
-            // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
-            vertex_uuids.sort();
-
-            if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
-                // This is a duplicate cell - mark for removal
-                cells_to_remove_duplicates.push(*cell_id);
-            } else {
-                // This is a unique cell
-                unique_cells.insert(vertex_uuids, *cell_id);
-            }
-        }
-
-        // Remove duplicate cells
-        for cell_id in cells_to_remove_duplicates {
-            self.cells.remove(&cell_id);
-        }
+        Ok(())
     }
 
     /// Remove duplicate cells (cells with identical vertex sets)
@@ -2686,7 +2669,9 @@ mod tests {
         let supercell = cell!(Vertex::from_points(supercell_points));
 
         // Test the removal logic
-        result.remove_cells_containing_supercell_vertices(&supercell);
+        result
+            .remove_cells_containing_supercell_vertices(&supercell)
+            .unwrap();
 
         // Should still have the same cells since none contain supercell vertices
         assert_eq!(result.number_of_cells(), initial_cell_count);
