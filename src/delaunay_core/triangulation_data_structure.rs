@@ -1180,7 +1180,7 @@ where
         let supercell_vertices: HashSet<Uuid> =
             supercell.vertices().iter().map(Vertex::uuid).collect();
 
-        self.cells.insert(supercell.uuid(), supercell.clone());
+        self.cells.insert(supercell.uuid(), supercell);
 
         for vertex in vertices {
             if supercell_vertices.contains(&vertex.uuid()) {
@@ -1207,7 +1207,8 @@ where
             }
         }
 
-        self.remove_cells_containing_supercell_vertices(&supercell)?;
+        self.remove_cells_containing_supercell_vertices();
+        self.remove_duplicate_cells()?;
         self.assign_neighbors()?;
         self.assign_incident_cells();
 
@@ -1403,10 +1404,7 @@ where
     // DUPLICATE REMOVAL
     // =============================================================================
 
-    fn remove_cells_containing_supercell_vertices(
-        &mut self,
-        _supercell: &Cell<T, U, V, D>,
-    ) -> Result<(), TriangulationValidationError> {
+    fn remove_cells_containing_supercell_vertices(&mut self) {
         // The goal is to remove supercell artifacts while preserving valid Delaunay cells
         // We should only keep cells that are made entirely of input vertices
 
@@ -1430,11 +1428,6 @@ where
         for cell_id in cells_to_remove {
             self.cells.remove(&cell_id);
         }
-
-        // After removing supercell-related cells, remove any duplicate cells that may have resulted
-        self.remove_duplicate_cells()?;
-
-        Ok(())
     }
 
     /// Remove duplicate cells (cells with identical vertex sets)
@@ -2676,12 +2669,11 @@ mod tests {
             Point::new([10.0, -10.0, 10.0]),
             Point::new([10.0, 10.0, -10.0]),
         ];
-        let supercell = cell!(Vertex::from_points(supercell_points));
+        let _supercell: Cell<f64, Option<()>, Option<()>, 3> =
+            cell!(Vertex::from_points(supercell_points));
 
         // Test the removal logic
-        result
-            .remove_cells_containing_supercell_vertices(&supercell)
-            .unwrap();
+        result.remove_cells_containing_supercell_vertices();
 
         // Should still have the same cells since none contain supercell vertices
         assert_eq!(result.number_of_cells(), initial_cell_count);
