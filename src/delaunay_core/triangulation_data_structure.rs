@@ -1,20 +1,144 @@
 //! Data and operations on d-dimensional triangulation data structures.
 //!
-//! Intended to match functionality of the
-//! [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
+//! This module provides the `Tds` (Triangulation Data Structure) struct which represents
+//! a D-dimensional finite simplicial complex with geometric vertices, cells, and their
+//! topological relationships. The implementation closely follows the design principles
+//! of [CGAL Triangulation](https://doc.cgal.org/latest/Triangulation/index.html).
+//!
+//! # Key Features
+//!
+//! - **Generic Coordinate Support**: Works with any floating-point type (`f32`, `f64`, etc.)
+//!   that implements the `CoordinateScalar` trait
+//! - **Arbitrary Dimensions**: Supports triangulations in any dimension D ≥ 1
+//! - **Delaunay Triangulation**: Implements Bowyer-Watson algorithm for Delaunay triangulation
+//! - **Hierarchical Cell Structure**: Stores maximal D-dimensional cells and infers lower-dimensional
+//!   simplices (vertices, edges, facets) from the maximal cells
+//! - **Neighbor Relationships**: Maintains adjacency information between cells for efficient
+//!   traversal and geometric queries
+//! - **Validation Support**: Comprehensive validation of triangulation properties including
+//!   neighbor consistency and geometric validity
+//! - **Serialization Support**: Full serde support for persistence and data exchange
+//! - **UUID-based Identification**: Unique identification for vertices and cells
+//!
+//! # Geometric Structure
+//!
+//! The triangulation data structure represents a finite simplicial complex where:
+//!
+//! - **0-cells**: Individual vertices embedded in D-dimensional Euclidean space
+//! - **1-cells**: Edges connecting two vertices (inferred from maximal cells)
+//! - **2-cells**: Triangular faces with three vertices (inferred from maximal cells)
+//! - **...**
+//! - **D-cells**: Maximal D-dimensional simplices with D+1 vertices (explicitly stored)
+//!
+//! For example, in 3D space:
+//! - Vertices are 0-dimensional cells
+//! - Edges are 1-dimensional cells (inferred from tetrahedra)
+//! - Faces are 2-dimensional cells represented as `Facet`s
+//! - Tetrahedra are 3-dimensional cells (maximal cells)
+//!
+//! # Delaunay Property
+//!
+//! When constructed via the Delaunay triangulation algorithm, the structure satisfies
+//! the **empty circumsphere property**: no vertex lies inside the circumsphere of any
+//! D-dimensional cell. This property ensures optimal geometric characteristics for
+//! many applications including mesh generation, interpolation, and spatial analysis.
+//!
+//! # Examples
+//!
+//! ## Creating a 3D Triangulation
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::vertex;
+//!
+//! // Create vertices for a tetrahedron
+//! let vertices = vec![
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
+//! ];
+//!
+//! // Create Delaunay triangulation
+//! let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+//!
+//! // Query triangulation properties
+//! assert_eq!(tds.number_of_vertices(), 4);
+//! assert_eq!(tds.number_of_cells(), 1);
+//! assert_eq!(tds.dim(), 3);
+//! assert!(tds.is_valid().is_ok());
+//! ```
+//!
+//! ## Adding Vertices to Existing Triangulation
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::vertex;
+//!
+//! // Start with initial vertices
+//! let initial_vertices = vec![
+//!     vertex!([0.0, 0.0, 0.0]),
+//!     vertex!([1.0, 0.0, 0.0]),
+//!     vertex!([0.0, 1.0, 0.0]),
+//!     vertex!([0.0, 0.0, 1.0]),
+//! ];
+//!
+//! let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&initial_vertices).unwrap();
+//!
+//! // Add a new vertex
+//! let new_vertex = vertex!([0.5, 0.5, 0.5]);
+//! tds.add(new_vertex).unwrap();
+//!
+//! assert_eq!(tds.number_of_vertices(), 5);
+//! assert!(tds.is_valid().is_ok());
+//! ```
+//!
+//! ## 2D Triangulation
+//!
+//! ```rust
+//! use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+//! use d_delaunay::vertex;
+//!
+//! // Create 2D triangulation
+//! let vertices_2d = vec![
+//!     vertex!([0.0, 0.0]),
+//!     vertex!([1.0, 0.0]),
+//!     vertex!([0.0, 1.0]),
+//!     vertex!([1.0, 1.0]),
+//! ];
+//!
+//! let tds_2d: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices_2d).unwrap();
+//! assert_eq!(tds_2d.dim(), 2);
+//! ```
+//!
+//! # References
+//!
+//! - [CGAL Triangulation Documentation](https://doc.cgal.org/latest/Triangulation/index.html)
+//! - Bowyer, A. "Computing Dirichlet tessellations." The Computer Journal 24.2 (1981): 162-166
+//! - Watson, D.F. "Computing the n-dimensional Delaunay tessellation with application to Voronoi polytopes." The Computer Journal 24.2 (1981): 167-172
+//! - de Berg, M., et al. "Computational Geometry: Algorithms and Applications." 3rd ed. Springer-Verlag, 2008
 
+// =============================================================================
+// IMPORTS
+// =============================================================================
+
+// Parent module imports
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::Facet,
     traits::data::DataType,
     vertex::Vertex,
 };
+
+// Crate internal imports
 use crate::delaunay_core::utilities::find_extreme_coordinates;
 use crate::geometry::predicates::{InSphere, insphere};
 use crate::geometry::{
     point::Point,
     traits::coordinate::{Coordinate, CoordinateScalar},
 };
+
+// External crate imports
 use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::NumCast;
@@ -26,6 +150,10 @@ use std::iter::Sum;
 use std::ops::{AddAssign, Div, SubAssign};
 use thiserror::Error;
 use uuid::Uuid;
+
+// =============================================================================
+// ERROR TYPES
+// =============================================================================
 
 /// Errors that can occur during triangulation validation.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -66,8 +194,49 @@ pub enum TriangulationValidationError {
     },
 }
 
-/// Helper function to check if two facets are adjacent (share the same vertices)
-fn facets_are_adjacent<T, U, V, const D: usize>(
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/// Checks if two facets are adjacent by comparing their vertex sets.
+///
+/// Two facets are considered adjacent if they share the exact same set of vertices,
+/// regardless of the order. This is a common check in triangulation algorithms to
+/// identify neighboring cells.
+///
+/// # Arguments
+///
+/// * `facet1` - A reference to the first facet.
+/// * `facet2` - A reference to the second facet.
+///
+/// # Returns
+///
+/// `true` if the facets share the same vertices, `false` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::facet::Facet;
+/// use d_delaunay::delaunay_core::triangulation_data_structure::facets_are_adjacent;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::delaunay_core::cell::Cell;
+/// use d_delaunay::{cell, vertex};
+///
+/// let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+/// let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
+/// let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
+/// let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
+///
+/// let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
+/// let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
+///
+/// let facet1 = Facet::new(cell1, v1).unwrap();
+/// let facet2 = Facet::new(cell2, v4).unwrap();
+///
+/// // These facets share vertices v2 and v3, so they are adjacent
+/// assert!(facets_are_adjacent(&facet1, &facet2));
+/// ```
+pub fn facets_are_adjacent<T, U, V, const D: usize>(
     facet1: &Facet<T, U, V, D>,
     facet2: &Facet<T, U, V, D>,
 ) -> bool
@@ -90,8 +259,44 @@ where
     vertices1.iter().all(|v1| vertices2.contains(v1))
 }
 
-/// Generate all combinations of `k` vertices from the given vertex list
-fn generate_combinations<T, U, const D: usize>(
+/// Generates all unique combinations of `k` items from a given slice.
+///
+/// This function is used to generate vertex combinations for creating k-simplices
+/// (e.g., edges, triangles, tetrahedra) from a set of vertices.
+///
+/// # Arguments
+///
+/// * `vertices` - A slice of vertices from which to generate combinations.
+/// * `k` - The size of each combination.
+///
+/// # Returns
+///
+/// A vector of vectors, where each inner vector is a unique combination of `k` vertices.
+///
+/// # Examples
+///
+/// This function is made public for testing purposes.
+///
+/// ```
+/// use d_delaunay::delaunay_core::triangulation_data_structure::generate_combinations;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::vertex;
+///
+/// let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
+///     vertex!([0.0]),
+///     vertex!([1.0]),
+///     vertex!([2.0]),
+/// ];
+///
+/// // Generate all 2-vertex combinations (edges)
+/// let combinations = generate_combinations(&vertices, 2);
+///
+/// assert_eq!(combinations.len(), 3);
+/// assert!(combinations.contains(&vec![vertices[0], vertices[1]]));
+/// assert!(combinations.contains(&vec![vertices[0], vertices[2]]));
+/// assert!(combinations.contains(&vec![vertices[1], vertices[2]]));
+/// ```
+pub fn generate_combinations<T, U, const D: usize>(
     vertices: &[Vertex<T, U, D>],
     k: usize,
 ) -> Vec<Vec<Vertex<T, U, D>>>
@@ -144,6 +349,10 @@ where
     }
 }
 
+// =============================================================================
+// STRUCT DEFINITION
+// =============================================================================
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
 /// and cells, where the vertices and cells are identified by UUIDs.
@@ -172,6 +381,36 @@ where
 ///
 /// In general, vertices are embedded into D-dimensional Euclidean space,
 /// and so the [Tds] is a finite simplicial complex.
+///
+/// # Usage
+///
+/// The `Tds` struct is the primary entry point for creating and manipulating
+/// Delaunay triangulations. It is initialized with a set of vertices and
+/// automatically computes the triangulation.
+///
+/// ```rust
+/// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+/// use d_delaunay::vertex;
+///
+/// // Create vertices for a 2D triangulation
+/// let vertices = vec![
+///     vertex!([0.0, 0.0]),
+///     vertex!([1.0, 0.0]),
+///     vertex!([0.0, 1.0]),
+///     vertex!([1.0, 1.0]),
+/// ];
+///
+/// // Create a new TDS
+/// let mut tds: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices).unwrap();
+///
+/// // Add a new vertex to the triangulation
+/// let new_vertex = vertex!([0.5, 0.5]);
+/// tds.add(new_vertex).unwrap();
+///
+/// // Check the number of cells and vertices
+/// assert_eq!(tds.number_of_cells(), 4);
+/// assert_eq!(tds.number_of_vertices(), 5);
+/// ```
 pub struct Tds<T, U, V, const D: usize>
 where
     T: CoordinateScalar,
@@ -203,6 +442,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
+    // =============================================================================
+    // CORE METHODS
+    // =============================================================================
+
     /// The function creates a new instance of a triangulation data structure
     /// with given vertices, initializing the vertices and cells.
     ///
@@ -640,6 +883,10 @@ where
         self.cells.len()
     }
 
+    // =============================================================================
+    // TRIANGULATION LOGIC
+    // =============================================================================
+
     /// The `supercell` function creates a larger cell that contains all the
     /// input vertices, with some padding added.
     ///
@@ -1041,54 +1288,9 @@ where
         Ok((bad_cells, boundary_facets))
     }
 
-    fn remove_cells_containing_supercell_vertices(&mut self, _supercell: &Cell<T, U, V, D>) {
-        // The goal is to remove supercell artifacts while preserving valid Delaunay cells
-        // We should only keep cells that are made entirely of input vertices
-
-        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().copied().collect();
-
-        let cells_to_remove: Vec<Uuid> = self
-            .cells
-            .iter()
-            .filter(|(_, cell)| {
-                let cell_vertex_uuids: HashSet<Uuid> =
-                    cell.vertices().iter().map(Vertex::uuid).collect();
-                let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
-
-                // Remove cells that don't consist entirely of input vertices
-                // Keep only cells that are made entirely of input vertices
-                !has_only_input_vertices
-            })
-            .map(|(uuid, _)| *uuid)
-            .collect();
-
-        for cell_id in cells_to_remove {
-            self.cells.remove(&cell_id);
-        }
-
-        // Remove duplicate cells (cells with identical vertex sets)
-        let mut unique_cells = HashMap::new();
-        let mut cells_to_remove_duplicates = Vec::new();
-
-        for (cell_id, cell) in &self.cells {
-            // Create a sorted vector of vertex UUIDs as a key for uniqueness
-            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
-            vertex_uuids.sort();
-
-            if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
-                // This is a duplicate cell - mark for removal
-                cells_to_remove_duplicates.push(*cell_id);
-            } else {
-                // This is a unique cell
-                unique_cells.insert(vertex_uuids, *cell_id);
-            }
-        }
-
-        // Remove duplicate cells
-        for cell_id in cells_to_remove_duplicates {
-            self.cells.remove(&cell_id);
-        }
-    }
+    // =============================================================================
+    // NEIGHBOR & INCIDENT ASSIGNMENT
+    // =============================================================================
 
     fn assign_neighbors(&mut self) -> Result<(), TriangulationValidationError> {
         // Create a map to store neighbor relationships
@@ -1189,6 +1391,59 @@ where
         }
     }
 
+    // =============================================================================
+    // DUPLICATE REMOVAL
+    // =============================================================================
+
+    fn remove_cells_containing_supercell_vertices(&mut self, _supercell: &Cell<T, U, V, D>) {
+        // The goal is to remove supercell artifacts while preserving valid Delaunay cells
+        // We should only keep cells that are made entirely of input vertices
+
+        let input_vertex_uuids: HashSet<Uuid> = self.vertices.keys().copied().collect();
+
+        let cells_to_remove: Vec<Uuid> = self
+            .cells
+            .iter()
+            .filter(|(_, cell)| {
+                let cell_vertex_uuids: HashSet<Uuid> =
+                    cell.vertices().iter().map(Vertex::uuid).collect();
+                let has_only_input_vertices = cell_vertex_uuids.is_subset(&input_vertex_uuids);
+
+                // Remove cells that don't consist entirely of input vertices
+                // Keep only cells that are made entirely of input vertices
+                !has_only_input_vertices
+            })
+            .map(|(uuid, _)| *uuid)
+            .collect();
+
+        for cell_id in cells_to_remove {
+            self.cells.remove(&cell_id);
+        }
+
+        // Remove duplicate cells (cells with identical vertex sets)
+        let mut unique_cells = HashMap::new();
+        let mut cells_to_remove_duplicates = Vec::new();
+
+        for (cell_id, cell) in &self.cells {
+            // Create a sorted vector of vertex UUIDs as a key for uniqueness
+            let mut vertex_uuids: Vec<Uuid> = cell.vertices().iter().map(Vertex::uuid).collect();
+            vertex_uuids.sort();
+
+            if let Some(_existing_cell_id) = unique_cells.get(&vertex_uuids) {
+                // This is a duplicate cell - mark for removal
+                cells_to_remove_duplicates.push(*cell_id);
+            } else {
+                // This is a unique cell
+                unique_cells.insert(vertex_uuids, *cell_id);
+            }
+        }
+
+        // Remove duplicate cells
+        for cell_id in cells_to_remove_duplicates {
+            self.cells.remove(&cell_id);
+        }
+    }
+
     /// Remove duplicate cells (cells with identical vertex sets)
     ///
     /// Returns the number of duplicate cells that were removed, or an error if
@@ -1233,6 +1488,10 @@ where
 
         Ok(removed_count)
     }
+
+    // =============================================================================
+    // VALIDATION
+    // =============================================================================
 
     /// Check for duplicate cells and return an error if any are found
     ///
@@ -1499,6 +1758,10 @@ where
     }
 }
 
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
 #[allow(clippy::uninlined_format_args, clippy::similar_names)]
 mod tests {
@@ -1511,6 +1774,14 @@ mod tests {
 
     // Type alias for easier test writing - change this to test different coordinate types
     type TestFloat = f64;
+
+    // =============================================================================
+    // TEST HELPER FUNCTIONS
+    // =============================================================================
+
+    // =============================================================================
+    // add() TESTS
+    // =============================================================================
 
     #[test]
     fn test_add_vertex_already_exists() {
@@ -1597,6 +1868,10 @@ mod tests {
         assert_eq!(stored_coords, expected_coords); // Should be vertex2's coordinates
     }
 
+    // =============================================================================
+    // dim() TESTS
+    // =============================================================================
+
     #[test]
     fn test_dim_multiple_vertices() {
         let mut tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
@@ -1629,6 +1904,10 @@ mod tests {
         tds.add(vertex5).unwrap();
         assert_eq!(tds.is_valid(), Ok(()));
     }
+
+    // =============================================================================
+    // TRIANGULATION LOGIC TESTS
+    // =============================================================================
 
     #[test]
     fn test_supercell_empty_vertices() {
@@ -2081,6 +2360,10 @@ mod tests {
         assert_eq!(supercell_4d.vertices().len(), 5); // 4-simplex for 4D
     }
 
+    // =============================================================================
+    // NEIGHBOR AND INCIDENT CELL TESTS
+    // =============================================================================
+
     #[test]
     fn test_neighbor_assignment_logic() {
         let points = vec![
@@ -2114,6 +2397,53 @@ mod tests {
     }
 
     #[test]
+    fn test_facets_are_adjacent() {
+        let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+        let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
+        let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
+        let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
+
+        let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
+        let cell3: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v4]);
+
+        let facet1 = Facet::new(cell1, v1).unwrap(); // Vertices: v2, v3
+        let facet2 = Facet::new(cell2, v4).unwrap(); // Vertices: v2, v3
+        let facet3 = Facet::new(cell3, v4).unwrap(); // Vertices: v1, v2
+
+        assert!(facets_are_adjacent(&facet1, &facet2)); // Same vertices
+        assert!(!facets_are_adjacent(&facet1, &facet3)); // Different vertices
+    }
+
+    #[test]
+    fn test_generate_combinations() {
+        let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
+            vertex!([0.0]),
+            vertex!([1.0]),
+            vertex!([2.0]),
+            vertex!([3.0]),
+        ];
+
+        // Combinations of 2 from 4
+        let combinations_2 = generate_combinations(&vertices, 2);
+        assert_eq!(combinations_2.len(), 6);
+
+        // Combinations of 3 from 4
+        let combinations_3 = generate_combinations(&vertices, 3);
+        assert_eq!(combinations_3.len(), 4);
+        assert!(combinations_3.contains(&vec![vertices[0], vertices[1], vertices[2]]));
+
+        // Edge case: k=0
+        let combinations_0 = generate_combinations(&vertices, 0);
+        assert_eq!(combinations_0.len(), 1);
+        assert!(combinations_0[0].is_empty());
+
+        // Edge case: k > len
+        let combinations_5 = generate_combinations(&vertices, 5);
+        assert!(combinations_5.is_empty());
+    }
+
+    #[test]
     fn test_incident_cell_assignment() {
         let points = vec![
             Point::new([0.0, 0.0, 0.0]),
@@ -2143,79 +2473,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_facets_are_adjacent() {
-        let points = vec![
-            Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
-        ];
-        let vertices = Vertex::from_points(points);
-        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
-        // Triangulation is automatically done in Tds::new
-        let result = tds;
-
-        if result.number_of_cells() >= 2 {
-            let cell_vec: Vec<_> = result.cells.values().collect();
-            let cell1 = cell_vec[0];
-            let cell2 = cell_vec[1];
-
-            let facets1 = cell1.facets();
-            let facets2 = cell2.facets();
-
-            // Test if any facets are adjacent
-            let mut found_adjacent = false;
-            for facet1 in &facets1 {
-                for facet2 in &facets2 {
-                    if facets_are_adjacent(facet1, facet2) {
-                        found_adjacent = true;
-                        break;
-                    }
-                }
-                if found_adjacent {
-                    break;
-                }
-            }
-
-            // In a proper triangulation, neighboring cells should share facets
-            println!("Found adjacent facets: {}", found_adjacent);
-        }
-    }
-
-    #[test]
-    fn test_generate_combinations() {
-        let points = vec![
-            Point::new([0.0, 0.0, 0.0]),
-            Point::new([1.0, 0.0, 0.0]),
-            Point::new([0.0, 1.0, 0.0]),
-            Point::new([0.0, 0.0, 1.0]),
-            Point::new([1.0, 1.0, 1.0]),
-        ];
-        let vertices: Vec<Vertex<f64, usize, 3>> = Vertex::from_points(points);
-
-        // Test generating combinations of different sizes
-        let combinations_0 = generate_combinations(&vertices, 0);
-        assert_eq!(combinations_0.len(), 1);
-        assert_eq!(combinations_0[0].len(), 0);
-
-        let combinations_1 = generate_combinations(&vertices, 1);
-        assert_eq!(combinations_1.len(), 5);
-
-        let combinations_2 = generate_combinations(&vertices, 2);
-        assert_eq!(combinations_2.len(), 10); // C(5,2) = 10
-
-        let combinations_4 = generate_combinations(&vertices, 4);
-        assert_eq!(combinations_4.len(), 5); // C(5,4) = 5
-
-        let combinations_6 = generate_combinations(&vertices, 6);
-        assert_eq!(combinations_6.len(), 0); // k > n, should be empty
-
-        let combinations_all = generate_combinations(&vertices, 5);
-        assert_eq!(combinations_all.len(), 1); // C(5,5) = 1
-        assert_eq!(combinations_all[0].len(), 5);
-    }
+    // =============================================================================
+    // VALIDATION TESTS
+    // =============================================================================
 
     #[test]
     fn test_validation_with_too_many_neighbors() {
@@ -2551,6 +2811,10 @@ mod tests {
             }
         }
     }
+
+    // =============================================================================
+    // UTILITY FUNCTION TESTS
+    // =============================================================================
 
     #[test]
     fn test_assign_neighbors_comprehensive() {

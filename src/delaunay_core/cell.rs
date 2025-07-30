@@ -160,6 +160,18 @@ macro_rules! cell {
 // Re-export the macro at the crate level for convenience
 pub use crate::cell;
 
+/// Helper function to sort vertices for comparison and hashing
+fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    let mut sorted = vertices.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted
+}
+
 // =============================================================================
 // CELL STRUCT DEFINITION
 // =============================================================================
@@ -558,8 +570,53 @@ where
         })
     }
 
-    /// The function `into_hashmap` converts a [Vec] of cells into a [`HashMap`],
-    /// using the [Cell] [Uuid]s as keys.
+    /// Converts a vector of cells into a `HashMap` indexed by their UUIDs.
+    ///
+    /// This utility function transforms a collection of cells into a hash map structure
+    /// for efficient lookups by UUID. Each cell's unique identifier becomes the key,
+    /// and the cell itself becomes the value in the resulting `HashMap`.
+    ///
+    /// # Arguments
+    ///
+    /// * `cells` - A vector of cells to be converted into a `HashMap`.
+    ///
+    /// # Returns
+    ///
+    /// A [`HashMap\u003cUuid, Self\u003e`] where each key is a cell's UUID and each value
+    /// is the corresponding cell. The `HashMap` provides O(1) average-case lookups
+    /// by UUID.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    /// use uuid::Uuid;
+    ///
+    /// // Create some cells
+    /// let vertices1 = vec![vertex!([0.0, 0.0, 1.0]), vertex!([0.0, 1.0, 0.0])];
+    /// let vertices2 = vec![vertex!([1.0, 0.0, 0.0]), vertex!([1.0, 1.0, 1.0])];
+    /// let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
+    /// let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+    ///
+    /// let cells = vec![cell1.clone(), cell2.clone()];
+    /// let cell_map = Cell::into_hashmap(cells);
+    ///
+    /// // Access cells by their UUIDs
+    /// assert_eq!(cell_map.get(&cell1.uuid()), Some(&cell1));
+    /// assert_eq!(cell_map.get(&cell2.uuid()), Some(&cell2));
+    /// assert_eq!(cell_map.len(), 2);
+    /// ```
+    ///
+    /// ```
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// // Empty vector produces empty HashMap
+    /// let empty_cells: Vec<Cell<f64, Option<()>, Option<()>, 3>> = vec![];
+    /// let empty_map = Cell::into_hashmap(empty_cells);
+    /// assert!(empty_map.is_empty());
+    /// ```
     #[must_use]
     pub fn into_hashmap(cells: Vec<Self>) -> HashMap<Uuid, Self> {
         cells.into_iter().map(|c| (c.uuid, c)).collect()
@@ -650,14 +707,35 @@ where
     f64: From<T>,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    /// The function `facets` returns the [Facet]s of the [Cell].
+    /// Returns all facets (faces) of the cell.
+    ///
+    /// A facet is a (D-1)-dimensional face of a D-dimensional cell. For example,
+    /// in a 3D tetrahedron, each facet is a 2D triangle. Each facet is created by
+    /// removing one vertex from the cell, resulting in a lower-dimensional simplex.
+    ///
+    /// The number of facets equals the number of vertices in the cell, as each
+    /// vertex defines one facet by its absence from the cell.
+    ///
+    /// # Type Parameters
+    ///
+    /// This method requires the coordinate type `T` to implement additional traits
+    /// beyond the basic `Cell` requirements:
+    /// - `Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum`: Required for
+    ///   geometric computations and facet creation.
+    /// - `f64: From<T>`: Enables conversion to `f64` for numerical operations.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Facet<T, U, V, D>>` containing all facets of the cell. Each facet
+    /// contains D vertices (one fewer than the original cell's D+1 vertices).
     ///
     /// # Panics
     ///
     /// Panics if `Facet::new()` fails for any vertex in the cell. This should not
-    /// happen under normal circumstances with valid cell data.
+    /// happen under normal circumstances with valid cell data, as facets are created
+    /// by removing each vertex in turn.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use d_delaunay::{cell, vertex};
@@ -665,13 +743,41 @@ where
     /// use d_delaunay::delaunay_core::vertex::Vertex;
     /// use d_delaunay::delaunay_core::facet::Facet;
     ///
+    /// // Create a 3D tetrahedron (4 vertices)
     /// let vertex1: Vertex<f64, i32, 3> = vertex!([0.0, 0.0, 1.0], 1);
     /// let vertex2: Vertex<f64, i32, 3> = vertex!([0.0, 1.0, 0.0], 1);
     /// let vertex3: Vertex<f64, i32, 3> = vertex!([1.0, 0.0, 0.0], 1);
     /// let vertex4: Vertex<f64, i32, 3> = vertex!([1.0, 1.0, 1.0], 2);
     /// let cell: Cell<f64, i32, i32, 3> = cell!(vec![vertex1, vertex2, vertex3, vertex4], 42);
+    ///
     /// let facets = cell.facets();
-    /// assert_eq!(facets.len(), 4);
+    /// assert_eq!(facets.len(), 4); // 4 facets for tetrahedron
+    ///
+    /// // Each facet should have 3 vertices (triangular faces)
+    /// for facet in &facets {
+    ///     assert_eq!(facet.vertices().len(), 3);
+    /// }
+    /// ```
+    ///
+    /// ```
+    /// use d_delaunay::{cell, vertex};
+    /// use d_delaunay::delaunay_core::cell::Cell;
+    ///
+    /// // Create a 2D triangle (3 vertices)
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0]),
+    ///     vertex!([1.0, 0.0]),
+    ///     vertex!([0.0, 1.0]),
+    /// ];
+    /// let cell: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices);
+    ///
+    /// let facets = cell.facets();
+    /// assert_eq!(facets.len(), 3); // 3 facets (edges) for triangle
+    ///
+    /// // Each facet should have 2 vertices (line segments)
+    /// for facet in &facets {
+    ///     assert_eq!(facet.vertices().len(), 2);
+    /// }
     /// ```
     pub fn facets(&self) -> Vec<Facet<T, U, V, D>> {
         self.vertices
@@ -679,22 +785,6 @@ where
             .map(|vertex| Facet::new(self.clone(), *vertex).unwrap())
             .collect()
     }
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/// Helper function to sort vertices for comparison and hashing
-fn sorted_vertices<T, U, const D: usize>(vertices: &[Vertex<T, U, D>]) -> Vec<Vertex<T, U, D>>
-where
-    T: CoordinateScalar,
-    U: DataType,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    let mut sorted = vertices.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    sorted
 }
 
 // =============================================================================

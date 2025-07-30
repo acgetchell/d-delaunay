@@ -50,6 +50,21 @@ use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
 // =============================================================================
+// ERROR TYPES
+// =============================================================================
+
+/// Error type for facet operations.
+#[derive(Debug, Error)]
+pub enum FacetError {
+    /// The cell does not contain the vertex.
+    #[error("The cell does not contain the vertex!")]
+    CellDoesNotContainVertex,
+    /// The cell is a 0-simplex with no facet.
+    #[error("The cell is a 0-simplex with no facet!")]
+    CellIsZeroSimplex,
+}
+
+// =============================================================================
 // FACET STRUCT DEFINITION
 // =============================================================================
 
@@ -406,21 +421,6 @@ where
         self.cell.hash(state);
         self.vertex.hash(state);
     }
-}
-
-// =============================================================================
-// ERROR TYPES
-// =============================================================================
-
-/// Error type for facet operations.
-#[derive(Debug, Error)]
-pub enum FacetError {
-    /// The cell does not contain the vertex.
-    #[error("The cell does not contain the vertex!")]
-    CellDoesNotContainVertex,
-    /// The cell is a 0-simplex with no facet.
-    #[error("The cell is a 0-simplex with no facet!")]
-    CellIsZeroSimplex,
 }
 
 // =============================================================================

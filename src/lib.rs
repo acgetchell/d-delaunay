@@ -72,6 +72,24 @@ pub mod geometry {
     pub use traits::*;
 }
 
+/// A prelude module that re-exports commonly used types and macros.
+/// This makes it easier to import the most commonly used items from the crate.
+pub mod prelude {
+    // Re-export from delaunay_core
+    pub use crate::delaunay_core::{
+        cell::*, facet::*, traits::data::*, triangulation_data_structure::*, utilities::*,
+        vertex::*,
+    };
+
+    // Re-export from geometry
+    pub use crate::geometry::{
+        matrix::*,
+        point::*,
+        predicates::*,
+        traits::{coordinate::*, finitecheck::*, hashcoordinate::*, orderedeq::*},
+    };
+}
+
 /// The function `is_normal` checks that structs implement `auto` traits.
 /// Traits are checked at compile time, so this function is only used for
 /// testing.

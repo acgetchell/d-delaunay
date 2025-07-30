@@ -61,6 +61,7 @@
         "phpmd",
         "phpstan",
         "pipefail",
+        "polytopes",
         "powi",
         "Preparata",
         "profraw",

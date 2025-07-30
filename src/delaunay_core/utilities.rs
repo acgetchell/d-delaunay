@@ -1,13 +1,14 @@
 //! Utility functions
 
-use crate::delaunay_core::traits::data::DataType;
-use crate::delaunay_core::vertex::Vertex;
-use crate::geometry::traits::coordinate::CoordinateScalar;
 use anyhow::Error;
 use serde::{Serialize, de::DeserializeOwned};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+use crate::delaunay_core::traits::data::DataType;
+use crate::delaunay_core::vertex::Vertex;
+use crate::geometry::traits::coordinate::CoordinateScalar;
 
 /// The function `make_uuid` generates a version 4 [Uuid].
 ///
