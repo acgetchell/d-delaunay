@@ -377,10 +377,9 @@ where
 ///
 /// # Properties
 ///
-/// - `vertices`: A [`HashMap`] that stores vertices with their corresponding
-///   [Uuid]s as keys. Each [Vertex] has a [Point] of type T, vertex data of type
-///   U, and a constant D representing the dimension.
-/// - `cells`: The `cells` property is a [`HashMap`] that stores [Cell] objects.
+/// - `vertices`: A [`SlotMap`] that stores vertices with stable keys for efficient access.
+///   Each [Vertex] has a [Point] of type T, vertex data of type U, and a constant D representing the dimension.
+/// - `cells`: The `cells` property is a [`SlotMap`] that stores [Cell] objects with stable keys.
 ///   Each [Cell] has one or more [Vertex] objects with cell data of type V.
 ///   Note the dimensionality of the cell may differ from D, though the [Tds]
 ///   only stores cells of maximal dimensionality D and infers other lower
@@ -448,6 +447,17 @@ where
 
     /// `HashMap` to map `CellKeys` to their corresponding Cell UUIDs.
     pub cell_key_to_uuid: HashMap<CellKey, Uuid>,
+
+    // Reusable buffers to minimize allocations during Bowyer-Watson algorithm
+    // These are kept as part of the struct to avoid repeated allocations
+    #[serde(skip)]
+    bad_cells_buffer: Vec<CellKey>,
+    #[serde(skip)]
+    boundary_facets_buffer: Vec<Facet<T, U, V, D>>,
+    #[serde(skip)]
+    vertex_points_buffer: Vec<Point<T, D>>,
+    #[serde(skip)]
+    bad_cell_facets_buffer: HashMap<CellKey, Vec<Facet<T, U, V, D>>>,
 }
 
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
@@ -571,6 +581,11 @@ where
             vertex_key_to_uuid: HashMap::new(),
             cell_uuid_to_key: HashMap::new(),
             cell_key_to_uuid: HashMap::new(),
+            // Initialize reusable buffers
+            bad_cells_buffer: Vec::new(),
+            boundary_facets_buffer: Vec::new(),
+            vertex_points_buffer: Vec::new(),
+            bad_cell_facets_buffer: HashMap::new(),
         };
 
         // Add vertices to SlotMap and create bidirectional UUID-to-key mappings
@@ -615,6 +630,11 @@ where
             vertex_key_to_uuid: HashMap::new(),
             cell_uuid_to_key: HashMap::new(),
             cell_key_to_uuid: HashMap::new(),
+            // Initialize reusable buffers
+            bad_cells_buffer: Vec::new(),
+            boundary_facets_buffer: Vec::new(),
+            vertex_points_buffer: Vec::new(),
+            bad_cell_facets_buffer: HashMap::new(),
         }
     }
 
@@ -964,15 +984,9 @@ where
             return Self::create_default_supercell();
         }
 
-        // Find the bounding box of all input vertices
-        // Create a temporary HashMap for the find_extreme_coordinates function
-        let vertices_map: HashMap<Uuid, Vertex<T, U, D>> = self
-            .vertices
-            .iter()
-            .map(|(key, vertex)| (self.vertex_key_to_uuid[&key], *vertex))
-            .collect();
-        let min_coords = find_extreme_coordinates(&vertices_map, Ordering::Less)?;
-        let max_coords = find_extreme_coordinates(&vertices_map, Ordering::Greater)?;
+        // Find the bounding box of all input vertices using SlotMap directly
+        let min_coords = find_extreme_coordinates(&self.vertices, Ordering::Less)?;
+        let max_coords = find_extreme_coordinates(&self.vertices, Ordering::Greater)?;
 
         // Convert coordinates to f64 for calculations
         let mut center_f64 = [0.0f64; D];
@@ -1319,7 +1333,7 @@ where
 
     #[allow(clippy::type_complexity)]
     fn find_bad_cells_and_boundary_facets(
-        &self,
+        &mut self,
         vertex: &Vertex<T, U, D>,
     ) -> Result<(Vec<CellKey>, Vec<Facet<T, U, V, D>>), anyhow::Error>
     where
@@ -1327,53 +1341,61 @@ where
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
     {
         // Pre-allocate with estimated capacity based on typical triangulation patterns
-        let mut bad_cells = Vec::with_capacity(self.cells.len() / 4);
-        let mut boundary_facets = Vec::with_capacity(bad_cells.capacity() * (D + 1));
-
+        self.bad_cells_buffer.clear();
+        self.boundary_facets_buffer.clear();
         // Find cells whose circumsphere contains the vertex
         for (cell_key, cell) in &self.cells {
-            // Re-use the existing slice, no allocation
-            let vertex_points: Vec<Point<T, D>> =
-                cell.vertices().iter().map(|v| *v.point()).collect();
-            let contains = insphere(&vertex_points, *vertex.point())?;
+            // Clear and reuse the vertex_points_buffer
+            self.vertex_points_buffer.clear();
+
+            // Create a vector of points by dereferencing the borrowed points
+            self.vertex_points_buffer
+                .extend(cell.vertices().iter().map(|v| *v.point()));
+            let contains = insphere(&self.vertex_points_buffer, *vertex.point())?;
             if matches!(contains, InSphere::INSIDE) {
-                bad_cells.push(cell_key);
+                self.bad_cells_buffer.push(cell_key);
             }
         }
 
         // Early return if no bad cells found
-        if bad_cells.is_empty() {
-            return Ok((bad_cells, boundary_facets));
+        if self.bad_cells_buffer.is_empty() {
+            return Ok((
+                self.bad_cells_buffer.clone(),
+                self.boundary_facets_buffer.clone(),
+            ));
         }
 
-        // Pre-compute facets for all bad cells to avoid repeated computation
-        let mut bad_cell_facets: HashMap<CellKey, Vec<Facet<T, U, V, D>>> =
-            HashMap::with_capacity(bad_cells.len());
+        // Clear the hashmap buffer and pre-compute facets for all bad cells to avoid repeated computation
+        self.bad_cell_facets_buffer.clear();
 
-        for &bad_cell_key in &bad_cells {
+        for &bad_cell_key in &self.bad_cells_buffer {
             if let Some(bad_cell) = self.cells.get(bad_cell_key) {
-                bad_cell_facets.insert(bad_cell_key, bad_cell.facets());
+                self.bad_cell_facets_buffer
+                    .insert(bad_cell_key, bad_cell.facets());
             }
         }
 
         // Collect boundary facets - facets that are on the boundary of the bad cells cavity
-        for (&bad_cell_key, facets) in &bad_cell_facets {
+        for (&bad_cell_key, facets) in &self.bad_cell_facets_buffer {
             for facet in facets {
                 // A facet is on the boundary if it's not shared with another bad cell
                 let mut is_boundary = true;
-                for (&other_bad_cell_key, other_facets) in &bad_cell_facets {
+                for (&other_bad_cell_key, other_facets) in &self.bad_cell_facets_buffer {
                     if other_bad_cell_key != bad_cell_key && other_facets.contains(facet) {
                         is_boundary = false;
                         break;
                     }
                 }
                 if is_boundary {
-                    boundary_facets.push(facet.clone());
+                    self.boundary_facets_buffer.push(facet.clone());
                 }
             }
         }
 
-        Ok((bad_cells, boundary_facets))
+        Ok((
+            self.bad_cells_buffer.clone(),
+            self.boundary_facets_buffer.clone(),
+        ))
     }
 
     // =============================================================================
@@ -3298,7 +3320,7 @@ mod tests {
         let vertices = Vertex::from_points(points);
         let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         // Triangulation is automatically done in Tds::new
-        let result = tds;
+        let mut result = tds;
 
         if result.number_of_cells() > 0 {
             // Create a test vertex that might be inside/outside existing cells
@@ -3600,7 +3622,7 @@ mod tests {
             Point::new([0.0, 0.0, 2.0]),
         ];
         let vertices = Vertex::from_points(points);
-        let result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        let mut result: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
         // let mut result = tds.bowyer_watson().unwrap();
 
         if result.number_of_cells() > 0 {

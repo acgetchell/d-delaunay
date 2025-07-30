@@ -2,8 +2,8 @@
 
 use anyhow::Error;
 use serde::{Serialize, de::DeserializeOwned};
+use slotmap::SlotMap;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::delaunay_core::traits::data::DataType;
@@ -29,15 +29,15 @@ pub fn make_uuid() -> Uuid {
     Uuid::new_v4()
 }
 
-/// Find the extreme coordinates (minimum or maximum) across all vertices in a `HashMap`.
+/// Find the extreme coordinates (minimum or maximum) across all vertices in a `SlotMap`.
 ///
-/// This function takes a `HashMap` of vertices and returns the minimum or maximum
-/// coordinates based on the specified ordering.
+/// This function takes a `SlotMap` of vertices and returns the minimum or maximum
+/// coordinates based on the specified ordering. This works directly with `SlotMap`
+/// to provide efficient coordinate finding in performance-critical contexts.
 ///
 /// # Arguments
 ///
-/// * `vertices` - A `HashMap` containing Vertex objects, where the key is a
-///   Uuid and the value is a Vertex.
+/// * `vertices` - A `SlotMap` containing Vertex objects
 /// * `ordering` - The ordering parameter is of type Ordering and is used to
 ///   specify whether the function should find the minimum or maximum
 ///   coordinates. Ordering is an enum with three possible values: `Less`,
@@ -46,15 +46,15 @@ pub fn make_uuid() -> Uuid {
 /// # Returns
 ///
 /// Returns `Ok([T; D])` containing the minimum or maximum coordinate for each dimension,
-/// or an error if the vertices `HashMap` is empty.
+/// or an error if the vertices `SlotMap` is empty.
 ///
 /// # Errors
 ///
-/// Returns an error if the vertices `HashMap` is empty.
+/// Returns an error if the vertices `SlotMap` is empty.
 ///
 /// # Panics
 ///
-/// This function should not panic under normal circumstances as the empty `HashMap`
+/// This function should not panic under normal circumstances as the empty `SlotMap`
 /// case is handled by returning an error.
 ///
 /// # Example
@@ -64,44 +64,47 @@ pub fn make_uuid() -> Uuid {
 /// use d_delaunay::delaunay_core::vertex::Vertex;
 /// use d_delaunay::geometry::point::Point;
 /// use d_delaunay::geometry::traits::coordinate::Coordinate;
-/// use std::collections::HashMap;
+/// use slotmap::{SlotMap, DefaultKey};
 /// use std::cmp::Ordering;
+///
 /// let points = vec![
 ///     Point::new([-1.0, 2.0, 3.0]),
 ///     Point::new([4.0, -5.0, 6.0]),
 ///     Point::new([7.0, 8.0, -9.0]),
 /// ];
 /// let vertices: Vec<Vertex<f64, Option<()>, 3>> = Vertex::from_points(points);
-/// let hashmap = Vertex::into_hashmap(vertices);
-/// let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
+/// let mut slotmap: SlotMap<DefaultKey, Vertex<f64, Option<()>, 3>> = SlotMap::new();
+/// for vertex in vertices {
+///     slotmap.insert(vertex);
+/// }
+/// let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
 /// # use approx::assert_relative_eq;
 /// assert_relative_eq!(min_coords.as_slice(), [-1.0, -5.0, -9.0].as_slice(), epsilon = 1e-9);
 /// ```
-pub fn find_extreme_coordinates<T, U, const D: usize, S: ::std::hash::BuildHasher>(
-    vertices: &HashMap<Uuid, Vertex<T, U, D>, S>,
+pub fn find_extreme_coordinates<K, T, U, const D: usize>(
+    vertices: &SlotMap<K, Vertex<T, U, D>>,
     ordering: Ordering,
 ) -> Result<[T; D], Error>
 where
+    K: slotmap::Key,
     T: CoordinateScalar,
     U: DataType,
     [T; D]: Default + DeserializeOwned + Serialize + Sized,
 {
     if vertices.is_empty() {
         return Err(anyhow::Error::msg(
-            "Cannot find extreme coordinates: vertices HashMap is empty",
+            "Cannot find extreme coordinates: vertices SlotMap is empty",
         ));
     }
 
-    // Initialize with the first vertex's coordinates using implicit conversion
-    let mut extreme_coords: [T; D] = vertices
-        .values()
+    let mut iter = vertices.values();
+    let first_vertex = iter
         .next()
-        .expect("HashMap is unexpectedly empty despite earlier check")
-        .into();
+        .expect("SlotMap is unexpectedly empty despite earlier check");
+    let mut extreme_coords: [T; D] = (*first_vertex).into();
 
-    // Compare with remaining vertices
-    for vertex in vertices.values().skip(1) {
-        let vertex_coords: [T; D] = vertex.into();
+    for vertex in iter {
+        let vertex_coords: [T; D] = (*vertex).into();
         for (i, coord) in vertex_coords.iter().enumerate() {
             match ordering {
                 Ordering::Less => {
@@ -131,7 +134,7 @@ mod tests {
     use crate::geometry::traits::coordinate::Coordinate;
     use crate::vertex;
     use approx::assert_relative_eq;
-    use std::collections::HashMap;
+    use slotmap::{DefaultKey, SlotMap};
 
     use super::*;
 
@@ -180,10 +183,16 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(
             min_coords.as_slice(),
@@ -206,10 +215,16 @@ mod tests {
         let points = vec![Point::new([5.0, -3.0, 7.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         // With single point, min and max should be the same
         assert_relative_eq!(
@@ -229,11 +244,17 @@ mod tests {
         let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
         // Using Ordering::Equal should return the first vertex's coordinates unchanged
-        let coords = find_extreme_coordinates(&hashmap, Ordering::Equal).unwrap();
-        // The first vertex in the iteration (order is not guaranteed in HashMap)
+        let coords = find_extreme_coordinates(&slotmap, Ordering::Equal).unwrap();
+        // The first vertex in the iteration (order is deterministic in SlotMap)
         // but the result should be one of the input coordinates
         let matches_first = approx::relative_eq!(
             coords.as_slice(),
@@ -257,10 +278,16 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(min_coords.as_slice(), [1.0, 2.0].as_slice(), epsilon = 1e-9);
         assert_relative_eq!(max_coords.as_slice(), [3.0, 5.0].as_slice(), epsilon = 1e-9);
@@ -271,10 +298,16 @@ mod tests {
         let points = vec![Point::new([10.0]), Point::new([-5.0]), Point::new([3.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(min_coords.as_slice(), [-5.0].as_slice(), epsilon = 1e-9);
         assert_relative_eq!(max_coords.as_slice(), [10.0].as_slice(), epsilon = 1e-9);
@@ -297,10 +330,14 @@ mod tests {
                 )
             })
             .collect();
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<DefaultKey, crate::delaunay_core::vertex::Vertex<f64, i32, 3>> =
+            SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(
             min_coords.as_slice(),
@@ -323,10 +360,16 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         // All points are identical, so min and max should be the same
         assert_relative_eq!(
@@ -350,10 +393,16 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(
             min_coords.as_slice(),
@@ -377,10 +426,16 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f32, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let hashmap = crate::delaunay_core::vertex::Vertex::into_hashmap(vertices);
+        let mut slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f32, Option<()>, 3>,
+        > = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(
             min_coords.as_slice(),
@@ -396,40 +451,36 @@ mod tests {
 
     #[test]
     fn utilities_find_extreme_coordinates_empty_error_message() {
-        // Test that the correct error message is returned for empty hashmap
-        let empty_hashmap: HashMap<Uuid, crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
-            HashMap::new();
-        let result = find_extreme_coordinates(&empty_hashmap, Ordering::Less);
+        // Test that the correct error message is returned for empty slotmap
+        let empty_slotmap: SlotMap<
+            DefaultKey,
+            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
+        > = SlotMap::new();
+        let result = find_extreme_coordinates(&empty_slotmap, Ordering::Less);
 
         assert!(result.is_err());
         let error_message = result.unwrap_err().to_string();
         assert!(error_message.contains("Cannot find extreme coordinates"));
-        assert!(error_message.contains("vertices HashMap is empty"));
+        assert!(error_message.contains("vertices SlotMap is empty"));
     }
 
     #[test]
-    fn utilities_find_extreme_coordinates_custom_hasher() {
-        // Test with a custom hasher to ensure the generic hasher parameter works
-        use std::collections::HashMap;
-        use std::collections::hash_map::RandomState;
-
+    fn utilities_find_extreme_coordinates_ordering() {
+        // Test SlotMap ordering and insertion behavior
         let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 1.0, 2.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
 
-        // Create HashMap with explicit RandomState hasher
-        let mut hashmap: HashMap<
-            Uuid,
+        let mut slotmap: SlotMap<
+            DefaultKey,
             crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-            RandomState,
-        > = HashMap::with_hasher(RandomState::new());
-
+        > = SlotMap::new();
         for vertex in vertices {
-            hashmap.insert(vertex.uuid(), vertex);
+            slotmap.insert(vertex);
         }
 
-        let min_coords = find_extreme_coordinates(&hashmap, Ordering::Less).unwrap();
-        let max_coords = find_extreme_coordinates(&hashmap, Ordering::Greater).unwrap();
+        let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
+        let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
 
         assert_relative_eq!(
             min_coords.as_slice(),
