@@ -1430,14 +1430,14 @@ where
             }
         }
 
-        // Iterate over for (vkey, cell_keys) in vertex_to_cells
-        for (vkey, cell_keys) in vertex_to_cells {
+        // Iterate over for (vertex_key, cell_keys) in vertex_to_cells
+        for (vertex_key, cell_keys) in vertex_to_cells {
             if !cell_keys.is_empty() {
                 // Convert cell_keys[0] to Uuid via cell_key_to_uuid
                 let cell_uuid = self.cell_key_to_uuid[&cell_keys[0]];
 
-                // Do self.vertices.get_mut(&vkey).unwrap().incident_cell = Some(cell_uuid)
-                self.vertices.get_mut(vkey).unwrap().incident_cell = Some(cell_uuid);
+                // Do self.vertices.get_mut(&vertex_key).unwrap().incident_cell = Some(cell_uuid)
+                self.vertices.get_mut(vertex_key).unwrap().incident_cell = Some(cell_uuid);
             }
         }
     }
