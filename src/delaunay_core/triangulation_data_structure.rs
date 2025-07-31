@@ -598,7 +598,7 @@ where
 
         // Initialize cells using Bowyer-Watson triangulation
         // Note: bowyer_watson_logic now populates the SlotMaps internally
-        tds.bowyer_watson_logic()?;
+        tds.bowyer_watson()?;
 
         Ok(tds)
     }
@@ -1210,7 +1210,7 @@ where
     /// ```
     /// Private method that performs Bowyer-Watson triangulation on a set of vertices
     /// and returns a vector of cells
-    fn bowyer_watson_logic(&mut self) -> Result<(), TriangulationValidationError>
+    fn bowyer_watson(&mut self) -> Result<(), TriangulationValidationError>
     where
         OPoint<T, Const<D>>: From<[f64; D]>,
         [f64; D]: Default + DeserializeOwned + Serialize + Sized,
@@ -1296,32 +1296,6 @@ where
         self.assign_incident_cells();
 
         Ok(())
-    }
-
-    /// Create a Delaunay triangulation using the Bowyer-Watson algorithm
-    ///
-    /// # Deprecated
-    ///
-    /// This method is deprecated. Use `Tds::new(&vertices)` instead, which automatically
-    /// performs triangulation during construction.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `TriangulationValidationError` if:
-    /// - Supercell creation fails
-    /// - Circumsphere calculations fail during the algorithm
-    /// - Cell creation from facets and vertices fails
-    /// - Duplicate cell removal fails
-    /// - Neighbor assignment fails
-    #[deprecated(since = "0.2.0", note = "Use `Tds::new(&vertices)` instead")]
-    pub fn bowyer_watson(mut self) -> Result<Self, TriangulationValidationError>
-    where
-        OPoint<T, Const<D>>: From<[f64; D]>,
-        [f64; D]: Default + DeserializeOwned + Serialize + Sized,
-    {
-        // Simply use the existing triangulation logic
-        self.bowyer_watson_logic()?;
-        Ok(self)
     }
 
     #[allow(clippy::type_complexity)]
@@ -2038,14 +2012,18 @@ where
 
         // Then validate all cells
         for (cell_id, cell) in &self.cells {
-            cell.is_valid()
-                .map_err(|source| TriangulationValidationError::InvalidCell {
-                    cell_id: *self
-                        .cell_bimap
-                        .get_by_right(&cell_id)
-                        .expect("Cell key should have a corresponding UUID"),
-                    source,
-                })?;
+            cell.is_valid().map_err(|source| {
+                let cell_id = self
+                    .cell_bimap
+                    .get_by_right(&cell_id)
+                    .copied()
+                    .unwrap_or_else(|| {
+                        // This shouldn't happen if validate_cell_mappings passed
+                        eprintln!("Warning: Cell key {cell_id:?} has no UUID mapping");
+                        Uuid::nil()
+                    });
+                TriangulationValidationError::InvalidCell { cell_id, source }
+            })?;
         }
 
         // Finally validate neighbor relationships
