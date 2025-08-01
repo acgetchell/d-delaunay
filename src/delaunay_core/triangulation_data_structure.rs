@@ -144,7 +144,7 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::NumCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
-use slotmap::{SlotMap, new_key_type};
+use slotmap::{Key, SlotMap, new_key_type};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -473,6 +473,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
+    // Hash constants for facet key generation
+    const HASH_PRIME: u64 = 1_099_511_628_211; // Large prime (FNV prime)
+    const HASH_OFFSET: u64 = 14_695_981_039_346_656_037; // FNV offset basis
+
     // =============================================================================
     // CORE METHODS
     // =============================================================================
@@ -1371,15 +1375,17 @@ where
 
     /// Assigns neighbor relationships between cells based on shared facets.
     ///
-    /// This method builds neighbor relationships by identifying cells that share facets.
+    /// This method efficiently builds neighbor relationships by using
+    /// the `facet_key_from_vertex_keys` function to compute unique keys for facets.
     /// Two cells are considered neighbors if they share exactly one facet (which contains
     /// D vertices for a D-dimensional triangulation).
     ///
     /// # Algorithm
     ///
     /// 1. Creates a mapping from facet keys to the cells that contain those facets
-    /// 2. For each facet shared by exactly two cells, marks those cells as neighbors
-    /// 3. Updates each cell's neighbor list with the UUIDs of its neighboring cells
+    ///    using `facet_key_from_vertex_keys` for efficient facet key computation.
+    /// 2. For each facet shared by exactly two cells, marks those cells as neighbors.
+    /// 3. Updates each cell's neighbor list with the UUIDs of its neighboring cells.
     ///
     /// # Performance
     ///
@@ -1431,8 +1437,14 @@ where
             HashMap::with_capacity(self.cells.len() * (D + 1));
 
         for (cell_key, cell) in &self.cells {
-            for facet in cell.facets() {
-                facet_map.entry(facet.key()).or_default().push(cell_key);
+            let vertex_keys = cell.vertex_keys(&self.vertex_bimap);
+            for i in 0..vertex_keys.len() {
+                // Create a temporary slice excluding the i-th element
+                let mut temp_keys = vertex_keys.clone();
+                temp_keys.remove(i);
+                // Compute facet key for the current subset of vertex keys
+                let facet_key = Self::facet_key_from_vertex_keys(&temp_keys);
+                facet_map.entry(facet_key).or_default().push(cell_key);
             }
         }
 
@@ -1602,6 +1614,149 @@ where
         }
 
         duplicate_count
+    }
+
+    // =============================================================================
+    // VERTEX KEY-BASED FACET KEY GENERATION
+    // =============================================================================
+
+    /// Generates a canonical facet key from sorted 64-bit `VertexKey` arrays.
+    ///
+    /// This function creates a deterministic facet key by:
+    /// 1. Converting `VertexKeys` to 64-bit integers using their internal `KeyData`
+    /// 2. Sorting the keys to ensure deterministic ordering regardless of input order
+    /// 3. Combining the keys using an efficient bitwise hash algorithm
+    ///
+    /// The resulting key is guaranteed to be identical for any facet that contains
+    /// the same set of vertices, regardless of the order in which the vertices are provided.
+    ///
+    /// # Arguments
+    ///
+    /// * `vertex_keys` - A slice of `VertexKeys` representing the vertices of the facet
+    ///
+    /// # Returns
+    ///
+    /// A `u64` hash value representing the canonical key of the facet
+    ///
+    /// # Performance
+    ///
+    /// This method is optimized for performance:
+    /// - Time Complexity: O(n log n) where n is the number of vertices (due to sorting)
+    /// - Space Complexity: O(n) for the temporary sorted array
+    /// - Uses efficient bitwise operations for hash combination
+    /// - Avoids heap allocation when possible
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Get vertex keys for some vertices
+    /// let vertex_keys: Vec<_> = tds.vertex_bimap.right_values().take(3).cloned().collect();
+    ///
+    /// // Generate facet key from vertex keys
+    /// let facet_key = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&vertex_keys);
+    ///
+    /// // The same vertices in different order should produce the same key
+    /// let mut reversed_keys = vertex_keys.clone();
+    /// reversed_keys.reverse();
+    /// let facet_key_reversed = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&reversed_keys);
+    /// assert_eq!(facet_key, facet_key_reversed);
+    /// ```
+    ///
+    /// # Algorithm Details
+    ///
+    /// The hash combination uses a polynomial rolling hash approach:
+    /// 1. Start with an initial hash value
+    /// 2. For each sorted vertex key, combine it using: `hash = hash.wrapping_mul(PRIME).wrapping_add(key)`
+    /// 3. Apply a final avalanche step to improve bit distribution
+    ///
+    /// This approach ensures:
+    /// - Good hash distribution across the output space
+    /// - Deterministic results independent of vertex ordering
+    /// - Efficient computation with minimal allocations
+    #[must_use]
+    pub fn facet_key_from_vertex_keys(vertex_keys: &[VertexKey]) -> u64 {
+        // Handle empty case
+        if vertex_keys.is_empty() {
+            return 0;
+        }
+
+        // Convert VertexKeys to u64 and sort for deterministic ordering
+        let mut key_values: Vec<u64> = vertex_keys.iter().map(|key| key.data().as_ffi()).collect();
+        key_values.sort_unstable();
+
+        // Use a polynomial rolling hash for efficient combination
+        // Prime constant chosen for good hash distribution
+
+        let mut hash = Self::HASH_OFFSET;
+        for &key_value in &key_values {
+            hash = hash.wrapping_mul(Self::HASH_PRIME).wrapping_add(key_value);
+        }
+
+        // Apply avalanche step for better bit distribution
+        hash ^= hash >> 33;
+        hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
+        hash ^= hash >> 33;
+        hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+        hash ^= hash >> 33;
+
+        hash
+    }
+
+    /// Generates a canonical facet key from a collection of vertices using their `VertexKeys`.
+    ///
+    /// This is a convenience method that looks up `VertexKeys` for the given vertices
+    /// and then calls `facet_key_from_vertex_keys` to generate the canonical key.
+    ///
+    /// # Arguments
+    ///
+    /// * `vertices` - A slice of vertices to generate a facet key for
+    ///
+    /// # Returns
+    ///
+    /// A `u64` hash value representing the canonical key of the facet, or `None`
+    /// if any vertex is not found in the triangulation
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Create a facet from some vertices
+    /// let facet_vertices = &vertices[0..3]; // First 3 vertices
+    ///
+    /// // Generate facet key from vertices
+    /// let facet_key = tds.facet_key_from_vertices(facet_vertices).unwrap();
+    /// println!("Facet key: {}", facet_key);
+    /// ```
+    #[must_use]
+    pub fn facet_key_from_vertices(&self, vertices: &[Vertex<T, U, D>]) -> Option<u64> {
+        // Look up VertexKeys for all vertices
+        let vertex_keys: Option<Vec<VertexKey>> = vertices
+            .iter()
+            .map(|vertex| self.vertex_bimap.get_by_left(&vertex.uuid()).copied())
+            .collect();
+
+        vertex_keys.map(|keys| Self::facet_key_from_vertex_keys(&keys))
     }
 
     // =============================================================================
@@ -2580,6 +2735,52 @@ mod tests {
     }
 
     // =============================================================================
+    // facet_key_from_vertex_keys TEST
+    // =============================================================================
+
+    #[test]
+    fn test_facet_key_from_vertex_keys() {
+        // Create a temporary SlotMap to generate valid VertexKeys
+        let mut temp_vertices: SlotMap<VertexKey, ()> = SlotMap::with_key();
+        let vertex_keys = vec![
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+        ];
+        let key1 = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&vertex_keys);
+
+        let mut reversed_keys = vertex_keys.clone();
+        reversed_keys.reverse();
+        let key2 =
+            Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&reversed_keys);
+
+        assert_eq!(
+            key1, key2,
+            "Facet keys should be identical for the same vertices in different order"
+        );
+
+        // Test with different vertex keys
+        let different_keys = vec![
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+        ];
+        let key3 =
+            Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&different_keys);
+
+        assert_ne!(
+            key1, key3,
+            "Different vertices should produce different keys"
+        );
+
+        // Test empty case
+        let empty_keys: Vec<VertexKey> = vec![];
+        let key_empty =
+            Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&empty_keys);
+        assert_eq!(key_empty, 0, "Empty vertex keys should produce key 0");
+    }
+
+    // =============================================================================
     // dim() TESTS
     // =============================================================================
 
@@ -3195,6 +3396,44 @@ mod tests {
 
     // =============================================================================
     // VALIDATION TESTS
+    #[test]
+    fn test_assign_neighbors_edge_cases() {
+        // Edge case: Degenerate case with no neighbors expected
+        let points = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+        let vertices = Vertex::from_points(points);
+        let tds: Tds<f64, usize, usize, 3> = Tds::new(&vertices).unwrap();
+        let mut result = tds;
+
+        result.assign_neighbors();
+
+        // Ensure no neighbors in a single tetrahedron (expected behavior)
+        for cell in result.cells.values() {
+            assert!(cell.neighbors.is_none() || cell.neighbors.as_ref().unwrap().is_empty());
+        }
+
+        // Edge case: Test with linear configuration (1D-like)
+        let points_linear = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([2.0, 0.0, 0.0]),
+            Point::new([4.0, 0.0, 0.0]),
+        ];
+        let vertices_linear = Vertex::from_points(points_linear);
+        let tds_linear: Tds<f64, usize, usize, 3> = Tds::new(&vertices_linear).unwrap();
+        let mut result_linear = tds_linear;
+
+        result_linear.assign_neighbors();
+
+        // Line should have no valid neighbors
+        for cell in result_linear.cells.values() {
+            assert!(cell.neighbors.is_none() || cell.neighbors.as_ref().unwrap().is_empty());
+        }
+    }
+
     // =============================================================================
 
     #[test]

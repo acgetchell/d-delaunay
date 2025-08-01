@@ -44,6 +44,10 @@ harness = false
 name = "microbenchmarks"
 harness = false
 
+[[bench]]
+name = "assign_neighbors_performance"
+harness = false
+
 [lints.rust]
 unsafe_code = "forbid"
 dead_code = "warn"
