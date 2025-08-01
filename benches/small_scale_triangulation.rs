@@ -2,7 +2,7 @@
 //!
 //! This benchmark measures the performance of core triangulation operations
 //! across different dimensions (2D, 3D, 4D) and small point counts (10-50 points).
-//! Memory allocations are tracked at each iteration.
+//! Memory allocations are tracked at each iteration with detailed logging and bounds checking.
 
 #![allow(missing_docs)]
 

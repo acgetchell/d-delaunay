@@ -12,7 +12,6 @@ simple_examples=(
     "point_comparison_and_hashing"
     "test_alloc_api"
     "test_circumsphere"
-    "triangulation_example"
 )
 
 # Run simple examples

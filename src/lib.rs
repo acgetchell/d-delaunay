@@ -123,4 +123,88 @@ mod lib_tests {
         assert!(is_normal::<Cell<f64, Option<()>, Option<()>, 4>>());
         assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 4>>());
     }
+
+    /// Run these with cargo test `allocation_counting` --features count-allocations
+    #[cfg(feature = "count-allocations")]
+    #[test]
+    fn test_basic_allocation_counting() {
+        use allocation_counter::measure;
+
+        // Test a trivial operation that should not allocate
+        let result = measure(|| {
+            let x = 1 + 1;
+            assert_eq!(x, 2);
+        });
+
+        // Assert that the returned struct has the expected fields
+        // Available fields: count_total, count_current, count_max, bytes_total, bytes_current, bytes_max
+        // For a trivial operation, we expect zero allocations
+        assert_eq!(
+            result.count_total, 0,
+            "Expected zero total allocations for trivial operation, found: {}",
+            result.count_total
+        );
+        assert_eq!(
+            result.bytes_total, 0,
+            "Expected zero total bytes allocated for trivial operation, found: {}",
+            result.bytes_total
+        );
+
+        // Also check that current allocations are zero (no leaked allocations)
+        assert_eq!(
+            result.count_current, 0,
+            "Expected zero current allocations after trivial operation, found: {}",
+            result.count_current
+        );
+        assert_eq!(
+            result.bytes_current, 0,
+            "Expected zero current bytes allocated after trivial operation, found: {}",
+            result.bytes_current
+        );
+    }
+
+    #[cfg(feature = "count-allocations")]
+    #[test]
+    fn test_allocation_counting_with_allocating_operation() {
+        use allocation_counter::measure;
+
+        // Test an operation that does allocate memory
+        let result = measure(|| {
+            let _vec: Vec<i32> = vec![1, 2, 3, 4, 5];
+        });
+
+        // For this operation, we expect some allocations
+        assert!(
+            result.count_total > 0,
+            "Expected some allocations for Vec creation, found: {}",
+            result.count_total
+        );
+        assert!(
+            result.bytes_total > 0,
+            "Expected some bytes allocated for Vec creation, found: {}",
+            result.bytes_total
+        );
+
+        // After the operation, current allocations should be zero (Vec was dropped)
+        assert_eq!(
+            result.count_current, 0,
+            "Expected zero current allocations after Vec drop, found: {}",
+            result.count_current
+        );
+        assert_eq!(
+            result.bytes_current, 0,
+            "Expected zero current bytes after Vec drop, found: {}",
+            result.bytes_current
+        );
+
+        // Max values should be at least as large as total (they track peak usage)
+        assert!(
+            result.count_max >= result.count_total,
+            "Max count should be >= total count"
+        );
+        assert!(
+            result.bytes_max >= result.bytes_total,
+            "Max bytes should be >= total bytes"
+        );
+    }
 }
