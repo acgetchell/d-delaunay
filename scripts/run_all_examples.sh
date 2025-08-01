@@ -10,6 +10,9 @@ simple_examples=(
     "check_float_traits"
     "implicit_conversion"
     "point_comparison_and_hashing"
+    "test_alloc_api"
+    "test_circumsphere"
+    "triangulation_example"
 )
 
 # Run simple examples
