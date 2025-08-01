@@ -2749,7 +2749,7 @@ mod tests {
         ];
         let key1 = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&vertex_keys);
 
-        let mut reversed_keys = vertex_keys.clone();
+        let mut reversed_keys = vertex_keys;
         reversed_keys.reverse();
         let key2 =
             Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&reversed_keys);

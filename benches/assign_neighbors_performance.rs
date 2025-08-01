@@ -3,9 +3,12 @@
 //! This benchmark measures the runtime of the `assign_neighbors` method before and after
 //! optimizations to confirm reduced overhead on representative triangulations.
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+#![allow(missing_docs, unused_doc_comments, unused_attributes)]
+
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use d_delaunay::prelude::*;
 use rand::Rng;
+use std::hint::black_box;
 use std::time::Instant;
 
 /// Creates random points for benchmarking
@@ -30,11 +33,10 @@ fn generate_grid_points_3d(n_side: usize) -> Vec<Point<f64, 3>> {
     for i in 0..n_side {
         for j in 0..n_side {
             for k in 0..n_side {
-                points.push(Point::new([
-                    i as f64 * spacing,
-                    j as f64 * spacing,
-                    k as f64 * spacing,
-                ]));
+                #[allow(clippy::cast_precision_loss)]
+                let point =
+                    Point::new([i as f64 * spacing, j as f64 * spacing, k as f64 * spacing]);
+                points.push(point);
             }
         }
     }
@@ -59,7 +61,7 @@ fn generate_spherical_points_3d(n_points: usize) -> Vec<Point<f64, 3>> {
         .collect()
 }
 
-/// Benchmark assign_neighbors with random point distributions
+/// Benchmark `assign_neighbors` with random point distributions
 fn benchmark_assign_neighbors_random(c: &mut Criterion) {
     let point_counts = [10, 20, 30, 40, 50];
 
@@ -98,7 +100,7 @@ fn benchmark_assign_neighbors_random(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark assign_neighbors with grid point distributions
+/// Benchmark `assign_neighbors` with grid point distributions
 fn benchmark_assign_neighbors_grid(c: &mut Criterion) {
     let grid_sizes = [2, 3, 4]; // 2^3=8, 3^3=27, 4^3=64 points
 
@@ -138,7 +140,7 @@ fn benchmark_assign_neighbors_grid(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark assign_neighbors with spherical point distributions
+/// Benchmark `assign_neighbors` with spherical point distributions
 fn benchmark_assign_neighbors_spherical(c: &mut Criterion) {
     let point_counts = [15, 25, 35, 45];
 
@@ -215,8 +217,7 @@ fn benchmark_assign_neighbors_scaling(c: &mut Criterion) {
 
                         // Print scaling information
                         println!(
-                            "Points: {}, Cells: {}, Vertices: {}, Time: {:?}",
-                            n_points, num_cells, num_vertices, duration
+                            "Points: {n_points}, Cells: {num_cells}, Vertices: {num_vertices}, Time: {duration:?}"
                         );
 
                         black_box((tds, duration));
@@ -229,7 +230,7 @@ fn benchmark_assign_neighbors_scaling(c: &mut Criterion) {
     group.finish();
 }
 
-/// Compare assign_neighbors performance across different dimensions
+/// Compare `assign_neighbors` performance across different dimensions
 fn benchmark_assign_neighbors_2d_vs_3d(c: &mut Criterion) {
     let point_counts = [10, 20, 30];
 

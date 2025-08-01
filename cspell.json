@@ -55,6 +55,8 @@
         "luacheck",
         "matrixmultiply",
         "memchr",
+        "microbenchmark",
+        "microbenchmarks",
         "msvc",
         "nalgebra",
         "nocapture",
