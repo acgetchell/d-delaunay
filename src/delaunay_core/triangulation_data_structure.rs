@@ -125,7 +125,7 @@
 // Parent module imports
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
-    facet::Facet,
+    facet::{Facet, facet_key_from_vertex_keys},
     traits::data::DataType,
     vertex::Vertex,
 };
@@ -144,7 +144,7 @@ use na::{ComplexField, Const, OPoint};
 use nalgebra as na;
 use num_traits::NumCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
-use slotmap::{Key, SlotMap, new_key_type};
+use slotmap::{SlotMap, new_key_type};
 use std::cmp::{Ordering, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -216,157 +216,6 @@ pub enum TriangulationValidationError {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
-
-/// Checks if two facets are adjacent by comparing their vertex sets.
-///
-/// Two facets are considered adjacent if they share the exact same set of vertices,
-/// regardless of the order. This is a common check in triangulation algorithms to
-/// identify neighboring cells.
-///
-/// # Arguments
-///
-/// * `facet1` - A reference to the first facet.
-/// * `facet2` - A reference to the second facet.
-///
-/// # Returns
-///
-/// `true` if the facets share the same vertices, `false` otherwise.
-///
-/// # Examples
-///
-/// ```
-/// use d_delaunay::delaunay_core::facet::Facet;
-/// use d_delaunay::delaunay_core::triangulation_data_structure::facets_are_adjacent;
-/// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::delaunay_core::cell::Cell;
-/// use d_delaunay::{cell, vertex};
-///
-/// let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
-/// let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
-/// let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
-/// let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
-///
-/// let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
-/// let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
-///
-/// let facet1 = Facet::new(cell1, v1).unwrap();
-/// let facet2 = Facet::new(cell2, v4).unwrap();
-///
-/// // These facets share vertices v2 and v3, so they are adjacent
-/// assert!(facets_are_adjacent(&facet1, &facet2));
-/// ```
-pub fn facets_are_adjacent<T, U, V, const D: usize>(
-    facet1: &Facet<T, U, V, D>,
-    facet2: &Facet<T, U, V, D>,
-) -> bool
-where
-    T: CoordinateScalar,
-    U: DataType,
-    V: DataType,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    // Two facets are adjacent if they have the same vertices
-    // (though they may have different orientations)
-    let vertices1 = facet1.vertices();
-    let vertices2 = facet2.vertices();
-
-    if vertices1.len() != vertices2.len() {
-        return false;
-    }
-
-    // Check if all vertices in facet1 are present in facet2
-    vertices1.iter().all(|v1| vertices2.contains(v1))
-}
-
-/// Generates all unique combinations of `k` items from a given slice.
-///
-/// This function is used to generate vertex combinations for creating k-simplices
-/// (e.g., edges, triangles, tetrahedra) from a set of vertices.
-///
-/// # Arguments
-///
-/// * `vertices` - A slice of vertices from which to generate combinations.
-/// * `k` - The size of each combination.
-///
-/// # Returns
-///
-/// A vector of vectors, where each inner vector is a unique combination of `k` vertices.
-///
-/// # Examples
-///
-/// This function is made public for testing purposes.
-///
-/// ```
-/// use d_delaunay::delaunay_core::triangulation_data_structure::generate_combinations;
-/// use d_delaunay::delaunay_core::vertex::Vertex;
-/// use d_delaunay::vertex;
-///
-/// let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
-///     vertex!([0.0]),
-///     vertex!([1.0]),
-///     vertex!([2.0]),
-/// ];
-///
-/// // Generate all 2-vertex combinations (edges)
-/// let combinations = generate_combinations(&vertices, 2);
-///
-/// assert_eq!(combinations.len(), 3);
-/// assert!(combinations.contains(&vec![vertices[0], vertices[1]]));
-/// assert!(combinations.contains(&vec![vertices[0], vertices[2]]));
-/// assert!(combinations.contains(&vec![vertices[1], vertices[2]]));
-/// ```
-pub fn generate_combinations<T, U, const D: usize>(
-    vertices: &[Vertex<T, U, D>],
-    k: usize,
-) -> Vec<Vec<Vertex<T, U, D>>>
-where
-    T: CoordinateScalar,
-    U: DataType,
-    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
-{
-    let mut combinations = Vec::new();
-
-    if k == 0 {
-        combinations.push(Vec::new());
-        return combinations;
-    }
-
-    if k > vertices.len() {
-        return combinations;
-    }
-
-    if k == vertices.len() {
-        combinations.push(vertices.to_vec());
-        return combinations;
-    }
-
-    // Generate combinations using iterative approach
-    let n = vertices.len();
-    let mut indices = (0..k).collect::<Vec<_>>();
-
-    loop {
-        // Add current combination
-        let combination = indices.iter().map(|i| vertices[*i]).collect();
-        combinations.push(combination);
-
-        // Find next combination
-        let mut i = k;
-        loop {
-            if i == 0 {
-                return combinations;
-            }
-            i -= 1;
-            if indices[i] != i + n - k {
-                break;
-            }
-        }
-
-        indices[i] += 1;
-        for j in (i + 1)..k {
-            indices[j] = indices[j - 1] + 1;
-        }
-    }
-}
 
 // =============================================================================
 // STRUCT DEFINITION
@@ -473,10 +322,6 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
-    // Hash constants for facet key generation
-    const HASH_PRIME: u64 = 1_099_511_628_211; // Large prime (FNV prime)
-    const HASH_OFFSET: u64 = 14_695_981_039_346_656_037; // FNV offset basis
-
     // =============================================================================
     // CORE METHODS
     // =============================================================================
@@ -607,39 +452,6 @@ where
         Ok(tds)
     }
 
-    /// Creates an empty triangulation data structure with no vertices or cells.
-    ///
-    /// This is useful for testing purposes or when building a triangulation manually.
-    ///
-    /// # Returns
-    ///
-    /// An empty `Tds` instance.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::empty();
-    /// assert_eq!(tds.number_of_vertices(), 0);
-    /// assert_eq!(tds.number_of_cells(), 0);
-    /// assert_eq!(tds.dim(), -1);
-    /// ```
-    #[must_use]
-    pub fn empty() -> Self {
-        Self {
-            vertices: SlotMap::with_key(),
-            cells: SlotMap::with_key(),
-            vertex_bimap: BiMap::new(),
-            cell_bimap: BiMap::new(),
-            // Initialize reusable buffers
-            bad_cells_buffer: Vec::new(),
-            boundary_facets_buffer: Vec::new(),
-            vertex_points_buffer: Vec::new(),
-            bad_cell_facets_buffer: HashMap::new(),
-        }
-    }
-
     /// The `add` function checks if a [Vertex] with the same coordinates already
     /// exists in the [`HashMap`], and if not, inserts the [Vertex].
     ///
@@ -670,7 +482,7 @@ where
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::default();
     /// let vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
     ///
     /// let result = tds.add(vertex);
@@ -687,7 +499,7 @@ where
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::default();
     /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
     /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]); // Same coordinates
     ///
@@ -705,7 +517,7 @@ where
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::default();
     ///
     /// let vertices = vec![
     ///     vertex!([0.0, 0.0, 0.0]),
@@ -762,7 +574,7 @@ where
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let tds: Tds<f64, usize, usize, 3> = Tds::new(&[]).unwrap();
+    /// let tds: Tds<f64, usize, usize, 3> = Tds::default();
     /// assert_eq!(tds.number_of_vertices(), 0);
     /// ```
     ///
@@ -775,7 +587,7 @@ where
     /// use d_delaunay::geometry::point::Point;
     /// use d_delaunay::geometry::traits::coordinate::Coordinate;
     ///
-    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::new(&[]).unwrap();
+    /// let mut tds: Tds<f64, Option<()>, usize, 3> = Tds::default();
     /// let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
     /// let vertex2: Vertex<f64, Option<()>, 3> = vertex!([4.0, 5.0, 6.0]);
     ///
@@ -1302,8 +1114,35 @@ where
         Ok(())
     }
 
+    /// Finds bad cells and boundary facets for the Bowyer-Watson algorithm.
+    ///
+    /// This method identifies all cells whose circumsphere contains the given vertex
+    /// ("bad cells") and collects the facets that form the boundary of the cavity
+    /// created by removing these bad cells. This is a core operation in the
+    /// Bowyer-Watson Delaunay triangulation algorithm.
+    ///
+    /// # Arguments
+    ///
+    /// * `vertex` - The vertex to test against existing cells' circumspheres
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple containing:
+    /// - `Vec<CellKey>`: Keys of cells whose circumsphere contains the vertex
+    /// - `Vec<Facet<T, U, V, D>>`: Boundary facets that form the cavity boundary
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the circumsphere containment test fails for any cell.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Tests each existing cell to see if its circumsphere contains the vertex
+    /// 2. Collects all "bad" cells (those whose circumsphere contains the vertex)
+    /// 3. Finds boundary facets - facets belonging to bad cells but not shared with other bad cells
+    /// 4. Returns both the bad cell keys and boundary facets for cavity reconstruction
     #[allow(clippy::type_complexity)]
-    fn find_bad_cells_and_boundary_facets(
+    pub fn find_bad_cells_and_boundary_facets(
         &mut self,
         vertex: &Vertex<T, U, D>,
     ) -> Result<(Vec<CellKey>, Vec<Facet<T, U, V, D>>), anyhow::Error>
@@ -1443,7 +1282,7 @@ where
                 let mut temp_keys = vertex_keys.clone();
                 temp_keys.remove(i);
                 // Compute facet key for the current subset of vertex keys
-                let facet_key = Self::facet_key_from_vertex_keys(&temp_keys);
+                let facet_key = facet_key_from_vertex_keys(&temp_keys);
                 facet_map.entry(facet_key).or_default().push(cell_key);
             }
         }
@@ -1619,145 +1458,6 @@ where
     // =============================================================================
     // VERTEX KEY-BASED FACET KEY GENERATION
     // =============================================================================
-
-    /// Generates a canonical facet key from sorted 64-bit `VertexKey` arrays.
-    ///
-    /// This function creates a deterministic facet key by:
-    /// 1. Converting `VertexKeys` to 64-bit integers using their internal `KeyData`
-    /// 2. Sorting the keys to ensure deterministic ordering regardless of input order
-    /// 3. Combining the keys using an efficient bitwise hash algorithm
-    ///
-    /// The resulting key is guaranteed to be identical for any facet that contains
-    /// the same set of vertices, regardless of the order in which the vertices are provided.
-    ///
-    /// # Arguments
-    ///
-    /// * `vertex_keys` - A slice of `VertexKeys` representing the vertices of the facet
-    ///
-    /// # Returns
-    ///
-    /// A `u64` hash value representing the canonical key of the facet
-    ///
-    /// # Performance
-    ///
-    /// This method is optimized for performance:
-    /// - Time Complexity: O(n log n) where n is the number of vertices (due to sorting)
-    /// - Space Complexity: O(n) for the temporary sorted array
-    /// - Uses efficient bitwise operations for hash combination
-    /// - Avoids heap allocation when possible
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::vertex;
-    ///
-    /// let vertices = vec![
-    ///     vertex!([0.0, 0.0, 0.0]),
-    ///     vertex!([1.0, 0.0, 0.0]),
-    ///     vertex!([0.0, 1.0, 0.0]),
-    ///     vertex!([0.0, 0.0, 1.0]),
-    /// ];
-    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// // Get vertex keys for some vertices
-    /// let vertex_keys: Vec<_> = tds.vertex_bimap.right_values().take(3).cloned().collect();
-    ///
-    /// // Generate facet key from vertex keys
-    /// let facet_key = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&vertex_keys);
-    ///
-    /// // The same vertices in different order should produce the same key
-    /// let mut reversed_keys = vertex_keys.clone();
-    /// reversed_keys.reverse();
-    /// let facet_key_reversed = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&reversed_keys);
-    /// assert_eq!(facet_key, facet_key_reversed);
-    /// ```
-    ///
-    /// # Algorithm Details
-    ///
-    /// The hash combination uses a polynomial rolling hash approach:
-    /// 1. Start with an initial hash value
-    /// 2. For each sorted vertex key, combine it using: `hash = hash.wrapping_mul(PRIME).wrapping_add(key)`
-    /// 3. Apply a final avalanche step to improve bit distribution
-    ///
-    /// This approach ensures:
-    /// - Good hash distribution across the output space
-    /// - Deterministic results independent of vertex ordering
-    /// - Efficient computation with minimal allocations
-    #[must_use]
-    pub fn facet_key_from_vertex_keys(vertex_keys: &[VertexKey]) -> u64 {
-        // Handle empty case
-        if vertex_keys.is_empty() {
-            return 0;
-        }
-
-        // Convert VertexKeys to u64 and sort for deterministic ordering
-        let mut key_values: Vec<u64> = vertex_keys.iter().map(|key| key.data().as_ffi()).collect();
-        key_values.sort_unstable();
-
-        // Use a polynomial rolling hash for efficient combination
-        // Prime constant chosen for good hash distribution
-
-        let mut hash = Self::HASH_OFFSET;
-        for &key_value in &key_values {
-            hash = hash.wrapping_mul(Self::HASH_PRIME).wrapping_add(key_value);
-        }
-
-        // Apply avalanche step for better bit distribution
-        hash ^= hash >> 33;
-        hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
-        hash ^= hash >> 33;
-        hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
-        hash ^= hash >> 33;
-
-        hash
-    }
-
-    /// Generates a canonical facet key from a collection of vertices using their `VertexKeys`.
-    ///
-    /// This is a convenience method that looks up `VertexKeys` for the given vertices
-    /// and then calls `facet_key_from_vertex_keys` to generate the canonical key.
-    ///
-    /// # Arguments
-    ///
-    /// * `vertices` - A slice of vertices to generate a facet key for
-    ///
-    /// # Returns
-    ///
-    /// A `u64` hash value representing the canonical key of the facet, or `None`
-    /// if any vertex is not found in the triangulation
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::vertex;
-    ///
-    /// let vertices = vec![
-    ///     vertex!([0.0, 0.0, 0.0]),
-    ///     vertex!([1.0, 0.0, 0.0]),
-    ///     vertex!([0.0, 1.0, 0.0]),
-    ///     vertex!([0.0, 0.0, 1.0]),
-    /// ];
-    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// // Create a facet from some vertices
-    /// let facet_vertices = &vertices[0..3]; // First 3 vertices
-    ///
-    /// // Generate facet key from vertices
-    /// let facet_key = tds.facet_key_from_vertices(facet_vertices).unwrap();
-    /// println!("Facet key: {}", facet_key);
-    /// ```
-    #[must_use]
-    pub fn facet_key_from_vertices(&self, vertices: &[Vertex<T, U, D>]) -> Option<u64> {
-        // Look up VertexKeys for all vertices
-        let vertex_keys: Option<Vec<VertexKey>> = vertices
-            .iter()
-            .map(|vertex| self.vertex_bimap.get_by_left(&vertex.uuid()).copied())
-            .collect();
-
-        vertex_keys.map(|keys| Self::facet_key_from_vertex_keys(&keys))
-    }
 
     // =============================================================================
     // FACET-TO-CELLS MAPPING
@@ -2187,164 +1887,6 @@ where
         Ok(())
     }
 
-    /// Identifies all boundary facets in the triangulation.
-    ///
-    /// A boundary facet is a facet that belongs to only one cell, meaning it lies on the
-    /// boundary of the triangulation (convex hull). These facets are important for
-    /// convex hull computation and boundary analysis.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Facet<T, U, V, D>>` containing all boundary facets in the triangulation.
-    /// The facets are returned in no particular order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::vertex;
-    ///
-    /// // Create a simple 3D triangulation (single tetrahedron)
-    /// let vertices = vec![
-    ///     vertex!([0.0, 0.0, 0.0]),
-    ///     vertex!([1.0, 0.0, 0.0]),
-    ///     vertex!([0.0, 1.0, 0.0]),
-    ///     vertex!([0.0, 0.0, 1.0]),
-    /// ];
-    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// // A single tetrahedron has 4 boundary facets (all facets are on the boundary)
-    /// let boundary_facets = tds.boundary_facets();
-    /// assert_eq!(boundary_facets.len(), 4);
-    /// ```
-    #[must_use]
-    pub fn boundary_facets(&self) -> Vec<Facet<T, U, V, D>>
-    where
-        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
-        f64: From<T>,
-    {
-        // Build a map from facet keys to the cells that contain them
-        let facet_to_cells = self.build_facet_to_cells_hashmap();
-        let mut boundary_facets = Vec::new();
-
-        // Collect all facets that belong to only one cell
-        for (_facet_key, cells) in facet_to_cells {
-            if cells.len() == 1 {
-                let cell_id = cells[0].0;
-                let facet_index = cells[0].1;
-                if let Some(cell) = self.cells.get(cell_id) {
-                    boundary_facets.push(cell.facets()[facet_index].clone());
-                }
-            }
-        }
-
-        boundary_facets
-    }
-
-    /// Checks if a specific facet is a boundary facet.
-    ///
-    /// A boundary facet is a facet that belongs to only one cell in the triangulation.
-    ///
-    /// # Arguments
-    ///
-    /// * `facet` - The facet to check.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the facet is on the boundary (belongs to only one cell), `false` otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::delaunay_core::facet::Facet;
-    /// use d_delaunay::vertex;
-    ///
-    /// let vertices = vec![
-    ///     vertex!([0.0, 0.0, 0.0]),
-    ///     vertex!([1.0, 0.0, 0.0]),
-    ///     vertex!([0.0, 1.0, 0.0]),
-    ///     vertex!([0.0, 0.0, 1.0]),
-    /// ];
-    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// // Get a facet from one of the cells
-    /// if let Some(cell) = tds.cells.values().next() {
-    ///     let facets = cell.facets();
-    ///     if let Some(facet) = facets.first() {
-    ///         // In a single tetrahedron, all facets are boundary facets
-    ///         assert!(tds.is_boundary_facet(facet));
-    ///     }
-    /// }
-    /// ```
-    pub fn is_boundary_facet(&self, facet: &Facet<T, U, V, D>) -> bool
-    where
-        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
-        f64: From<T>,
-    {
-        let facet_key = facet.key();
-        let mut count = 0;
-
-        // Count how many cells contain this facet
-        for cell in self.cells.values() {
-            for cell_facet in cell.facets() {
-                if cell_facet.key() == facet_key {
-                    count += 1;
-                    if count > 1 {
-                        return false; // Early exit - not a boundary facet
-                    }
-                }
-            }
-        }
-
-        count == 1
-    }
-
-    /// Returns the number of boundary facets in the triangulation.
-    ///
-    /// This is a more efficient way to count boundary facets without creating
-    /// the full vector of facets.
-    ///
-    /// # Returns
-    ///
-    /// The number of boundary facets in the triangulation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
-    /// use d_delaunay::vertex;
-    ///
-    /// let vertices = vec![
-    ///     vertex!([0.0, 0.0, 0.0]),
-    ///     vertex!([1.0, 0.0, 0.0]),
-    ///     vertex!([0.0, 1.0, 0.0]),
-    ///     vertex!([0.0, 0.0, 1.0]),
-    /// ];
-    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
-    ///
-    /// // A single tetrahedron has 4 boundary facets
-    /// assert_eq!(tds.number_of_boundary_facets(), 4);
-    /// ```
-    #[must_use]
-    pub fn number_of_boundary_facets(&self) -> usize
-    where
-        T: CoordinateScalar + Clone + ComplexField<RealField = T> + PartialEq + PartialOrd + Sum,
-        f64: From<T>,
-    {
-        // Build a map from facet keys to count of cells that contain them
-        let mut facet_counts: HashMap<u64, usize> = HashMap::new();
-
-        for cell in self.cells.values() {
-            for facet in cell.facets() {
-                *facet_counts.entry(facet.key()).or_insert(0) += 1;
-            }
-        }
-
-        // Count facets that appear in only one cell
-        facet_counts.values().filter(|&&count| count == 1).count()
-    }
-
     /// Internal method for validating neighbor relationships.
     ///
     /// This method is optimized for performance using:
@@ -2620,7 +2162,10 @@ where
 #[allow(clippy::uninlined_format_args, clippy::similar_names)]
 mod tests {
     use crate::cell;
-    use crate::delaunay_core::vertex::VertexBuilder;
+    use crate::delaunay_core::{
+        traits::boundary_analysis::BoundaryAnalysis, utilities::facets_are_adjacent,
+        vertex::VertexBuilder,
+    };
     use crate::geometry::traits::coordinate::Coordinate;
     use crate::vertex;
 
@@ -2732,52 +2277,6 @@ mod tests {
         // Test that the UUID collision is handled - the mapping should point to the newer vertex
         let looked_up_key = tds.vertex_bimap.get_by_left(&uuid1).unwrap();
         assert_eq!(*looked_up_key, key2); // Should point to the second vertex's key
-    }
-
-    // =============================================================================
-    // facet_key_from_vertex_keys TEST
-    // =============================================================================
-
-    #[test]
-    fn test_facet_key_from_vertex_keys() {
-        // Create a temporary SlotMap to generate valid VertexKeys
-        let mut temp_vertices: SlotMap<VertexKey, ()> = SlotMap::with_key();
-        let vertex_keys = vec![
-            temp_vertices.insert(()),
-            temp_vertices.insert(()),
-            temp_vertices.insert(()),
-        ];
-        let key1 = Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&vertex_keys);
-
-        let mut reversed_keys = vertex_keys;
-        reversed_keys.reverse();
-        let key2 =
-            Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&reversed_keys);
-
-        assert_eq!(
-            key1, key2,
-            "Facet keys should be identical for the same vertices in different order"
-        );
-
-        // Test with different vertex keys
-        let different_keys = vec![
-            temp_vertices.insert(()),
-            temp_vertices.insert(()),
-            temp_vertices.insert(()),
-        ];
-        let key3 =
-            Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&different_keys);
-
-        assert_ne!(
-            key1, key3,
-            "Different vertices should produce different keys"
-        );
-
-        // Test empty case
-        let empty_keys: Vec<VertexKey> = vec![];
-        let key_empty =
-            Tds::<f64, Option<()>, Option<()>, 3>::facet_key_from_vertex_keys(&empty_keys);
-        assert_eq!(key_empty, 0, "Empty vertex keys should produce key 0");
     }
 
     // =============================================================================
@@ -3315,53 +2814,6 @@ mod tests {
                 "Multi-cell triangulation should have neighbor relationships"
             );
         }
-    }
-
-    #[test]
-    fn test_facets_are_adjacent() {
-        let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
-        let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
-        let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
-        let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
-
-        let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
-        let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
-        let cell3: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v4]);
-
-        let facet1 = Facet::new(cell1, v1).unwrap(); // Vertices: v2, v3
-        let facet2 = Facet::new(cell2, v4).unwrap(); // Vertices: v2, v3
-        let facet3 = Facet::new(cell3, v4).unwrap(); // Vertices: v1, v2
-
-        assert!(facets_are_adjacent(&facet1, &facet2)); // Same vertices
-        assert!(!facets_are_adjacent(&facet1, &facet3)); // Different vertices
-    }
-
-    #[test]
-    fn test_generate_combinations() {
-        let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
-            vertex!([0.0]),
-            vertex!([1.0]),
-            vertex!([2.0]),
-            vertex!([3.0]),
-        ];
-
-        // Combinations of 2 from 4
-        let combinations_2 = generate_combinations(&vertices, 2);
-        assert_eq!(combinations_2.len(), 6);
-
-        // Combinations of 3 from 4
-        let combinations_3 = generate_combinations(&vertices, 3);
-        assert_eq!(combinations_3.len(), 4);
-        assert!(combinations_3.contains(&vec![vertices[0], vertices[1], vertices[2]]));
-
-        // Edge case: k=0
-        let combinations_0 = generate_combinations(&vertices, 0);
-        assert_eq!(combinations_0.len(), 1);
-        assert!(combinations_0[0].is_empty());
-
-        // Edge case: k > len
-        let combinations_5 = generate_combinations(&vertices, 5);
-        assert!(combinations_5.is_empty());
     }
 
     #[test]

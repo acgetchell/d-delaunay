@@ -22,6 +22,7 @@ extern crate derive_builder;
 /// It includes the `Tds` struct, which represents the triangulation, as well as `Cell`, `Facet`, and `Vertex` components.
 /// This module also provides traits for customizing vertex and cell data, and a `prelude` for convenient access to commonly used types.
 pub mod delaunay_core {
+    pub mod boundary;
     pub mod cell;
     pub mod facet;
     pub mod triangulation_data_structure;
@@ -29,7 +30,9 @@ pub mod delaunay_core {
     pub mod vertex;
     /// Traits for Delaunay triangulation data structures.
     pub mod traits {
+        pub mod boundary_analysis;
         pub mod data;
+        pub use boundary_analysis::*;
         pub use data::*;
     }
     // Re-export the `delaunay_core` modules.
@@ -79,7 +82,11 @@ pub mod geometry {
 pub mod prelude {
     // Re-export from delaunay_core
     pub use crate::delaunay_core::{
-        cell::*, facet::*, traits::data::*, triangulation_data_structure::*, utilities::*,
+        cell::*,
+        facet::*,
+        traits::{boundary_analysis::*, data::*},
+        triangulation_data_structure::*,
+        utilities::*,
         vertex::*,
     };
 

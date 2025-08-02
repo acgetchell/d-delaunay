@@ -1,4 +1,4 @@
-//! Utility functions
+//! General helper utilities
 
 use anyhow::Error;
 use serde::{Serialize, de::DeserializeOwned};
@@ -6,6 +6,7 @@ use slotmap::SlotMap;
 use std::cmp::Ordering;
 use uuid::Uuid;
 
+use crate::delaunay_core::facet::Facet;
 use crate::delaunay_core::traits::data::DataType;
 use crate::delaunay_core::vertex::Vertex;
 use crate::geometry::traits::coordinate::CoordinateScalar;
@@ -125,6 +126,157 @@ where
     }
 
     Ok(extreme_coords)
+}
+
+/// Checks if two facets are adjacent by comparing their vertex sets.
+///
+/// Two facets are considered adjacent if they share the exact same set of vertices,
+/// regardless of the order. This is a common check in triangulation algorithms to
+/// identify neighboring cells.
+///
+/// # Arguments
+///
+/// * `facet1` - A reference to the first facet.
+/// * `facet2` - A reference to the second facet.
+///
+/// # Returns
+///
+/// `true` if the facets share the same vertices, `false` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::facet::Facet;
+/// use d_delaunay::delaunay_core::utilities::facets_are_adjacent;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::delaunay_core::cell::Cell;
+/// use d_delaunay::{cell, vertex};
+///
+/// let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+/// let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
+/// let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
+/// let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
+///
+/// let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
+/// let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
+///
+/// let facet1 = Facet::new(cell1, v1).unwrap();
+/// let facet2 = Facet::new(cell2, v4).unwrap();
+///
+/// // These facets share vertices v2 and v3, so they are adjacent
+/// assert!(facets_are_adjacent(&facet1, &facet2));
+/// ```
+pub fn facets_are_adjacent<T, U, V, const D: usize>(
+    facet1: &Facet<T, U, V, D>,
+    facet2: &Facet<T, U, V, D>,
+) -> bool
+where
+    T: CoordinateScalar,
+    U: DataType,
+    V: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    // Two facets are adjacent if they have the same vertices
+    // (though they may have different orientations)
+    let vertices1 = facet1.vertices();
+    let vertices2 = facet2.vertices();
+
+    if vertices1.len() != vertices2.len() {
+        return false;
+    }
+
+    // Check if all vertices in facet1 are present in facet2
+    vertices1.iter().all(|v1| vertices2.contains(v1))
+}
+
+/// Generates all unique combinations of `k` items from a given slice.
+///
+/// This function is used to generate vertex combinations for creating k-simplices
+/// (e.g., edges, triangles, tetrahedra) from a set of vertices.
+///
+/// # Arguments
+///
+/// * `vertices` - A slice of vertices from which to generate combinations.
+/// * `k` - The size of each combination.
+///
+/// # Returns
+///
+/// A vector of vectors, where each inner vector is a unique combination of `k` vertices.
+///
+/// # Examples
+///
+/// This function is made public for testing purposes.
+///
+/// ```
+/// use d_delaunay::delaunay_core::utilities::generate_combinations;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::vertex;
+///
+/// let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
+///     vertex!([0.0]),
+///     vertex!([1.0]),
+///     vertex!([2.0]),
+/// ];
+///
+/// // Generate all 2-vertex combinations (edges)
+/// let combinations = generate_combinations(&vertices, 2);
+///
+/// assert_eq!(combinations.len(), 3);
+/// assert!(combinations.contains(&vec![vertices[0], vertices[1]]));
+/// assert!(combinations.contains(&vec![vertices[0], vertices[2]]));
+/// assert!(combinations.contains(&vec![vertices[1], vertices[2]]));
+/// ```
+pub fn generate_combinations<T, U, const D: usize>(
+    vertices: &[Vertex<T, U, D>],
+    k: usize,
+) -> Vec<Vec<Vertex<T, U, D>>>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    let mut combinations = Vec::new();
+
+    if k == 0 {
+        combinations.push(Vec::new());
+        return combinations;
+    }
+
+    if k > vertices.len() {
+        return combinations;
+    }
+
+    if k == vertices.len() {
+        combinations.push(vertices.to_vec());
+        return combinations;
+    }
+
+    // Generate combinations using iterative approach
+    let n = vertices.len();
+    let mut indices = (0..k).collect::<Vec<_>>();
+
+    loop {
+        // Add current combination
+        let combination = indices.iter().map(|i| vertices[*i]).collect();
+        combinations.push(combination);
+
+        // Find next combination
+        let mut i = k;
+        loop {
+            if i == 0 {
+                return combinations;
+            }
+            i -= 1;
+            if indices[i] != i + n - k {
+                break;
+            }
+        }
+
+        indices[i] += 1;
+        for j in (i + 1)..k {
+            indices[j] = indices[j - 1] + 1;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -492,5 +644,131 @@ mod tests {
             [4.0, 2.0, 3.0].as_slice(),
             epsilon = 1e-9
         );
+    }
+
+    #[test]
+    fn test_facets_are_adjacent() {
+        use crate::delaunay_core::{cell::Cell, facet::Facet};
+        use crate::{cell, vertex};
+
+        let v1: Vertex<f64, Option<()>, 2> = vertex!([0.0, 0.0]);
+        let v2: Vertex<f64, Option<()>, 2> = vertex!([1.0, 0.0]);
+        let v3: Vertex<f64, Option<()>, 2> = vertex!([0.0, 1.0]);
+        let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 1.0]);
+
+        let cell1: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v2, v3, v4]);
+        let cell3: Cell<f64, Option<()>, Option<()>, 2> = cell!(vec![v1, v2, v4]);
+
+        let facet1 = Facet::new(cell1, v1).unwrap(); // Vertices: v2, v3
+        let facet2 = Facet::new(cell2, v4).unwrap(); // Vertices: v2, v3
+        let facet3 = Facet::new(cell3, v4).unwrap(); // Vertices: v1, v2
+
+        assert!(facets_are_adjacent(&facet1, &facet2)); // Same vertices
+        assert!(!facets_are_adjacent(&facet1, &facet3)); // Different vertices
+    }
+
+    #[test]
+    fn test_facets_are_adjacent_edge_cases() {
+        use crate::cell;
+        use crate::delaunay_core::cell::Cell;
+
+        let points1 = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([0.0, 0.0, 1.0]),
+        ];
+
+        let points2 = vec![
+            Point::new([0.0, 0.0, 0.0]),
+            Point::new([1.0, 0.0, 0.0]),
+            Point::new([0.0, 1.0, 0.0]),
+            Point::new([2.0, 0.0, 0.0]),
+        ];
+
+        let cell1: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points1));
+        let cell2: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points2));
+
+        let facets1 = cell1.facets();
+        let facets2 = cell2.facets();
+
+        // Test adjacency detection
+        let mut found_adjacent = false;
+        for facet1 in &facets1 {
+            for facet2 in &facets2 {
+                if facets_are_adjacent(facet1, facet2) {
+                    found_adjacent = true;
+                    break;
+                }
+            }
+            if found_adjacent {
+                break;
+            }
+        }
+
+        // These cells share 3 vertices, so they should have adjacent facets
+        assert!(
+            found_adjacent,
+            "Cells sharing 3 vertices should have adjacent facets"
+        );
+
+        // Test with completely different cells
+        let points3 = vec![
+            Point::new([10.0, 10.0, 10.0]),
+            Point::new([11.0, 10.0, 10.0]),
+            Point::new([10.0, 11.0, 10.0]),
+            Point::new([10.0, 10.0, 11.0]),
+        ];
+
+        let cell3: Cell<f64, usize, usize, 3> = cell!(Vertex::from_points(points3));
+        let facets3 = cell3.facets();
+
+        let mut found_adjacent2 = false;
+        for facet1 in &facets1 {
+            for facet3 in &facets3 {
+                if facets_are_adjacent(facet1, facet3) {
+                    found_adjacent2 = true;
+                    break;
+                }
+            }
+            if found_adjacent2 {
+                break;
+            }
+        }
+
+        // These cells share no vertices, so no facets should be adjacent
+        assert!(
+            !found_adjacent2,
+            "Cells sharing no vertices should not have adjacent facets"
+        );
+    }
+
+    #[test]
+    fn test_generate_combinations() {
+        let vertices: Vec<Vertex<f64, Option<()>, 1>> = vec![
+            vertex!([0.0]),
+            vertex!([1.0]),
+            vertex!([2.0]),
+            vertex!([3.0]),
+        ];
+
+        // Combinations of 2 from 4
+        let combinations_2 = generate_combinations(&vertices, 2);
+        assert_eq!(combinations_2.len(), 6);
+
+        // Combinations of 3 from 4
+        let combinations_3 = generate_combinations(&vertices, 3);
+        assert_eq!(combinations_3.len(), 4);
+        assert!(combinations_3.contains(&vec![vertices[0], vertices[1], vertices[2]]));
+
+        // Edge case: k=0
+        let combinations_0 = generate_combinations(&vertices, 0);
+        assert_eq!(combinations_0.len(), 1);
+        assert!(combinations_0[0].is_empty());
+
+        // Edge case: k > len
+        let combinations_5 = generate_combinations(&vertices, 5);
+        assert!(combinations_5.is_empty());
     }
 }

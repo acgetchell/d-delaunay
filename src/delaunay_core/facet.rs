@@ -42,10 +42,11 @@
 // IMPORTS
 // =============================================================================
 
-use super::{cell::Cell, vertex::Vertex};
+use super::{cell::Cell, triangulation_data_structure::VertexKey, vertex::Vertex};
 use crate::delaunay_core::traits::data::DataType;
 use crate::geometry::traits::coordinate::CoordinateScalar;
 use serde::{Serialize, de::DeserializeOwned};
+use slotmap::Key;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
@@ -443,14 +444,182 @@ where
 }
 
 // =============================================================================
+// FACET KEY GENERATION FUNCTIONS
+// =============================================================================
+
+/// Generates a canonical facet key from sorted 64-bit `VertexKey` arrays.
+///
+/// This function creates a deterministic facet key by:
+/// 1. Converting `VertexKeys` to 64-bit integers using their internal `KeyData`
+/// 2. Sorting the keys to ensure deterministic ordering regardless of input order
+/// 3. Combining the keys using an efficient bitwise hash algorithm
+///
+/// The resulting key is guaranteed to be identical for any facet that contains
+/// the same set of vertices, regardless of the order in which the vertices are provided.
+///
+/// # Arguments
+///
+/// * `vertex_keys` - A slice of `VertexKeys` representing the vertices of the facet
+///
+/// # Returns
+///
+/// A `u64` hash value representing the canonical key of the facet
+///
+/// # Performance
+///
+/// This method is optimized for performance:
+/// - Time Complexity: O(n log n) where n is the number of vertices (due to sorting)
+/// - Space Complexity: O(n) for the temporary sorted array
+/// - Uses efficient bitwise operations for hash combination
+/// - Avoids heap allocation when possible
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::facet::facet_key_from_vertex_keys;
+/// use d_delaunay::delaunay_core::triangulation_data_structure::VertexKey;
+/// use slotmap::Key;
+///
+/// // Create some vertex keys (normally these would come from a TDS)
+/// let vertex_keys = vec![
+///     VertexKey::from(slotmap::KeyData::from_ffi(1u64)),
+///     VertexKey::from(slotmap::KeyData::from_ffi(2u64)),
+///     VertexKey::from(slotmap::KeyData::from_ffi(3u64)),
+/// ];
+///
+/// // Generate facet key from vertex keys
+/// let facet_key = facet_key_from_vertex_keys(&vertex_keys);
+///
+/// // The same vertices in different order should produce the same key
+/// let mut reversed_keys = vertex_keys.clone();
+/// reversed_keys.reverse();
+/// let facet_key_reversed = facet_key_from_vertex_keys(&reversed_keys);
+/// assert_eq!(facet_key, facet_key_reversed);
+/// ```
+///
+/// # Algorithm Details
+///
+/// The hash combination uses a polynomial rolling hash approach:
+/// 1. Start with an initial hash value
+/// 2. For each sorted vertex key, combine it using: `hash = hash.wrapping_mul(PRIME).wrapping_add(key)`
+/// 3. Apply a final avalanche step to improve bit distribution
+///
+/// This approach ensures:
+/// - Good hash distribution across the output space
+/// - Deterministic results independent of vertex ordering
+/// - Efficient computation with minimal allocations
+#[must_use]
+pub fn facet_key_from_vertex_keys(vertex_keys: &[VertexKey]) -> u64 {
+    // Hash constants for facet key generation
+    const HASH_PRIME: u64 = 1_099_511_628_211; // Large prime (FNV prime)
+    const HASH_OFFSET: u64 = 14_695_981_039_346_656_037; // FNV offset basis
+
+    // Handle empty case
+    if vertex_keys.is_empty() {
+        return 0;
+    }
+
+    // Convert VertexKeys to u64 and sort for deterministic ordering
+    let mut key_values: Vec<u64> = vertex_keys.iter().map(|key| key.data().as_ffi()).collect();
+    key_values.sort_unstable();
+
+    // Use a polynomial rolling hash for efficient combination
+    // Prime constant chosen for good hash distribution
+
+    let mut hash = HASH_OFFSET;
+    for &key_value in &key_values {
+        hash = hash.wrapping_mul(HASH_PRIME).wrapping_add(key_value);
+    }
+
+    // Apply avalanche step for better bit distribution
+    hash ^= hash >> 33;
+    hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
+    hash ^= hash >> 33;
+    hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+    hash ^= hash >> 33;
+
+    hash
+}
+
+/// Generates a canonical facet key from a collection of vertices using their `VertexKeys`.
+///
+/// This is a convenience method that looks up `VertexKeys` for the given vertices
+/// and then calls `facet_key_from_vertex_keys` to generate the canonical key.
+///
+/// This function requires access to the vertex bimap from a triangulation data structure
+/// to look up the vertex keys. It's typically used within the context of a TDS.
+///
+/// # Arguments
+///
+/// * `vertices` - A slice of vertices to generate a facet key for
+/// * `vertex_bimap` - A reference to the bimap that maps vertex UUIDs to vertex keys
+///
+/// # Returns
+///
+/// A `u64` hash value representing the canonical key of the facet, or `None`
+/// if any vertex is not found in the triangulation
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::facet::facet_key_from_vertices;
+/// use d_delaunay::delaunay_core::triangulation_data_structure::VertexKey;
+/// use d_delaunay::delaunay_core::vertex::Vertex;
+/// use d_delaunay::vertex;
+/// use bimap::BiMap;
+/// use uuid::Uuid;
+/// use slotmap::Key;
+///
+/// // Create some vertices with explicit type annotations
+/// let vertices: Vec<Vertex<f64, Option<()>, 3>> = vec![
+///     vertex!([0.0, 0.0, 0.0]),
+///     vertex!([1.0, 0.0, 0.0]),
+///     vertex!([0.0, 1.0, 0.0]),
+/// ];
+///
+/// // Create a vertex bimap (normally this would be part of a TDS)
+/// let mut vertex_bimap: BiMap<Uuid, VertexKey> = BiMap::new();
+/// for (i, vertex) in vertices.iter().enumerate() {
+///     let key = VertexKey::from(slotmap::KeyData::from_ffi(i as u64 + 1));
+///     vertex_bimap.insert(vertex.uuid(), key);
+/// }
+///
+/// // Generate facet key from vertices
+/// let facet_key = facet_key_from_vertices(&vertices, &vertex_bimap).unwrap();
+/// println!("Facet key: {}", facet_key);
+/// ```
+#[must_use]
+pub fn facet_key_from_vertices<T, U, const D: usize>(
+    vertices: &[Vertex<T, U, D>],
+    vertex_bimap: &bimap::BiMap<uuid::Uuid, VertexKey>,
+) -> Option<u64>
+where
+    T: CoordinateScalar,
+    U: DataType,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    // Look up VertexKeys for all vertices
+    let vertex_keys: Option<Vec<VertexKey>> = vertices
+        .iter()
+        .map(|vertex| vertex_bimap.get_by_left(&vertex.uuid()).copied())
+        .collect();
+
+    vertex_keys.map(|keys| facet_key_from_vertex_keys(&keys))
+}
+
+// =============================================================================
 // TESTS
 // =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::delaunay_core::triangulation_data_structure::VertexKey;
     use crate::{cell, vertex};
     use approx::assert_relative_eq;
+    use bimap::BiMap;
+    use slotmap::SlotMap;
+    use uuid::Uuid;
 
     // =============================================================================
     // TYPE ALIASES AND HELPERS
@@ -1152,5 +1321,91 @@ mod tests {
         assert!(error_message.contains("vertex"));
 
         println!("✓ Correctly detected missing vertex field: {error_message}");
+    }
+
+    // =============================================================================
+    // FACET KEY GENERATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_facet_key_from_vertex_keys() {
+        // Create a temporary SlotMap to generate valid VertexKeys
+        use slotmap::SlotMap;
+        let mut temp_vertices: SlotMap<VertexKey, ()> = SlotMap::with_key();
+        let vertex_keys = vec![
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+        ];
+        let key1 = facet_key_from_vertex_keys(&vertex_keys);
+
+        let mut reversed_keys = vertex_keys;
+        reversed_keys.reverse();
+        let key2 = facet_key_from_vertex_keys(&reversed_keys);
+
+        assert_eq!(
+            key1, key2,
+            "Facet keys should be identical for the same vertices in different order"
+        );
+
+        // Test with different vertex keys
+        let different_keys = vec![
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+            temp_vertices.insert(()),
+        ];
+        let key3 = facet_key_from_vertex_keys(&different_keys);
+
+        assert_ne!(
+            key1, key3,
+            "Different vertices should produce different keys"
+        );
+
+        // Test empty case
+        let empty_keys: Vec<VertexKey> = vec![];
+        let key_empty = facet_key_from_vertex_keys(&empty_keys);
+        assert_eq!(key_empty, 0, "Empty vertex keys should produce key 0");
+    }
+
+    #[test]
+    fn test_facet_key_from_vertices() {
+        // Create some vertices
+        let vertices: Vec<Vertex<f64, Option<()>, 3>> = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+        ];
+
+        // Create a vertex bimap
+        let mut vertex_bimap: BiMap<Uuid, VertexKey> = BiMap::new();
+        let mut temp_vertices: SlotMap<VertexKey, ()> = SlotMap::with_key();
+
+        for vertex in &vertices {
+            let key = temp_vertices.insert(());
+            vertex_bimap.insert(vertex.uuid(), key);
+        }
+
+        // Generate facet key from vertices
+        let facet_key = facet_key_from_vertices(&vertices, &vertex_bimap).unwrap();
+
+        // Test with different order
+        let mut reversed_vertices = vertices.clone();
+        reversed_vertices.reverse();
+        let facet_key_reversed =
+            facet_key_from_vertices(&reversed_vertices, &vertex_bimap).unwrap();
+
+        assert_eq!(
+            facet_key, facet_key_reversed,
+            "Keys should be consistent regardless of vertex order"
+        );
+
+        // Test with missing vertex
+        let missing_vertex = vertex!([2.0, 2.0, 2.0]);
+        let vertices_with_missing = vec![vertices[0], missing_vertex];
+        let result = facet_key_from_vertices(&vertices_with_missing, &vertex_bimap);
+        assert!(
+            result.is_none(),
+            "Should return None when vertex is not in bimap"
+        );
     }
 }

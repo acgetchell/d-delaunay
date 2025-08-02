@@ -13,7 +13,7 @@ use rand::Rng;
 
 /// Common test helpers for initializing and working with the allocator
 pub mod test_helpers {
-    use super::{Point, Rng, Tds, Vertex, vertex};
+    use super::{Point, Rng, Tds, vertex};
     #[cfg(feature = "count-allocations")]
     use allocation_counter::measure;
     use d_delaunay::geometry::Coordinate;
@@ -42,7 +42,7 @@ pub mod test_helpers {
             result = Some(f());
         });
         println!("Memory info: {info:?}");
-        (result.unwrap(), info)
+        (result.expect("Closure should have set result"), info)
     }
 
     /// Fallback for when allocation counting is disabled
@@ -87,8 +87,7 @@ pub mod test_helpers {
     #[must_use]
     pub fn create_test_tds() -> Tds<f64, Option<()>, Option<()>, 4> {
         // Create an empty TDS with no vertices
-        let vertices: Vec<Vertex<f64, Option<()>, 4>> = Vec::new();
-        Tds::new(&vertices).expect("Should create empty TDS successfully")
+        Tds::default()
     }
 
     /// Create a triangulation with some test vertices
@@ -104,7 +103,7 @@ pub mod test_helpers {
             vertex!([0.0, 1.0, 0.0]),
             vertex!([0.0, 0.0, 1.0]),
         ];
-        Tds::new(&vertices).expect("Should create TDS with vertices successfully")
+        Tds::new(&vertices).expect("Failed to create TDS with vertices")
     }
 
     /// Print memory allocation summary
