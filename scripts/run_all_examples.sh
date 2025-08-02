@@ -7,9 +7,12 @@ echo "=============================================="
 
 # Simple examples that don't take arguments
 simple_examples=(
+    "boundary_analysis_trait"
     "check_float_traits"
     "implicit_conversion"
     "point_comparison_and_hashing"
+    "test_alloc_api"
+    "test_circumsphere"
 )
 
 # Run simple examples

@@ -1296,15 +1296,13 @@ mod tests {
 
         // Test with origin (should be inside this symmetric simplex)
         let origin = Point::new([0.0, 0.0, 0.0, 0.0]);
-        // TODO: Fix matrix method - it disagrees with standard method on this case
-        let _result = insphere_lifted(&simplex_points, origin).unwrap();
-        // Don't assert specific result until matrix method is fixed
+        let result = insphere_lifted(&simplex_points, origin).unwrap();
+        assert_eq!(result, InSphere::INSIDE);
 
         // Test with point far outside
         let far_point = Point::new([10.0, 10.0, 10.0, 10.0]);
-        // TODO: Fix matrix method - it may give incorrect results for far points in 4D cases
-        let _far_result = insphere_lifted(&simplex_points, far_point).unwrap();
-        // Don't assert specific result until matrix method is fixed
+        let far_result = insphere_lifted(&simplex_points, far_point).unwrap();
+        assert_eq!(far_result, InSphere::OUTSIDE);
 
         // Test with point on the surface of the circumsphere (approximately)
         // This is challenging to compute exactly, so we test a point that should be close

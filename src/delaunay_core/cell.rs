@@ -49,6 +49,8 @@ use super::{
     vertex::{Vertex, VertexValidationError},
 };
 use crate::geometry::{point::Point, traits::coordinate::CoordinateScalar};
+use crate::prelude::VertexKey;
+use bimap::BiMap;
 use na::ComplexField;
 use nalgebra as na;
 use peroxide::fuga::anyhow;
@@ -434,6 +436,18 @@ where
     #[inline]
     pub const fn uuid(&self) -> Uuid {
         self.uuid
+    }
+
+    /// Returns the list of `VertexKeys` for the [Cell].
+    ///
+    /// # Returns
+    ///
+    /// A Vec of `VertexKeys` corresponding to the vertices of the cell.
+    pub fn vertex_keys(&self, vertex_bimap: &BiMap<Uuid, VertexKey>) -> Vec<VertexKey> {
+        self.vertices()
+            .iter()
+            .filter_map(|v| vertex_bimap.get_by_left(&v.uuid()).copied())
+            .collect()
     }
 
     /// The `dim` function returns the dimensionality of the [Cell].
