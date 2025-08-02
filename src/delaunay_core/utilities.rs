@@ -176,17 +176,12 @@ where
     V: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
-    // Two facets are adjacent if they have the same vertices
-    // (though they may have different orientations)
-    let vertices1 = facet1.vertices();
-    let vertices2 = facet2.vertices();
+    // This works because Vertex implements `Eq` and `Hash`
+    use std::collections::HashSet;
+    let vertices1: HashSet<_> = facet1.vertices().into_iter().collect();
+    let vertices2: HashSet<_> = facet2.vertices().into_iter().collect();
 
-    if vertices1.len() != vertices2.len() {
-        return false;
-    }
-
-    // Check if all vertices in facet1 are present in facet2
-    vertices1.iter().all(|v1| vertices2.contains(v1))
+    vertices1 == vertices2
 }
 
 /// Generates all unique combinations of `k` items from a given slice.
@@ -652,6 +647,7 @@ mod tests {
 
         // Test adjacency detection
         let mut found_adjacent = false;
+
         for facet1 in &facets1 {
             for facet2 in &facets2 {
                 if facets_are_adjacent(facet1, facet2) {
