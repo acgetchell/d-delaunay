@@ -112,7 +112,7 @@ where
     /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
     ///
     /// // Get a facet from one of the cells
-    /// if let Some(cell) = tds.cells.values().next() {
+    /// if let Some(cell) = tds.cells().values().next() {
     ///     let facets = cell.facets();
     ///     if let Some(facet) = facets.first() {
     ///         // In a single tetrahedron, all facets are boundary facets

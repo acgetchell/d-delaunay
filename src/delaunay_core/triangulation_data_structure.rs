@@ -284,7 +284,7 @@ where
     pub vertices: SlotMap<VertexKey, Vertex<T, U, D>>,
 
     /// `SlotMap` for storing cells, providing stable keys and efficient access.
-    pub cells: SlotMap<CellKey, Cell<T, U, V, D>>,
+    cells: SlotMap<CellKey, Cell<T, U, V, D>>,
 
     /// `BiMap` to map Vertex UUIDs to their `VertexKeys` in the `SlotMap` and vice versa.
     #[serde(
@@ -322,6 +322,91 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     ordered_float::OrderedFloat<f64>: From<T>,
 {
+    /// Returns a reference to the cells `SlotMap`.
+    ///
+    /// This method provides read-only access to the internal cells collection,
+    /// allowing external code to iterate over or access specific cells by their keys.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `SlotMap<CellKey, Cell<T, U, V, D>>` containing all cells
+    /// in the triangulation data structure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    ///
+    /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Access the cells SlotMap
+    /// let cells = tds.cells();
+    /// println!("Number of cells: {}", cells.len());
+    ///
+    /// // Iterate over all cells
+    /// for (cell_key, cell) in cells {
+    ///     println!("Cell {:?} has {} vertices", cell_key, cell.vertices().len());
+    /// }
+    /// ```
+    #[must_use]
+    pub const fn cells(&self) -> &SlotMap<CellKey, Cell<T, U, V, D>> {
+        &self.cells
+    }
+
+    /// Returns a mutable reference to the cells `SlotMap`.
+    ///
+    /// This method provides mutable access to the internal cells collection,
+    /// allowing external code to modify cells. This is primarily intended for
+    /// testing purposes and should be used with caution as it can break
+    /// triangulation invariants.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the `SlotMap<CellKey, Cell<T, U, V, D>>` containing all cells
+    /// in the triangulation data structure.
+    ///
+    /// # Warning
+    ///
+    /// This method provides direct mutable access to the internal cell storage.
+    /// Modifying cells through this method can break triangulation invariants
+    /// and should only be used for testing or when you understand the implications.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use d_delaunay::delaunay_core::triangulation_data_structure::Tds;
+    /// use d_delaunay::vertex;
+    ///
+    /// let vertices = vec![
+    ///     vertex!([0.0, 0.0, 0.0]),
+    ///     vertex!([1.0, 0.0, 0.0]),
+    ///     vertex!([0.0, 1.0, 0.0]),
+    ///     vertex!([0.0, 0.0, 1.0]),
+    /// ];
+    ///
+    /// let mut tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
+    ///
+    /// // Access the cells SlotMap mutably (for testing purposes)
+    /// let cells_mut = tds.cells_mut();
+    ///
+    /// // Clear all neighbor relationships (for testing)
+    /// for cell in cells_mut.values_mut() {
+    ///     cell.neighbors = None;
+    /// }
+    /// ```
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn cells_mut(&mut self) -> &mut SlotMap<CellKey, Cell<T, U, V, D>> {
+        &mut self.cells
+    }
+
     // =============================================================================
     // CORE METHODS
     // =============================================================================
@@ -372,7 +457,7 @@ where
     /// assert_eq!(tds.dim(), 3);
     ///
     /// // Verify cell creation and structure
-    /// let cells: Vec<_> = tds.cells.values().collect();
+    /// let cells: Vec<_> = tds.cells().values().collect();
     /// assert!(!cells.is_empty(), "Should have created at least one cell");
     ///
     /// // Check that the cell has the correct number of vertices (D+1 for a simplex)
@@ -1257,7 +1342,7 @@ where
     /// assert_eq!(tds.number_of_cells(), 1);
     ///
     /// // Clear existing neighbors to demonstrate assignment
-    /// for cell in tds.cells.values_mut() {
+    /// for cell in tds.cells_mut().values_mut() {
     ///     cell.neighbors = None;
     /// }
     ///
@@ -1265,7 +1350,7 @@ where
     /// tds.assign_neighbors();
     ///
     /// // Verify the assignment worked (a single cell has no neighbors)
-    /// for cell in tds.cells.values() {
+    /// for cell in tds.cells().values() {
     ///     assert!(cell.neighbors.is_none() || cell.neighbors.as_ref().unwrap().is_empty());
     /// }
     /// ```
@@ -1837,8 +1922,8 @@ where
     /// ];
     ///
     /// let invalid_cell = cell!(vertices);
-    /// let cell_key = tds.cells.insert(invalid_cell);
-    /// let cell_uuid = tds.cells[cell_key].uuid();
+    /// let cell_key = tds.cells_mut().insert(invalid_cell);
+    /// let cell_uuid = tds.cells().get(cell_key).unwrap().uuid();
     /// tds.cell_bimap.insert(cell_uuid, cell_key);
     ///
     /// // Validation should fail

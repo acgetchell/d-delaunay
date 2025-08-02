@@ -75,7 +75,7 @@ where
             if cells.len() == 1 {
                 let cell_id = cells[0].0;
                 let facet_index = cells[0].1;
-                if let Some(cell) = self.cells.get(cell_id) {
+                if let Some(cell) = self.cells().get(cell_id) {
                     boundary_facets.push(cell.facets()[facet_index].clone());
                 }
             }
@@ -113,7 +113,7 @@ where
     /// let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
     ///
     /// // Get a facet from one of the cells
-    /// if let Some(cell) = tds.cells.values().next() {
+    /// if let Some(cell) = tds.cells().values().next() {
     ///     let facets = cell.facets();
     ///     if let Some(facet) = facets.first() {
     ///         // In a single tetrahedron, all facets are boundary facets
@@ -126,7 +126,7 @@ where
         let mut count = 0;
 
         // Count how many cells contain this facet
-        for cell in self.cells.values() {
+        for cell in self.cells().values() {
             for cell_facet in cell.facets() {
                 if cell_facet.key() == facet_key {
                     count += 1;
@@ -171,7 +171,7 @@ where
         // Build a map from facet keys to count of cells that contain them
         let mut facet_counts: HashMap<u64, usize> = HashMap::new();
 
-        for cell in self.cells.values() {
+        for cell in self.cells().values() {
             for facet in cell.facets() {
                 *facet_counts.entry(facet.key()).or_insert(0) += 1;
             }
@@ -236,7 +236,7 @@ mod tests {
         let tds: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices).unwrap();
 
         println!("Created triangulation with {} cells", tds.number_of_cells());
-        for (i, cell) in tds.cells.values().enumerate() {
+        for (i, cell) in tds.cells().values().enumerate() {
             println!(
                 "Cell {}: vertices = {:?}",
                 i,
@@ -274,7 +274,7 @@ mod tests {
 
         // Build a map of facet keys to the cells that contain them
         let mut facet_map: HashMap<u64, Vec<Uuid>> = HashMap::new();
-        for cell in tds.cells.values() {
+        for cell in tds.cells().values() {
             for facet in cell.facets() {
                 facet_map.entry(facet.key()).or_default().push(cell.uuid());
             }
@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(shared_count, 1, "Should have 1 shared (internal) facet");
 
         // Verify neighbors are correctly assigned
-        let all_cells: Vec<_> = tds.cells.values().collect();
+        let all_cells: Vec<_> = tds.cells().values().collect();
         let first_cell = all_cells[0];
         let second_cell = all_cells[1];
 

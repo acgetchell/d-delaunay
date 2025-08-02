@@ -81,7 +81,7 @@ fn benchmark_assign_neighbors(c: &mut Criterion) {
                         let vertices: Vec<_> = points.iter().map(|p| vertex!(*p)).collect();
                         let mut tds = Tds::<f64, (), (), 3>::new(&vertices).unwrap();
                         // Clear existing neighbors to benchmark the assignment process
-                        for cell in tds.cells.values_mut() {
+                        for cell in tds.cells_mut().values_mut() {
                             cell.neighbors = None;
                         }
                         tds
@@ -125,7 +125,7 @@ fn benchmark_remove_duplicate_cells(c: &mut Criterion) {
                             // Create a few duplicate cells
                             for _ in 0..3 {
                                 let duplicate_cell = cell!(cell_vertices[0..4].to_vec());
-                                tds.cells.insert(duplicate_cell);
+                                tds.cells_mut().insert(duplicate_cell);
                             }
                         }
                         tds

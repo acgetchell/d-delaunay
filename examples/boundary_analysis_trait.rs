@@ -42,7 +42,7 @@ fn main() {
     println!("  - Boundary facet count: {boundary_count}");
 
     // Method 3: Check if specific facets are boundary facets
-    if let Some(cell) = tds.cells.values().next() {
+    if let Some(cell) = tds.cells().values().next() {
         let facets = cell.facets();
         println!("  - Testing individual facets from the first cell:");
 
