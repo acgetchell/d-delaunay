@@ -132,7 +132,8 @@ pub mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::test_helpers::*;
-    use super::*;
+    // Only import what we actually use from the parent module
+    // (the test_helpers module provides all the functions we need)
 
     #[test]
     fn test_basic_allocation_counting() {
