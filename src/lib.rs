@@ -31,9 +31,9 @@ pub mod delaunay_core {
     /// Traits for Delaunay triangulation data structures.
     pub mod traits {
         pub mod boundary_analysis;
-        pub mod data;
+        pub mod data_type;
         pub use boundary_analysis::*;
-        pub use data::*;
+        pub use data_type::*;
     }
     // Re-export the `delaunay_core` modules.
     pub use cell::*;
@@ -84,7 +84,7 @@ pub mod prelude {
     pub use crate::delaunay_core::{
         cell::*,
         facet::*,
-        traits::{boundary_analysis::*, data::*},
+        traits::{boundary_analysis::*, data_type::*},
         triangulation_data_structure::*,
         utilities::*,
         vertex::*,

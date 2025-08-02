@@ -43,7 +43,7 @@
 // =============================================================================
 
 use super::{cell::Cell, triangulation_data_structure::VertexKey, vertex::Vertex};
-use crate::delaunay_core::traits::data::DataType;
+use crate::delaunay_core::traits::data_type::DataType;
 use crate::geometry::traits::coordinate::CoordinateScalar;
 use serde::{Serialize, de::DeserializeOwned};
 use slotmap::Key;

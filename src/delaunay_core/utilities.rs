@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use uuid::Uuid;
 
 use crate::delaunay_core::facet::Facet;
-use crate::delaunay_core::traits::data::DataType;
+use crate::delaunay_core::traits::data_type::DataType;
 use crate::delaunay_core::vertex::Vertex;
 use crate::geometry::traits::coordinate::CoordinateScalar;
 

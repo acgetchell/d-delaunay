@@ -126,7 +126,7 @@
 use super::{
     cell::{Cell, CellBuilder, CellValidationError},
     facet::{Facet, facet_key_from_vertex_keys},
-    traits::data::DataType,
+    traits::data_type::DataType,
     vertex::Vertex,
 };
 

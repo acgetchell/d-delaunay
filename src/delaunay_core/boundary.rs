@@ -5,7 +5,7 @@
 
 use super::{
     facet::Facet,
-    traits::{boundary_analysis::BoundaryAnalysis, data::DataType},
+    traits::{boundary_analysis::BoundaryAnalysis, data_type::DataType},
     triangulation_data_structure::Tds,
 };
 use crate::geometry::traits::coordinate::CoordinateScalar;
@@ -122,22 +122,12 @@ where
     /// }
     /// ```
     fn is_boundary_facet(&self, facet: &Facet<T, U, V, D>) -> bool {
-        let facet_key = facet.key();
-        let mut count = 0;
-
-        // Count how many cells contain this facet
-        for cell in self.cells().values() {
-            for cell_facet in cell.facets() {
-                if cell_facet.key() == facet_key {
-                    count += 1;
-                    if count > 1 {
-                        return false; // Early exit - not a boundary facet
-                    }
-                }
-            }
-        }
-
-        count == 1
+        // Use the precomputed facet-to-cells map to check if the facet belongs to only one cell
+        // This avoids recomputing the facet's neighbors and is more efficient
+        let facet_to_cells = self.build_facet_to_cells_hashmap();
+        facet_to_cells
+            .get(&facet.key())
+            .is_some_and(|cells| cells.len() == 1)
     }
 
     /// Returns the number of boundary facets in the triangulation.

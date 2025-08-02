@@ -1,6 +1,6 @@
 //! Boundary analysis trait for triangulation data structures.
 
-use crate::delaunay_core::{facet::Facet, traits::data::DataType};
+use crate::delaunay_core::{facet::Facet, traits::data_type::DataType};
 use crate::geometry::traits::coordinate::CoordinateScalar;
 use nalgebra::ComplexField;
 use serde::{Serialize, de::DeserializeOwned};
