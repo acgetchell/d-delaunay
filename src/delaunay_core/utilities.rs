@@ -290,6 +290,21 @@ mod tests {
 
     use super::*;
 
+    fn create_vertex_slotmap<T, U, const D: usize>(
+        vertices: Vec<Vertex<T, U, D>>,
+    ) -> SlotMap<DefaultKey, Vertex<T, U, D>>
+    where
+        T: CoordinateScalar,
+        U: DataType,
+        [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    {
+        let mut slotmap = SlotMap::new();
+        for vertex in vertices {
+            slotmap.insert(vertex);
+        }
+        slotmap
+    }
+
     #[test]
     fn utilities_make_uuid_uniqueness() {
         let uuid1 = make_uuid();
@@ -335,13 +350,7 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -367,13 +376,7 @@ mod tests {
         let points = vec![Point::new([5.0, -3.0, 7.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -396,13 +399,7 @@ mod tests {
         let points = vec![Point::new([1.0, 2.0, 3.0]), Point::new([4.0, 5.0, 6.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         // Using Ordering::Equal should return the first vertex's coordinates unchanged
         let coords = find_extreme_coordinates(&slotmap, Ordering::Equal).unwrap();
@@ -430,13 +427,7 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 2>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -450,13 +441,7 @@ mod tests {
         let points = vec![Point::new([10.0]), Point::new([-5.0]), Point::new([3.0])];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 1>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -482,11 +467,7 @@ mod tests {
                 )
             })
             .collect();
-        let mut slotmap: SlotMap<DefaultKey, crate::delaunay_core::vertex::Vertex<f64, i32, 3>> =
-            SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -512,13 +493,7 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -545,13 +520,7 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -578,13 +547,7 @@ mod tests {
         ];
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f32, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f32, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();
@@ -623,13 +586,7 @@ mod tests {
         let vertices: Vec<crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>> =
             crate::delaunay_core::vertex::Vertex::from_points(points);
 
-        let mut slotmap: SlotMap<
-            DefaultKey,
-            crate::delaunay_core::vertex::Vertex<f64, Option<()>, 3>,
-        > = SlotMap::new();
-        for vertex in vertices {
-            slotmap.insert(vertex);
-        }
+        let slotmap = create_vertex_slotmap(vertices);
 
         let min_coords = find_extreme_coordinates(&slotmap, Ordering::Less).unwrap();
         let max_coords = find_extreme_coordinates(&slotmap, Ordering::Greater).unwrap();

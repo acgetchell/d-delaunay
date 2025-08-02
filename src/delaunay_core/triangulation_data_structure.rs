@@ -214,12 +214,10 @@ pub enum TriangulationValidationError {
 }
 
 // =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-// =============================================================================
 // STRUCT DEFINITION
 // =============================================================================
+
+// TODO: Implement `PartialEq` and `Eq` for Tds
 
 #[derive(Clone, Debug, Default, Serialize)]
 /// The `Tds` struct represents a triangulation data structure with vertices
