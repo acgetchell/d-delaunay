@@ -10,7 +10,9 @@ use uuid::Uuid;
 use crate::delaunay_core::facet::Facet;
 use crate::delaunay_core::traits::data_type::DataType;
 use crate::delaunay_core::vertex::Vertex;
-use crate::geometry::traits::coordinate::CoordinateScalar;
+use crate::geometry::point::Point;
+use crate::geometry::traits::coordinate::{Coordinate, CoordinateScalar};
+use num_traits::NumCast;
 
 // =============================================================================
 // UUID VALIDATION
@@ -340,6 +342,135 @@ where
             indices[j] = indices[j - 1] + 1;
         }
     }
+}
+
+// =============================================================================
+// SUPERCELL SIMPLEX CREATION
+// =============================================================================
+
+/// Creates a well-formed simplex centered at the given point with the given radius.
+///
+/// This utility function generates a proper non-degenerate simplex (e.g., tetrahedron
+/// for 3D) that can be used as a supercell in triangulation algorithms. The simplex
+/// is constructed to have vertices positioned strategically around the center point
+/// to ensure geometric validity and avoid degeneracies.
+///
+/// # Arguments
+///
+/// * `center` - The center point coordinates for the simplex
+/// * `radius` - The radius (half the size) of the simplex from center to vertices
+///
+/// # Returns
+///
+/// A vector of `Point<T, D>` representing the vertices of the simplex.
+/// For D-dimensional space, returns D+1 vertices forming a valid D-simplex.
+///
+/// # Type Parameters
+///
+/// * `T` - The coordinate scalar type (e.g., f64, f32)
+/// * `D` - The dimension of the space
+///
+/// # Panics
+///
+/// Panics if coordinate conversion from `f64` to type `T` fails during vertex creation.
+/// This can happen if the computed coordinate values exceed the representable range of type `T`
+/// or if the `NumCast::from` conversion fails.
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::utilities::create_supercell_simplex;
+/// use d_delaunay::geometry::point::Point;
+///
+/// // Create a 3D tetrahedron centered at origin with radius 10.0
+/// let center = [0.0f64; 3];
+/// let radius = 10.0f64;
+/// let simplex_points = create_supercell_simplex(&center, radius);
+/// assert_eq!(simplex_points.len(), 4); // Tetrahedron has 4 vertices
+///
+/// // Create a 2D triangle
+/// let center_2d = [5.0f64, 5.0f64];
+/// let simplex_2d = create_supercell_simplex(&center_2d, 3.0f64);
+/// assert_eq!(simplex_2d.len(), 3); // Triangle has 3 vertices
+/// ```
+///
+/// # Algorithm Details
+///
+/// - **3D Case**: Creates a regular tetrahedron using the vertices of a cube:
+///   (1,1,1), (1,-1,-1), (-1,1,-1), (-1,-1,1), scaled by radius and translated by center
+/// - **General Case**: For D dimensions, creates D+1 vertices using a systematic
+///   approach that places one vertex with all positive offsets, and D vertices
+///   each with one negative offset dimension
+///
+/// The resulting simplex is guaranteed to be non-degenerate and suitable for
+/// use as a bounding supercell in triangulation algorithms.
+pub fn create_supercell_simplex<T, const D: usize>(center: &[T; D], radius: T) -> Vec<Point<T, D>>
+where
+    T: CoordinateScalar + NumCast,
+    f64: From<T>,
+    [T; D]: Default + DeserializeOwned + Serialize + Copy + Sized,
+{
+    let mut points = Vec::new();
+
+    // For 3D, create a regular tetrahedron
+    if D == 3 {
+        // Create a regular tetrahedron with vertices at:
+        // (1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1)
+        // scaled by radius and translated by center
+        let tetrahedron_vertices = [
+            [1.0, 1.0, 1.0],
+            [1.0, -1.0, -1.0],
+            [-1.0, 1.0, -1.0],
+            [-1.0, -1.0, 1.0],
+        ];
+
+        for vertex_coords in &tetrahedron_vertices {
+            let mut coords = [T::default(); D];
+            for i in 0..D {
+                let center_f64: f64 = center[i].into();
+                let radius_f64: f64 = radius.into();
+                let coord_f64 = radius_f64.mul_add(vertex_coords[i], center_f64);
+                coords[i] = NumCast::from(coord_f64).expect("Failed to convert coordinate");
+            }
+            points.push(Point::new(coords));
+        }
+    } else {
+        // For other dimensions, create a simplex using a generalized approach
+        // Create D+1 vertices for a D-dimensional simplex
+
+        // Create a regular simplex by placing vertices at the corners of a hypercube
+        // scaled and offset appropriately
+        let radius_f64: f64 = radius.into();
+
+        // First vertex: all coordinates positive
+        let mut coords = [T::default(); D];
+        for i in 0..D {
+            let center_f64: f64 = center[i].into();
+            coords[i] =
+                NumCast::from(center_f64 + radius_f64).expect("Failed to convert center + radius");
+        }
+        points.push(Point::new(coords));
+
+        // Remaining D vertices: flip one coordinate at a time to negative
+        for dim in 0..D {
+            let mut coords = [T::default(); D];
+            for i in 0..D {
+                let center_f64: f64 = center[i].into();
+                if i == dim {
+                    // This dimension gets negative offset
+                    coords[i] = NumCast::from(center_f64 - radius_f64)
+                        .expect("Failed to convert center - radius");
+                } else {
+                    // Other dimensions get positive offset
+                    coords[i] = NumCast::from(center_f64 + radius_f64)
+                        .expect("Failed to convert center + radius");
+                }
+            }
+            points.push(Point::new(coords));
+        }
+    }
+
+    points
 }
 
 #[cfg(test)]

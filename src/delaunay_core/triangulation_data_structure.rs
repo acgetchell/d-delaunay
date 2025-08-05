@@ -122,21 +122,12 @@
 // IMPORTS
 // =============================================================================
 
-// Parent module imports
-use super::{
-    cell::{Cell, CellBuilder, CellValidationError},
-    facet::{Facet, facet_key_from_vertex_keys},
-    traits::data_type::DataType,
-    vertex::Vertex,
-};
-
-// Crate internal imports
-use crate::delaunay_core::utilities::find_extreme_coordinates;
-use crate::geometry::predicates::{InSphere, insphere};
-use crate::geometry::{
-    point::Point,
-    traits::coordinate::{Coordinate, CoordinateScalar},
-};
+// Standard library imports
+use std::cmp::{Ordering, min};
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::iter::Sum;
+use std::ops::{AddAssign, Div, SubAssign};
 
 // External crate imports
 use bimap::BiMap;
@@ -145,24 +136,21 @@ use nalgebra as na;
 use num_traits::NumCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use slotmap::{SlotMap, new_key_type};
-use std::cmp::{Ordering, min};
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use std::iter::Sum;
-use std::ops::{AddAssign, Div, SubAssign};
 use thiserror::Error;
 use uuid::Uuid;
 
-// Define key types for SlotMaps
-new_key_type! {
-    /// Key type for accessing vertices in SlotMap
-    pub struct VertexKey;
-}
+// Crate-internal imports
+use crate::delaunay_core::utilities::{create_supercell_simplex, find_extreme_coordinates};
+use crate::geometry::predicates::{InSphere, insphere};
+use crate::geometry::{point::Point, traits::coordinate::CoordinateScalar};
 
-new_key_type! {
-    /// Key type for accessing cells in SlotMap
-    pub struct CellKey;
-}
+// Parent module imports
+use super::{
+    cell::{Cell, CellBuilder, CellValidationError},
+    facet::{Facet, facet_key_from_vertex_keys},
+    traits::data_type::DataType,
+    vertex::Vertex,
+};
 
 // =============================================================================
 // ERROR TYPES
@@ -214,7 +202,40 @@ pub enum TriangulationValidationError {
 }
 
 // =============================================================================
-// STRUCT DEFINITION
+// MACROS/HELPERS
+// =============================================================================
+
+// Define key types for SlotMaps using slotmap's new_key_type! macro
+// These macros create unique, type-safe keys for accessing elements in SlotMaps
+
+new_key_type! {
+    /// Key type for accessing vertices in SlotMap.
+    ///
+    /// This creates a unique, type-safe identifier for vertices stored in the
+    /// triangulation's vertex SlotMap. Each VertexKey corresponds to exactly
+    /// one vertex and provides efficient, stable access even as vertices are
+    /// added or removed from the triangulation.
+    pub struct VertexKey;
+}
+
+new_key_type! {
+    /// Key type for accessing cells in SlotMap.
+    ///
+    /// This creates a unique, type-safe identifier for cells stored in the
+    /// triangulation's cell SlotMap. Each CellKey corresponds to exactly
+    /// one cell and provides efficient, stable access even as cells are
+    /// added or removed during triangulation operations.
+    pub struct CellKey;
+}
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+// TODO: Add constants if needed
+
+// =============================================================================
+// STRUCT DEFINITIONS
 // =============================================================================
 
 // TODO: Implement `PartialEq` and `Eq` for Tds
@@ -310,6 +331,14 @@ where
     bad_cell_facets_buffer: HashMap<CellKey, Vec<Facet<T, U, V, D>>>,
 }
 
+// =============================================================================
+// CORE FUNCTIONALITY
+// =============================================================================
+
+// =============================================================================
+// CORE API METHODS
+// =============================================================================
+
 impl<T, U, V, const D: usize> Tds<T, U, V, D>
 where
     T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
@@ -404,10 +433,6 @@ where
     pub fn cells_mut(&mut self) -> &mut SlotMap<CellKey, Cell<T, U, V, D>> {
         &mut self.cells
     }
-
-    // =============================================================================
-    // CORE METHODS
-    // =============================================================================
 
     /// The function creates a new instance of a triangulation data structure
     /// with given vertices, initializing the vertices and cells.
@@ -862,11 +887,28 @@ where
     pub fn number_of_cells(&self) -> usize {
         self.cells.len()
     }
+}
 
-    // =============================================================================
-    // TRIANGULATION LOGIC
-    // =============================================================================
+// =============================================================================
+// QUERY OPERATIONS
+// =============================================================================
 
+// TODO: Add query operations
+
+// =============================================================================
+// TRIANGULATION LOGIC
+// =============================================================================
+
+impl<T, U, V, const D: usize> Tds<T, U, V, D>
+where
+    T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+    U: DataType,
+    V: DataType,
+    f64: From<T>,
+    for<'a> &'a T: Div<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
+{
     /// The `supercell` function creates a larger cell that contains all the
     /// input vertices, with some padding added.
     ///
@@ -910,7 +952,7 @@ where
         let radius = NumCast::from(radius_f64).expect("Failed to convert radius");
 
         // Create a proper non-degenerate simplex (tetrahedron for 3D)
-        let points = Self::create_supercell_simplex(&center, radius);
+        let points = create_supercell_simplex(&center, radius);
 
         let supercell = CellBuilder::default()
             .vertices(Vertex::from_points(points))
@@ -925,7 +967,7 @@ where
     fn create_default_supercell() -> Result<Cell<T, U, V, D>, anyhow::Error> {
         let center = [T::default(); D];
         let radius = NumCast::from(20.0f64).expect("Failed to convert radius"); // Default radius of 20.0
-        let points = Self::create_supercell_simplex(&center, radius);
+        let points = create_supercell_simplex(&center, radius);
 
         CellBuilder::default()
             .vertices(Vertex::from_points(points))
@@ -937,71 +979,6 @@ where
                     ),
                 })
             })
-    }
-
-    /// Creates a well-formed simplex centered at the given point with the given radius
-    fn create_supercell_simplex(center: &[T; D], radius: T) -> Vec<Point<T, D>> {
-        let mut points = Vec::new();
-
-        // For 3D, create a regular tetrahedron
-        if D == 3 {
-            // Create a regular tetrahedron with vertices at:
-            // (1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1)
-            // scaled by radius and translated by center
-            let tetrahedron_vertices = [
-                [1.0, 1.0, 1.0],
-                [1.0, -1.0, -1.0],
-                [-1.0, 1.0, -1.0],
-                [-1.0, -1.0, 1.0],
-            ];
-
-            for vertex_coords in &tetrahedron_vertices {
-                let mut coords = [T::default(); D];
-                for i in 0..D {
-                    let center_f64: f64 = center[i].into();
-                    let radius_f64: f64 = radius.into();
-                    let coord_f64 = radius_f64.mul_add(vertex_coords[i], center_f64);
-                    coords[i] = NumCast::from(coord_f64).expect("Failed to convert coordinate");
-                }
-                points.push(Point::new(coords));
-            }
-        } else {
-            // For other dimensions, create a simplex using a generalized approach
-            // Create D+1 vertices for a D-dimensional simplex
-
-            // Create a regular simplex by placing vertices at the corners of a hypercube
-            // scaled and offset appropriately
-            let radius_f64: f64 = radius.into();
-
-            // First vertex: all coordinates positive
-            let mut coords = [T::default(); D];
-            for i in 0..D {
-                let center_f64: f64 = center[i].into();
-                coords[i] = NumCast::from(center_f64 + radius_f64)
-                    .expect("Failed to convert center + radius");
-            }
-            points.push(Point::new(coords));
-
-            // Remaining D vertices: flip one coordinate at a time to negative
-            for dim in 0..D {
-                let mut coords = [T::default(); D];
-                for i in 0..D {
-                    let center_f64: f64 = center[i].into();
-                    if i == dim {
-                        // This dimension gets negative offset
-                        coords[i] = NumCast::from(center_f64 - radius_f64)
-                            .expect("Failed to convert center - radius");
-                    } else {
-                        // Other dimensions get positive offset
-                        coords[i] = NumCast::from(center_f64 + radius_f64)
-                            .expect("Failed to convert center + radius");
-                    }
-                }
-                points.push(Point::new(coords));
-            }
-        }
-
-        points
     }
 
     /// Performs the Bowyer-Watson algorithm to triangulate a set of vertices.
@@ -1290,11 +1267,22 @@ where
             self.boundary_facets_buffer.clone(),
         ))
     }
+}
 
-    // =============================================================================
-    // NEIGHBOR & INCIDENT ASSIGNMENT
-    // =============================================================================
+// =============================================================================
+// NEIGHBOR & INCIDENT ASSIGNMENT
+// =============================================================================
 
+impl<T, U, V, const D: usize> Tds<T, U, V, D>
+where
+    T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+    U: DataType,
+    V: DataType,
+    f64: From<T>,
+    for<'a> &'a T: Div<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
+{
     /// Assigns neighbor relationships between cells based on shared facets.
     ///
     /// This method efficiently builds neighbor relationships by using
@@ -1441,11 +1429,22 @@ where
             }
         }
     }
+}
 
-    // =============================================================================
-    // DUPLICATE REMOVAL
-    // =============================================================================
+// =============================================================================
+// DUPLICATE REMOVAL & FACET MAPPING
+// =============================================================================
 
+impl<T, U, V, const D: usize> Tds<T, U, V, D>
+where
+    T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+    U: DataType,
+    V: DataType,
+    f64: From<T>,
+    for<'a> &'a T: Div<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
+{
     /// Removes cells that contain supercell vertices from the triangulation.
     ///
     /// This method efficiently filters out supercell artifacts after the Bowyer-Watson
@@ -1541,14 +1540,6 @@ where
         duplicate_count
     }
 
-    // =============================================================================
-    // VERTEX KEY-BASED FACET KEY GENERATION
-    // =============================================================================
-
-    // =============================================================================
-    // FACET-TO-CELLS MAPPING
-    // =============================================================================
-
     /// Builds a `HashMap` mapping facet keys to the cells and facet indices that contain them.
     ///
     /// This method iterates over all cells and their facets once, computes the canonical key
@@ -1623,11 +1614,22 @@ where
 
         facet_to_cells
     }
+}
 
-    // =============================================================================
-    // VALIDATION
-    // =============================================================================
+// =============================================================================
+// VALIDATION & CONSISTENCY CHECKS
+// =============================================================================
 
+impl<T, U, V, const D: usize> Tds<T, U, V, D>
+where
+    T: CoordinateScalar + AddAssign<T> + ComplexField<RealField = T> + SubAssign<T> + Sum,
+    U: DataType,
+    V: DataType,
+    f64: From<T>,
+    for<'a> &'a T: Div<T>,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    ordered_float::OrderedFloat<f64>: From<T>,
+{
     /// Validates the consistency of vertex UUID-to-key mappings.
     ///
     /// This helper function ensures that:
@@ -2064,10 +2066,10 @@ where
 }
 
 // =============================================================================
-// PARTIALEQ AND EQ IMPLEMENTATIONS
+// TRAIT IMPLEMENTATIONS
 // =============================================================================
 
-/// Manual implementation of PartialEq for Tds
+/// Manual implementation of `PartialEq` for Tds
 ///
 /// Two triangulation data structures are considered equal if they have:
 /// - The same set of vertices (compared by coordinates)
@@ -2126,16 +2128,32 @@ where
 
         // Sort cells by their vertex UUIDs
         self_cells.sort_by(|a, b| {
-            let mut a_vertex_uuids: Vec<Uuid> = a.vertices().iter().map(|v| v.uuid()).collect();
-            let mut b_vertex_uuids: Vec<Uuid> = b.vertices().iter().map(|v| v.uuid()).collect();
+            let mut a_vertex_uuids: Vec<Uuid> = a
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
+            let mut b_vertex_uuids: Vec<Uuid> = b
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
             a_vertex_uuids.sort();
             b_vertex_uuids.sort();
             a_vertex_uuids.cmp(&b_vertex_uuids)
         });
 
         other_cells.sort_by(|a, b| {
-            let mut a_vertex_uuids: Vec<Uuid> = a.vertices().iter().map(|v| v.uuid()).collect();
-            let mut b_vertex_uuids: Vec<Uuid> = b.vertices().iter().map(|v| v.uuid()).collect();
+            let mut a_vertex_uuids: Vec<Uuid> = a
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
+            let mut b_vertex_uuids: Vec<Uuid> = b
+                .vertices()
+                .iter()
+                .map(super::vertex::Vertex::uuid)
+                .collect();
             a_vertex_uuids.sort();
             b_vertex_uuids.sort();
             a_vertex_uuids.cmp(&b_vertex_uuids)
@@ -2156,9 +2174,9 @@ where
 
 /// Eq implementation for Tds
 ///
-/// This is a marker trait implementation that relies on the PartialEq implementation.
+/// This is a marker trait implementation that relies on the `PartialEq` implementation.
 /// Since Tds represents a well-defined mathematical structure (triangulation),
-/// the PartialEq relation is indeed an equivalence relation.
+/// the `PartialEq` relation is indeed an equivalence relation.
 impl<T, U, V, const D: usize> Eq for Tds<T, U, V, D>
 where
     T: CoordinateScalar + DeserializeOwned,
@@ -2167,10 +2185,6 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
 }
-
-// =============================================================================
-// MANUAL DESERIALIZE IMPLEMENTATION
-// =============================================================================
 
 /// Manual implementation of Deserialize for Tds to handle trait bound conflicts
 impl<'de, T, U, V, const D: usize> Deserialize<'de> for Tds<T, U, V, D>
@@ -2288,7 +2302,7 @@ where
 }
 
 // =============================================================================
-// CUSTOM SERDE FUNCTIONS
+// SERDE HELPERS
 // =============================================================================
 
 /// Custom serialization function for `BiMap<Uuid, VertexKey>`
@@ -4051,7 +4065,6 @@ mod tests {
             vertex!([1.0, 0.0, 0.0]),
             vertex!([0.5, 1.0, 0.0]),
             vertex!([0.5, 0.5, 1.0]),
-            vertex!([0.5, 0.5, -1.0]),
         ];
         let tds1: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices1).unwrap();
 
@@ -4060,7 +4073,7 @@ mod tests {
             vertex!([1.0, 0.0, 0.0]),
             vertex!([0.5, 1.0, 0.0]),
             vertex!([0.5, 0.5, 1.0]),
-            vertex!([0.5, 0.5, -1.0]),
+            vertex!([0.5, 0.5, -1.0]), // Additional vertex - different size
         ];
         let tds2: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices2).unwrap();
 

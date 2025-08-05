@@ -2166,7 +2166,7 @@ mod tests {
             vertex!([0.0, 1.0, 0.0]),
             vertex!([0.0, 0.0, 1.0]),
         ];
-        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1.clone());
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
 
         let vertices2 = vec![
             vertex!([0.0, 0.0, 0.0]),

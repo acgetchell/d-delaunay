@@ -83,7 +83,7 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
             .map(|(cell_key, cell)| {
                 let vertices: Vec<VertexKey> = cell.vertices()
                     .iter()
-                    .map(|v| self.vertex_uuid_to_key[&v.uuid()])
+                    .filter_map(|v| self.vertex_bimap.get_by_left(&v.uuid()).copied())
                     .collect();
                 (cell_key, vertices)
             })
@@ -102,7 +102,9 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
             let this_vertices = &cell_vertices[&cell_key];
             
             for neighbor_uuid in neighbors {
-                let neighbor_key = self.cell_uuid_to_key[neighbor_uuid];
+                let Some(&neighbor_key) = self.cell_bimap.get_by_left(neighbor_uuid) else {
+                    continue;
+                };
                 let neighbor_vertices = &cell_vertices[&neighbor_key];
                 
                 // Fast intersection count using sorted vectors
@@ -186,8 +188,7 @@ fn remove_duplicate_cells_optimized(&mut self) -> usize {
     let duplicate_count = cells_to_remove.len();
     for cell_key in cells_to_remove {
         if let Some(removed_cell) = self.cells.remove(cell_key) {
-            self.cell_uuid_to_key.remove(&removed_cell.uuid());
-            self.cell_key_to_uuid.remove(&cell_key);
+            self.cell_bimap.remove_by_left(&removed_cell.uuid());
         }
     }
     

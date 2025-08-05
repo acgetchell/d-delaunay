@@ -111,8 +111,12 @@ pub const fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true
 }
 
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
-mod lib_tests {
+mod tests {
     use crate::{
         delaunay_core::{
             cell::Cell, facet::Facet, triangulation_data_structure::Tds, vertex::Vertex,
@@ -120,6 +124,10 @@ mod lib_tests {
         geometry::Point,
         is_normal,
     };
+
+    // =============================================================================
+    // TYPE SAFETY TESTS
+    // =============================================================================
 
     #[test]
     fn normal_types() {
@@ -130,6 +138,10 @@ mod lib_tests {
         assert!(is_normal::<Cell<f64, Option<()>, Option<()>, 4>>());
         assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 4>>());
     }
+
+    // =============================================================================
+    // ALLOCATION COUNTING TESTS
+    // =============================================================================
 
     /// Run these with cargo test `allocation_counting` --features count-allocations
     #[cfg(feature = "count-allocations")]
