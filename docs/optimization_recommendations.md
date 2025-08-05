@@ -33,7 +33,9 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
         for (cell_key, cell) in &self.cells {
             let vertex_points: Vec<Point<T, D>> = 
                 cell.vertices().iter().map(|v| *v.point()).collect();
-            let circumsphere = compute_circumsphere(&vertex_points)?;
+            // Note: You may need to implement compute_circumsphere or use existing circumsphere logic
+            // For now, this is a placeholder for the circumsphere computation
+            // let circumsphere = compute_circumsphere(&vertex_points)?;
             let facets = cell.facets();
             
             cache.insert(cell_key, CachedCellData {
@@ -54,8 +56,9 @@ impl<T, U, V, const D: usize> Tds<T, U, V, D> {
         
         for (cell_key, cached_data) in cache {
             // Fast circumsphere test using pre-computed center and radius
-            let distance_squared = vertex_point.distance_squared_to(&cached_data.circumsphere.center);
-            if distance_squared < cached_data.circumsphere.radius_squared {
+            // Note: distance_squared_to may need to be implemented or use nalgebra distance methods
+            // let distance_squared = vertex_point.distance_squared_to(&cached_data.circumsphere.center);
+            // if distance_squared < cached_data.circumsphere.radius_squared {
                 bad_cells.push(*cell_key);
             }
         }
@@ -168,30 +171,30 @@ fn assign_neighbors(&mut self) {
 ### B. **Reduce Temporary Allocations**
 
 ```rust
-// Instead of collecting into vectors, use iterators where possible
+// Ensure computing hash using existing traits and utilities
 fn remove_duplicate_cells_optimized(&mut self) -> usize {
-    // Use a custom hash that doesn't require sorting
+    // Use a custom hash without requiring sorting by relying on VertexSetHash
     let mut unique_cells: HashMap<VertexSetHash, CellKey> = HashMap::new();
     let mut cells_to_remove = Vec::new();
-    
+
     for (cell_key, cell) in &self.cells {
         let vertex_hash = compute_vertex_set_hash(cell.vertices());
-        
+
         if let Some(_existing_key) = unique_cells.get(&vertex_hash) {
             cells_to_remove.push(cell_key);
         } else {
             unique_cells.insert(vertex_hash, cell_key);
         }
     }
-    
-    // Remove duplicates...
+
+    // Remove duplicates from the triangulation
     let duplicate_count = cells_to_remove.len();
     for cell_key in cells_to_remove {
         if let Some(removed_cell) = self.cells.remove(cell_key) {
             self.cell_bimap.remove_by_left(&removed_cell.uuid());
         }
     }
-    
+
     duplicate_count
 }
 
@@ -236,8 +239,9 @@ where
         
         for (cell_key, cell) in &self.cells {
             // Use cell centroid for spatial indexing
-            let centroid = compute_centroid(cell.vertices());
-            tree.add(centroid.coords, cell_key).unwrap();
+            // Note: compute_centroid needs to be implemented
+            // let centroid = compute_centroid(cell.vertices());
+            // tree.add(centroid.coords, cell_key).unwrap();
         }
         
         SpatialIndex { tree }
@@ -245,15 +249,19 @@ where
     
     fn find_bad_cells_spatial(&self, vertex: &Vertex<T, U, D>, 
                             index: &SpatialIndex<T, D>) -> Vec<CellKey> {
-        let vertex_point = vertex.point().coords;
+        let vertex_point = vertex.point().to_array();
         
         // Query nearby cells first, then test circumsphere
-        let nearby_cells = index.tree.within(&vertex_point, max_circumradius, &squared_euclidean)?;
+        // Assumes 'within' method exists and can handle query for nearby cells.
+        // You may need to replace 'squared_euclidean' with the correct distance function
+        // Verify if 'max_circumradius' needs definition or replacement.
+        let nearby_cells = index.tree.within(&vertex_point, /* max distance */, /* correct metric */)?;
         
         let mut bad_cells = Vec::new();
         for (_, &cell_key) in nearby_cells {
             let cell = &self.cells[cell_key];
-            if self.point_in_circumsphere(vertex.point(), cell) {
+            // Note: point_in_circumsphere method may need to be implemented or use existing insphere predicate
+            // if self.point_in_circumsphere(vertex.point(), cell) {
                 bad_cells.push(cell_key);
             }
         }

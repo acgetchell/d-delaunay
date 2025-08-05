@@ -28,8 +28,12 @@ convert_scientific() {
         fi
         echo "$converted"
     else
-        # Already in decimal format, return as-is
-        echo "$value"
+        # Already in decimal format, validate it's numeric before returning
+        if [[ "$value" =~ ^[+-]?[0-9]*\.?[0-9]+$ ]]; then
+            echo "$value"
+        else
+            error_exit "Non-numeric value detected: '$value' - expected a numeric value"
+        fi
     fi
 }
 
