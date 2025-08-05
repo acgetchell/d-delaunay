@@ -4,12 +4,80 @@ use anyhow::Error;
 use serde::{Serialize, de::DeserializeOwned};
 use slotmap::SlotMap;
 use std::cmp::Ordering;
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::delaunay_core::facet::Facet;
 use crate::delaunay_core::traits::data_type::DataType;
 use crate::delaunay_core::vertex::Vertex;
 use crate::geometry::traits::coordinate::CoordinateScalar;
+
+// =============================================================================
+// UUID VALIDATION
+// =============================================================================
+
+/// Errors that can occur during UUID validation.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum UuidValidationError {
+    /// The UUID is nil (all zeros), which is not allowed.
+    #[error("UUID is nil (all zeros) which is not allowed")]
+    NilUuid,
+    /// The UUID is not version 4.
+    #[error("UUID is not version 4: expected version 4, found version {found}")]
+    InvalidVersion {
+        /// The version number that was found.
+        found: usize,
+    },
+}
+
+/// Validates that a UUID is not nil and is version 4.
+///
+/// This function performs comprehensive UUID validation to ensure that UUIDs
+/// used throughout the system meet our requirements:
+/// - Must not be nil (all zeros)
+/// - Must be version 4 (randomly generated)
+///
+/// # Arguments
+///
+/// * `uuid` - The UUID to validate
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the UUID is valid, or a `UuidValidationError` if invalid.
+///
+/// # Errors
+///
+/// Returns `UuidValidationError::NilUuid` if the UUID is nil,
+/// or `UuidValidationError::InvalidVersion` if the UUID is not version 4.
+///
+/// # Examples
+///
+/// ```
+/// use d_delaunay::delaunay_core::utilities::{make_uuid, validate_uuid};
+/// use uuid::Uuid;
+///
+/// // Valid UUID (version 4)
+/// let valid_uuid = make_uuid();
+/// assert!(validate_uuid(&valid_uuid).is_ok());
+///
+/// // Invalid UUID (nil)
+/// let nil_uuid = Uuid::nil();
+/// assert!(validate_uuid(&nil_uuid).is_err());
+/// ```
+pub const fn validate_uuid(uuid: &Uuid) -> Result<(), UuidValidationError> {
+    // Check if UUID is nil
+    if uuid.is_nil() {
+        return Err(UuidValidationError::NilUuid);
+    }
+
+    // Check if UUID is version 4
+    let version = uuid.get_version_num();
+    if version != 4 {
+        return Err(UuidValidationError::InvalidVersion { found: version });
+    }
+
+    Ok(())
+}
 
 /// The function `make_uuid` generates a version 4 [Uuid].
 ///
@@ -695,6 +763,82 @@ mod tests {
             !found_adjacent2,
             "Cells sharing no vertices should not have adjacent facets"
         );
+    }
+
+    #[test]
+    fn test_validate_uuid_valid() {
+        // Test valid UUID (version 4)
+        let valid_uuid = make_uuid();
+        assert!(validate_uuid(&valid_uuid).is_ok());
+
+        // Test that the function returns Ok for valid UUIDs
+        let result = validate_uuid(&valid_uuid);
+        match result {
+            Ok(()) => (), // Expected
+            Err(e) => panic!("Expected valid UUID to pass validation, got: {e:?}"),
+        }
+    }
+
+    #[test]
+    fn test_validate_uuid_nil() {
+        // Test nil UUID
+        let nil_uuid = Uuid::nil();
+        let result = validate_uuid(&nil_uuid);
+
+        assert!(result.is_err());
+        match result {
+            Err(UuidValidationError::NilUuid) => (), // Expected
+            Err(other) => panic!("Expected NilUuid error, got: {other:?}"),
+            Ok(()) => panic!("Expected error for nil UUID, but validation passed"),
+        }
+    }
+
+    #[test]
+    fn test_validate_uuid_wrong_version() {
+        // Create a UUID with different version (version 1)
+        let v1_uuid = Uuid::parse_str("550e8400-e29b-11d4-a716-446655440000").unwrap();
+        assert_eq!(v1_uuid.get_version_num(), 1);
+
+        let result = validate_uuid(&v1_uuid);
+        assert!(result.is_err());
+
+        match result {
+            Err(UuidValidationError::InvalidVersion { found }) => {
+                assert_eq!(found, 1);
+            }
+            Err(other) => panic!("Expected InvalidVersion error, got: {other:?}"),
+            Ok(()) => panic!("Expected error for version 1 UUID, but validation passed"),
+        }
+    }
+
+    #[test]
+    fn test_validate_uuid_error_display() {
+        // Test error display formatting
+        let nil_error = UuidValidationError::NilUuid;
+        let nil_error_string = format!("{nil_error}");
+        assert!(nil_error_string.contains("nil"));
+        assert!(nil_error_string.contains("not allowed"));
+
+        let version_error = UuidValidationError::InvalidVersion { found: 3 };
+        let version_error_string = format!("{version_error}");
+        assert!(version_error_string.contains("version 4"));
+        assert!(version_error_string.contains("found version 3"));
+    }
+
+    #[test]
+    fn test_validate_uuid_error_equality() {
+        // Test PartialEq for UuidValidationError
+        let error1 = UuidValidationError::NilUuid;
+        let error2 = UuidValidationError::NilUuid;
+        assert_eq!(error1, error2);
+
+        let error3 = UuidValidationError::InvalidVersion { found: 2 };
+        let error4 = UuidValidationError::InvalidVersion { found: 2 };
+        assert_eq!(error3, error4);
+
+        let error5 = UuidValidationError::InvalidVersion { found: 3 };
+        assert_ne!(error3, error5);
+        assert_ne!(error1, error3);
     }
 
     #[test]

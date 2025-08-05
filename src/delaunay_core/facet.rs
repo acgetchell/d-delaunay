@@ -556,8 +556,13 @@ pub fn facet_key_from_vertex_keys(vertex_keys: &[VertexKey]) -> u64 {
 ///
 /// # Returns
 ///
-/// A `u64` hash value representing the canonical key of the facet, or `None`
+/// A `u64` hash value representing the canonical key of the facet, or an error
 /// if any vertex is not found in the triangulation
+///
+/// # Errors
+///
+/// Returns an error if any vertex UUID is not found in the provided vertex bimap.
+/// The error message will include the missing UUID.
 ///
 /// # Examples
 ///
@@ -588,20 +593,24 @@ pub fn facet_key_from_vertex_keys(vertex_keys: &[VertexKey]) -> u64 {
 /// let facet_key = facet_key_from_vertices(&vertices, &vertex_bimap).unwrap();
 /// println!("Facet key: {}", facet_key);
 /// ```
-#[must_use]
 pub fn facet_key_from_vertices<T, U, const D: usize>(
     vertices: &[Vertex<T, U, D>],
     vertex_bimap: &bimap::BiMap<uuid::Uuid, VertexKey>,
-) -> Option<u64>
+) -> Result<u64, String>
 where
     T: CoordinateScalar,
     U: DataType,
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     // Look up VertexKeys for all vertices
-    let vertex_keys: Option<Vec<VertexKey>> = vertices
+    let vertex_keys: Result<Vec<VertexKey>, String> = vertices
         .iter()
-        .map(|vertex| vertex_bimap.get_by_left(&vertex.uuid()).copied())
+        .map(|vertex| {
+            vertex_bimap
+                .get_by_left(&vertex.uuid())
+                .copied()
+                .ok_or_else(|| format!("UUID not found in bimap: {}", vertex.uuid()))
+        })
         .collect();
 
     vertex_keys.map(|keys| facet_key_from_vertex_keys(&keys))
@@ -1404,8 +1413,8 @@ mod tests {
         let vertices_with_missing = vec![vertices[0], missing_vertex];
         let result = facet_key_from_vertices(&vertices_with_missing, &vertex_bimap);
         assert!(
-            result.is_none(),
-            "Should return None when vertex is not in bimap"
+            result.is_err(),
+            "Should return an error when vertex is not in bimap"
         );
     }
 }

@@ -9,7 +9,6 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use d_delaunay::prelude::*;
 use rand::Rng;
 use std::hint::black_box;
-use std::time::Instant;
 
 /// Creates random points for benchmarking
 fn generate_random_points_3d(n_points: usize) -> Vec<Point<f64, 3>> {
@@ -87,10 +86,8 @@ fn benchmark_assign_neighbors_random(c: &mut Criterion) {
                         tds
                     },
                     |mut tds| {
-                        let start = Instant::now();
                         tds.assign_neighbors();
-                        let duration = start.elapsed();
-                        black_box((tds, duration));
+                        black_box(tds);
                     },
                 );
             },
@@ -127,10 +124,8 @@ fn benchmark_assign_neighbors_grid(c: &mut Criterion) {
                         tds
                     },
                     |mut tds| {
-                        let start = Instant::now();
                         tds.assign_neighbors();
-                        let duration = start.elapsed();
-                        black_box((tds, duration));
+                        black_box(tds);
                     },
                 );
             },
@@ -166,10 +161,8 @@ fn benchmark_assign_neighbors_spherical(c: &mut Criterion) {
                         tds
                     },
                     |mut tds| {
-                        let start = Instant::now();
                         tds.assign_neighbors();
-                        let duration = start.elapsed();
-                        black_box((tds, duration));
+                        black_box(tds);
                     },
                 );
             },
@@ -185,6 +178,43 @@ fn benchmark_assign_neighbors_scaling(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("assign_neighbors_scaling");
     group.sample_size(20); // Reduce sample size for longer tests
+
+    // Pre-compute and print scaling information outside of benchmark timing
+    println!("\n=== Scaling Analysis Pre-computation ===");
+    for &n_points in &point_counts {
+        let points = generate_random_points_3d(n_points);
+        let vertices: Vec<_> = points.iter().map(|p| vertex!(*p)).collect();
+        let tds = Tds::<f64, (), (), 3>::new(&vertices).unwrap();
+
+        let num_cells = tds.number_of_cells();
+        let num_vertices = tds.number_of_vertices();
+
+        // Calculate ratio with explicit precision handling
+        // For benchmark display purposes, f64 precision is sufficient
+        // Alternative approaches shown in comments below
+
+        // Approach 1: Simple with clippy allow (most practical)
+        #[allow(clippy::cast_precision_loss)]
+        let ratio = num_cells as f64 / n_points as f64;
+
+        // Approach 2: Check for precision loss (more defensive)
+        // let ratio = if num_cells < (1_u64 << 53) && n_points < (1_u64 << 53) {
+        //     num_cells as f64 / n_points as f64
+        // } else {
+        //     // For very large numbers, use integer arithmetic with rounding
+        //     (num_cells * 100 / n_points) as f64 / 100.0
+        // };
+
+        // Approach 3: Using ordered-float for guaranteed precision (overkill for this case)
+        // use ordered_float::OrderedFloat;
+        // let ratio_of = OrderedFloat(num_cells as f64) / OrderedFloat(n_points as f64);
+        // let ratio = ratio_of.into_inner();
+
+        println!(
+            "Points: {n_points}, Cells: {num_cells}, Vertices: {num_vertices} (ratio: {ratio:.2} cells/point)"
+        );
+    }
+    println!("==========================================\n");
 
     for &n_points in &point_counts {
         group.throughput(Throughput::Elements(n_points as u64));
@@ -203,24 +233,11 @@ fn benchmark_assign_neighbors_scaling(c: &mut Criterion) {
                         for cell in tds.cells_mut().values_mut() {
                             cell.neighbors = None;
                         }
-
-                        // Collect stats for analysis
-                        let num_cells = tds.number_of_cells();
-                        let num_vertices = tds.number_of_vertices();
-
-                        (tds, num_cells, num_vertices)
+                        tds
                     },
-                    |(mut tds, num_cells, num_vertices)| {
-                        let start = Instant::now();
+                    |mut tds| {
                         tds.assign_neighbors();
-                        let duration = start.elapsed();
-
-                        // Print scaling information
-                        println!(
-                            "Points: {n_points}, Cells: {num_cells}, Vertices: {num_vertices}, Time: {duration:?}"
-                        );
-
-                        black_box((tds, duration));
+                        black_box(tds);
                     },
                 );
             },
@@ -265,10 +282,8 @@ fn benchmark_assign_neighbors_2d_vs_3d(c: &mut Criterion) {
                         tds
                     },
                     |mut tds| {
-                        let start = Instant::now();
                         tds.assign_neighbors();
-                        let duration = start.elapsed();
-                        black_box((tds, duration));
+                        black_box(tds);
                     },
                 );
             },
@@ -292,10 +307,8 @@ fn benchmark_assign_neighbors_2d_vs_3d(c: &mut Criterion) {
                         tds
                     },
                     |mut tds| {
-                        let start = Instant::now();
                         tds.assign_neighbors();
-                        let duration = start.elapsed();
-                        black_box((tds, duration));
+                        black_box(tds);
                     },
                 );
             },

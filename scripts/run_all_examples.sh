@@ -1,18 +1,26 @@
 #!/bin/bash
+set -euo pipefail
+
+# Error handling function
+error_exit() {
+    local message="$1"
+    local code="${2:-1}"
+    echo "ERROR: $message" >&2
+    exit "$code"
+}
 
 # Script to run all examples in the d-delaunay project
 
 echo "Running all examples for d-delaunay project..."
 echo "=============================================="
 
-# Simple examples that don't take arguments
+# Simple examples that don't take arguments (excluding test_circumsphere which takes args)
 simple_examples=(
     "boundary_analysis_trait"
     "check_float_traits"
     "implicit_conversion"
     "point_comparison_and_hashing"
     "test_alloc_api"
-    "test_circumsphere"
 )
 
 # Run simple examples
@@ -21,8 +29,7 @@ for example in "${simple_examples[@]}"; do
     echo "=== Running $example ==="
     echo "--------------------------------------"
     if ! cargo run --example "$example"; then
-        echo "ERROR: Example $example failed!"
-        exit 1
+        error_exit "Example $example failed!"
     fi
     echo
 done
@@ -41,9 +48,8 @@ echo "---------------------------------------------------"
 for test_name in "${test_circumsphere_tests[@]}"; do
     echo
     echo "--- Running test_circumsphere $test_name ---"
-    if ! cargo run --example test_circumsphere "$test_name"; then
-        echo "ERROR: test_circumsphere $test_name failed!"
-        exit 1
+    if ! cargo run --example test_circumsphere -- "$test_name"; then
+        error_exit "test_circumsphere $test_name failed!"
     fi
 done
 

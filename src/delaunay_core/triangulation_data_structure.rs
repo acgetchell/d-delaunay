@@ -1359,14 +1359,17 @@ where
             HashMap::with_capacity(self.cells.len() * (D + 1));
 
         for (cell_key, cell) in &self.cells {
-            let vertex_keys = cell.vertex_keys(&self.vertex_bimap);
-            for i in 0..vertex_keys.len() {
-                // Create a temporary slice excluding the i-th element
-                let mut temp_keys = vertex_keys.clone();
-                temp_keys.remove(i);
-                // Compute facet key for the current subset of vertex keys
-                let facet_key = facet_key_from_vertex_keys(&temp_keys);
-                facet_map.entry(facet_key).or_default().push(cell_key);
+            if let Ok(vertex_keys) = cell.vertex_keys(&self.vertex_bimap) {
+                for i in 0..vertex_keys.len() {
+                    // Create a temporary slice excluding the i-th element
+                    let mut temp_keys = vertex_keys.clone();
+                    temp_keys.remove(i);
+                    // Compute facet key for the current subset of vertex keys
+                    let facet_key = facet_key_from_vertex_keys(&temp_keys);
+                    facet_map.entry(facet_key).or_default().push(cell_key);
+                }
+            } else {
+                eprintln!("Error retrieving vertex keys for cell: {}", cell.uuid());
             }
         }
 
@@ -2261,6 +2264,39 @@ mod tests {
     // TEST HELPER FUNCTIONS
     // =============================================================================
 
+    /// Test helper to create a vertex with a specific UUID for collision testing.
+    /// This is only used in tests to create specific scenarios.
+    #[cfg(test)]
+    fn create_vertex_with_uuid<T, U, const D: usize>(
+        point: Point<T, D>,
+        uuid: Uuid,
+        data: Option<U>,
+    ) -> Vertex<T, U, D>
+    where
+        T: CoordinateScalar,
+        U: DataType,
+        [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+    {
+        let mut vertex = data.map_or_else(
+            || {
+                VertexBuilder::default()
+                    .point(point)
+                    .build()
+                    .expect("Failed to build vertex")
+            },
+            |data_value| {
+                VertexBuilder::default()
+                    .point(point)
+                    .data(data_value)
+                    .build()
+                    .expect("Failed to build vertex")
+            },
+        );
+
+        vertex.set_uuid(uuid).expect("Failed to set UUID");
+        vertex
+    }
+
     // =============================================================================
     // add() TESTS
     // =============================================================================
@@ -2329,13 +2365,9 @@ mod tests {
             num_traits::NumCast::from(6.0f64).unwrap(),
         ]); // Different coordinates
 
-        // Create vertex2 with the SAME UUID as vertex1 using struct initialization
-        let vertex2 = Vertex {
-            point: point2,
-            uuid: uuid1, // Same UUID as vertex1 to create collision scenario
-            incident_cell: None,
-            data: None,
-        };
+        // Create vertex2 with the SAME UUID as vertex1 using test helper
+        // Note: This is a special case for testing UUID collision behavior
+        let vertex2 = create_vertex_with_uuid(point2, uuid1, None);
 
         // Manually insert the second vertex to test SlotMap behavior with UUID collision
         let key2 = tds.vertices.insert(vertex2);

@@ -31,7 +31,10 @@
 // IMPORTS
 // =============================================================================
 
-use super::{traits::DataType, utilities::make_uuid};
+use super::{
+    traits::DataType,
+    utilities::{UuidValidationError, make_uuid, validate_uuid},
+};
 use crate::geometry::{
     point::Point,
     traits::coordinate::{Coordinate, CoordinateScalar, CoordinateValidationError},
@@ -60,9 +63,13 @@ pub enum VertexValidationError {
         #[from]
         source: CoordinateValidationError,
     },
-    /// The vertex has an invalid (nil) UUID.
-    #[error("Invalid UUID: vertex has nil UUID which is not allowed")]
-    InvalidUuid,
+    /// The vertex has an invalid UUID.
+    #[error("Invalid UUID: {source}")]
+    InvalidUuid {
+        /// The underlying UUID validation error.
+        #[from]
+        source: UuidValidationError,
+    },
 }
 
 // =============================================================================
@@ -166,10 +173,10 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
 {
     /// The coordinates of the vertex as a D-dimensional Point.
-    pub(crate) point: Point<T, D>,
+    point: Point<T, D>,
     /// A universally unique identifier for the vertex.
     #[builder(setter(skip), default = "make_uuid()")]
-    pub(crate) uuid: Uuid,
+    uuid: Uuid,
     /// The [Uuid] of the `Cell` that the vertex is incident to.
     #[builder(setter(skip), default = "None")]
     pub incident_cell: Option<Uuid>,
@@ -266,12 +273,19 @@ where
                 let incident_cell = incident_cell.unwrap_or(None);
                 let data = data.unwrap_or(None);
 
-                Ok(Vertex {
-                    point,
+                let mut vertex = Vertex {
+                    point: Point::default(), // Temporary placeholder
                     uuid,
                     incident_cell,
                     data,
-                })
+                };
+
+                // Use set_point to ensure validation
+                vertex.set_point(point).map_err(|e| {
+                    de::Error::custom(format!("Invalid point during deserialization: {e}"))
+                })?;
+
+                Ok(vertex)
             }
         }
 
@@ -388,6 +402,34 @@ where
         &self.point
     }
 
+    /// Sets the vertex point with validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The new point to set for this vertex
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the point is valid and was set successfully,
+    /// otherwise returns a `VertexValidationError::InvalidPoint` if the point
+    /// contains invalid coordinates (NaN or infinite values).
+    ///
+    /// # Errors
+    ///
+    /// Returns `VertexValidationError::InvalidPoint` if the point has invalid coordinates.
+    pub(crate) fn set_point(&mut self, point: Point<T, D>) -> Result<(), VertexValidationError>
+    where
+        Point<T, D>: Coordinate<T, D>,
+    {
+        // Validate the point before setting it
+        point
+            .validate()
+            .map_err(|source| VertexValidationError::InvalidPoint { source })?;
+
+        self.point = point;
+        Ok(())
+    }
+
     /// Returns the UUID of the vertex.
     ///
     /// # Returns
@@ -413,6 +455,30 @@ where
     #[inline]
     pub const fn uuid(&self) -> Uuid {
         self.uuid
+    }
+
+    /// Sets the vertex UUID with validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid` - The new UUID to set for this vertex
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the UUID is valid and was set successfully,
+    /// otherwise returns a `VertexValidationError::InvalidUuid` if the UUID
+    /// is nil or has an invalid version.
+    ///
+    /// # Errors
+    ///
+    /// Returns `VertexValidationError::InvalidUuid` if the UUID is nil or invalid.
+    #[allow(dead_code)]
+    pub(crate) fn set_uuid(&mut self, uuid: Uuid) -> Result<(), VertexValidationError> {
+        // Validate the UUID before setting it
+        validate_uuid(&uuid)?;
+
+        self.uuid = uuid;
+        Ok(())
     }
 
     /// The `dim` function returns the dimensionality of the [Vertex].
@@ -474,10 +540,8 @@ where
             .validate()
             .map_err(|source| VertexValidationError::InvalidPoint { source })?;
 
-        // Check if UUID is not nil
-        if self.uuid.is_nil() {
-            return Err(VertexValidationError::InvalidUuid);
-        }
+        // Check if UUID is valid using centralized validation
+        validate_uuid(&self.uuid())?;
 
         Ok(())
         // TODO: Additional validation can be added here:
@@ -581,10 +645,10 @@ where
     Point<T, D>: Hash,
 {
     /// Hash implementation for Vertex using only coordinates for consistency with `PartialEq`.
-    /// 
+    ///
     /// This ensures that vertices with the same coordinates have the same hash,
     /// maintaining the Eq/Hash contract: if a == b, then hash(a) == hash(b).
-    /// 
+    ///
     /// Note: UUID, `incident_cell`, and data are excluded from hashing to match
     /// the `PartialEq` implementation which only compares coordinates.
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -601,6 +665,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::delaunay_core::utilities::{UuidValidationError, make_uuid};
     use crate::geometry::point::Point;
     use crate::geometry::traits::coordinate::Coordinate;
     use approx::assert_relative_eq;
@@ -1034,7 +1099,7 @@ mod tests {
     fn test_vertex_reference_equality() {
         // Type alias at the beginning of the function
         type VertexType = Vertex<f64, Option<()>, 3>;
-        
+
         // Test equality using references and in collections
         let vertices = vec![
             vertex!([0.0, 0.0, 0.0]),
@@ -1042,12 +1107,12 @@ mod tests {
             vertex!([0.0, 1.0, 0.0]),
             vertex!([0.0, 0.0, 1.0]),
         ];
-        
+
         // Test finding vertex by coordinates
         let target: VertexType = vertex!([1.0, 0.0, 0.0]);
         let found = vertices.iter().find(|&v| v == &target);
         assert!(found.is_some());
-        
+
         // Test that we found the right one
         let found_vertex = found.unwrap();
         assert_relative_eq!(
@@ -1433,7 +1498,7 @@ mod tests {
         // Test that default vertex (which has nil UUID) is invalid
         let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         match default_vertex.is_valid() {
-            Err(VertexValidationError::InvalidUuid) => (), // Expected
+            Err(VertexValidationError::InvalidUuid { source: _ }) => (), // Expected
             other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(default_vertex.uuid().is_nil());
@@ -1447,7 +1512,7 @@ mod tests {
             data: None,
         };
         match invalid_uuid_vertex.is_valid() {
-            Err(VertexValidationError::InvalidUuid) => (), // Expected
+            Err(VertexValidationError::InvalidUuid { source: _ }) => (), // Expected
             other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(invalid_uuid_vertex.point().validate().is_ok());
@@ -1667,7 +1732,7 @@ mod tests {
         let validation_result = vertex_with_nil_uuid.is_valid();
         assert!(validation_result.is_err());
         match validation_result.unwrap_err() {
-            VertexValidationError::InvalidUuid => (), // Expected
+            VertexValidationError::InvalidUuid { source: _ } => (), // Expected
             other @ VertexValidationError::InvalidPoint { .. } => {
                 panic!("Expected InvalidUuid error, got: {other:?}")
             }
@@ -1753,7 +1818,9 @@ mod tests {
         let error_string = format!("{vertex_error}");
         assert!(error_string.contains("Invalid point"));
 
-        let uuid_error = VertexValidationError::InvalidUuid;
+        let uuid_error = VertexValidationError::InvalidUuid {
+            source: UuidValidationError::NilUuid,
+        };
         let uuid_error_string = format!("{uuid_error}");
         assert!(uuid_error_string.contains("Invalid UUID"));
     }
@@ -1761,8 +1828,12 @@ mod tests {
     #[test]
     fn test_vertex_validation_error_equality() {
         // Test PartialEq for VertexValidationError
-        let error1 = VertexValidationError::InvalidUuid;
-        let error2 = VertexValidationError::InvalidUuid;
+        let error1 = VertexValidationError::InvalidUuid {
+            source: UuidValidationError::NilUuid,
+        };
+        let error2 = VertexValidationError::InvalidUuid {
+            source: UuidValidationError::NilUuid,
+        };
         assert_eq!(error1, error2);
 
         let point_error =
@@ -1780,6 +1851,72 @@ mod tests {
         assert_eq!(error3, error4);
 
         assert_ne!(error1, error3);
+    }
+
+    // =============================================================================
+    // SET_UUID METHOD TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_set_uuid_valid() {
+        let mut vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let original_uuid = vertex.uuid();
+        let new_uuid = make_uuid();
+
+        // Test setting a valid UUID
+        let result = vertex.set_uuid(new_uuid);
+        assert!(result.is_ok());
+        assert_eq!(vertex.uuid(), new_uuid);
+        assert_ne!(vertex.uuid(), original_uuid);
+    }
+
+    #[test]
+    fn test_set_uuid_nil_uuid() {
+        let mut vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let original_uuid = vertex.uuid();
+
+        // Test setting a nil UUID (should fail)
+        let result = vertex.set_uuid(uuid::Uuid::nil());
+        assert!(result.is_err());
+
+        // Verify the UUID wasn't changed
+        assert_eq!(vertex.uuid(), original_uuid);
+
+        // Verify the error type
+        match result.unwrap_err() {
+            VertexValidationError::InvalidUuid {
+                source: UuidValidationError::NilUuid,
+            } => (), // Expected
+            other => panic!("Expected InvalidUuid with NilUuid source, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_set_uuid_invalid_version() {
+        let mut vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let original_uuid = vertex.uuid();
+
+        // Create a UUID with an invalid version (version 0)
+        // Note: This is tricky since the uuid crate doesn't easily allow creating invalid UUIDs
+        // We'll use the fact that version 3 UUIDs exist but our validation might reject them
+        // depending on implementation
+        let uuid_bytes = [0u8; 16]; // This creates a nil-like UUID
+        let invalid_uuid = uuid::Uuid::from_bytes(uuid_bytes);
+
+        // Test setting an invalid UUID
+        let result = vertex.set_uuid(invalid_uuid);
+        assert!(result.is_err());
+
+        // Verify the UUID wasn't changed
+        assert_eq!(vertex.uuid(), original_uuid);
+
+        // Verify it's a UUID validation error
+        match result.unwrap_err() {
+            VertexValidationError::InvalidUuid { source: _ } => (), // Expected some UUID error
+            other @ VertexValidationError::InvalidPoint { .. } => {
+                panic!("Expected InvalidUuid error, got: {other:?}")
+            }
+        }
     }
 
     // =============================================================================

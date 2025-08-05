@@ -11,39 +11,11 @@ error_exit() {
     exit "$code"
 }
 
-# Dependency checking function
-check_dependencies() {
-    # Array of required commands
-    local required_commands=("jq" "find" "sort")
-    
-    # Map commands to Homebrew package names
-    declare -A package_map
-    package_map["jq"]="jq"
-    package_map["find"]="findutils"
-    package_map["sort"]="coreutils"
-    
-    # Check each required command
-    for cmd in "${required_commands[@]}"; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            error_exit "$cmd is required but not found.
-Install on macOS with brew: brew install ${package_map[$cmd]}"
-        fi
-    done
-    
-    # Check for Cargo.toml in current directory
-    if [[ ! -f "Cargo.toml" ]]; then
-        error_exit "Cargo.toml not found; please run from a Rust project root."
-    fi
-}
-
 # Print usage information
 usage() {
     echo "Usage: extract_benchmarks.sh [-h|--help] [directory]"
     echo
     echo "Extracts benchmark results from Criterion JSON files and outputs as JSON."
-    echo
-    echo "Dependencies:"
-    echo "  Requires jq, find, and sort commands (install on macOS: brew install jq findutils coreutils)"
     echo
     echo "Options:"
     echo "  -h, --help      Show this help message and exit"
@@ -72,9 +44,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Check dependencies after argument parsing
-check_dependencies
 
 # Set TARGET_DIR variable for validation
 TARGET_DIR=${result_dir}

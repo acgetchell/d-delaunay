@@ -45,7 +45,7 @@
 use super::{
     facet::Facet,
     traits::DataType,
-    utilities::make_uuid,
+    utilities::{UuidValidationError, make_uuid, validate_uuid},
     vertex::{Vertex, VertexValidationError},
 };
 use crate::geometry::{point::Point, traits::coordinate::CoordinateScalar};
@@ -73,9 +73,13 @@ pub enum CellValidationError {
         #[from]
         source: VertexValidationError,
     },
-    /// The cell has an invalid (nil) UUID.
-    #[error("Invalid UUID: cell has nil UUID which is not allowed")]
-    InvalidUuid,
+    /// The cell has an invalid UUID.
+    #[error("Invalid UUID: {source}")]
+    InvalidUuid {
+        /// The underlying UUID validation error.
+        #[from]
+        source: UuidValidationError,
+    },
     /// The cell contains duplicate vertices.
     #[error("Duplicate vertices: cell contains non-unique vertices which is not allowed")]
     DuplicateVertices,
@@ -440,13 +444,31 @@ where
 
     /// Returns the list of `VertexKeys` for the [Cell].
     ///
+    /// # Arguments
+    ///
+    /// * `vertex_bimap` - A reference to the bimap that maps vertex UUIDs to vertex keys
+    ///
     /// # Returns
     ///
-    /// A Vec of `VertexKeys` corresponding to the vertices of the cell.
-    pub fn vertex_keys(&self, vertex_bimap: &BiMap<Uuid, VertexKey>) -> Vec<VertexKey> {
+    /// A `Result` containing a `Vec<VertexKey>` if all vertices are found in the bimap,
+    /// or a `String` error message if any vertex is missing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any vertex UUID in this cell is not found in the provided
+    /// vertex bimap. The error message will include the missing UUID.
+    pub fn vertex_keys(
+        &self,
+        vertex_bimap: &BiMap<Uuid, VertexKey>,
+    ) -> Result<Vec<VertexKey>, String> {
         self.vertices()
             .iter()
-            .filter_map(|v| vertex_bimap.get_by_left(&v.uuid()).copied())
+            .map(|v| {
+                vertex_bimap
+                    .get_by_left(&v.uuid())
+                    .copied()
+                    .ok_or_else(|| format!("Vertex UUID not found in bimap: {}", v.uuid()))
+            })
             .collect()
     }
 
@@ -688,10 +710,8 @@ where
             vertex.is_valid()?;
         }
 
-        // Check if UUID is not nil
-        if self.uuid.is_nil() {
-            return Err(CellValidationError::InvalidUuid);
-        }
+        // Check if UUID is valid
+        validate_uuid(&self.uuid)?;
 
         // Check if all vertices are distinct from one another
         let mut seen = std::collections::HashSet::new();
@@ -2020,7 +2040,7 @@ mod tests {
 
         // Verify that we get the correct error type for invalid UUID
         match invalid_uuid_result {
-            Err(CellValidationError::InvalidUuid) => {
+            Err(CellValidationError::InvalidUuid { source: _ }) => {
                 println!("✓ Correctly detected invalid UUID");
             }
             Err(other_error) => {

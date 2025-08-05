@@ -1,7 +1,55 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# Enable strict mode: exit on error, undefined variables, pipe failures
+set -euo pipefail
+
+# Error handling function
+error_exit() {
+    local message="$1"
+    local code="${2:-1}"
+    echo "ERROR: $message" >&2
+    exit "$code"
+}
+
+# Print usage information
+usage() {
+    echo "Usage: compare_benchmarks.sh [-h|--help] [directory]"
+    echo
+    echo "Compares extracted benchmark results with baseline values."
+    echo
+    echo "Options:"
+    echo "  -h, --help      Show this help message and exit"
+    echo
+    echo "Arguments:"
+    echo "  directory       Optional directory containing results (default: target/criterion)"
+    echo
+    echo "Exit Codes:"
+    echo "  0  Success"
+    echo "  1  Error occurred"
+    exit 0
+}
+
+# Default values
+result_dir="target/criterion"
+
+# Check for help option and parse directory argument
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        *)
+            result_dir=$1
+            shift
+            ;;
+    esac
+done
+
+# Trap to catch unexpected errors
+trap 'error_exit "Unexpected error at line $LINENO"' ERR
 
 # Script to compare extracted benchmark results with baseline
-summary_file="results_dim2_summary.json"
+summary_file="$result_dir/results_dim2_summary.json"
 
 echo "Benchmark Results Summary:"
 echo "========================"
