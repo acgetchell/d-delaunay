@@ -11,6 +11,28 @@ error_exit() {
     exit "$code"
 }
 
+# Convert scientific notation to decimal format that bc can handle
+# Criterion benchmarks often output values in scientific notation (e.g., 1.23e-6)
+# but bc cannot parse scientific notation, so we need to convert it to decimal format
+convert_scientific() {
+    local value="$1"
+    
+    # Check if the value contains 'e' or 'E' (scientific notation)
+    if [[ "$value" == *[eE]* ]]; then
+        # Use awk to convert scientific notation to decimal format with 12 decimal places
+        # The +0 operation forces awk to interpret the value as a number
+        local converted
+        converted=$(echo "$value" | awk 'BEGIN{OFMT="%.12f"} {print $1+0}' 2>/dev/null)
+        if [[ $? -ne 0 ]] || [[ -z "$converted" ]]; then
+            error_exit "Failed to convert scientific notation: $value"
+        fi
+        echo "$converted"
+    else
+        # Already in decimal format, return as-is
+        echo "$value"
+    fi
+}
+
 # Print usage information
 usage() {
     echo "Usage: compare_benchmarks.sh [-h|--help] [directory]"
@@ -94,7 +116,10 @@ echo "====================================="
 # Check specific benchmarks that might match baseline
 jq -c '.benchmarks[]' "$summary_file" 2>/dev/null | while read -r benchmark; do
   id=$(echo "$benchmark" | jq -r '.id')
-  mean=$(echo "$benchmark" | jq -r '.mean')
+  mean_raw=$(echo "$benchmark" | jq -r '.mean')
+  
+  # Convert scientific notation to decimal format for bc
+  mean=$(convert_scientific "$mean_raw")
   
   # Check for potential matches and calculate regression
   case "$id" in
