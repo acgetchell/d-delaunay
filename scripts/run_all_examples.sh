@@ -39,24 +39,29 @@ cd "${PROJECT_ROOT}"
 echo "Running all examples for d-delaunay project..."
 echo "=============================================="
 
-# Simple examples that don't take arguments (excluding test_circumsphere which takes args)
-simple_examples=(
-    "boundary_analysis_trait"
-    "check_float_traits"
-    "implicit_conversion"
-    "point_comparison_and_hashing"
-    "test_alloc_api"
-)
+# Automatically discover all examples from the examples directory
+all_examples=()
+while IFS= read -r -d '' file; do
+    # Extract filename without path and .rs extension
+    example_name=$(basename "$file" .rs)
+    all_examples+=("$example_name")
+done < <(find "${PROJECT_ROOT}/examples" -name "*.rs" -type f -print0)
+
+# Define special example that needs special handling
+special_example="test_circumsphere"
+
+# Filter all_examples to exclude test_circumsphere into simple_examples
+simple_examples=()
+for example in "${all_examples[@]}"; do
+    if [[ "$example" != "$special_example" ]]; then
+        simple_examples+=("$example")
+    fi
+done
 
 # Run simple examples
 for example in "${simple_examples[@]}"; do
-    echo
     echo "=== Running $example ==="
-    echo "--------------------------------------"
-    if ! cargo run --example "$example"; then
-        error_exit "Example $example failed!"
-    fi
-    echo
+    cargo run --example "$example" || error_exit "Example $example failed!"
 done
 
 # Run test_circumsphere with comprehensive test categories

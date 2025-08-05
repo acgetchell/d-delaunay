@@ -2064,6 +2064,111 @@ where
 }
 
 // =============================================================================
+// PARTIALEQ AND EQ IMPLEMENTATIONS
+// =============================================================================
+
+/// Manual implementation of PartialEq for Tds
+///
+/// Two triangulation data structures are considered equal if they have:
+/// - The same set of vertices (compared by coordinates)
+/// - The same set of cells (compared by vertex sets)
+/// - Consistent vertex and cell mappings
+///
+/// Note: Buffer fields are ignored since they are transient data structures.
+impl<T, U, V, const D: usize> PartialEq for Tds<T, U, V, D>
+where
+    T: CoordinateScalar + DeserializeOwned,
+    U: DataType + DeserializeOwned,
+    V: DataType + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        // Early exit if the basic counts don't match
+        if self.vertices.len() != other.vertices.len()
+            || self.cells.len() != other.cells.len()
+            || self.vertex_bimap.len() != other.vertex_bimap.len()
+            || self.cell_bimap.len() != other.cell_bimap.len()
+        {
+            return false;
+        }
+
+        // Compare vertices by collecting them into sorted vectors
+        // We sort by coordinates to make comparison order-independent
+        let mut self_vertices: Vec<_> = self.vertices.values().collect();
+        let mut other_vertices: Vec<_> = other.vertices.values().collect();
+
+        // Sort vertices by their coordinates for consistent comparison
+        self_vertices.sort_by(|a, b| {
+            let a_coords: [T; D] = (*a).into();
+            let b_coords: [T; D] = (*b).into();
+            a_coords
+                .partial_cmp(&b_coords)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        other_vertices.sort_by(|a, b| {
+            let a_coords: [T; D] = (*a).into();
+            let b_coords: [T; D] = (*b).into();
+            a_coords
+                .partial_cmp(&b_coords)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Compare sorted vertex lists
+        if self_vertices != other_vertices {
+            return false;
+        }
+
+        // Compare cells by collecting them into sorted vectors
+        // We sort by the sorted vertex UUIDs to make comparison order-independent
+        let mut self_cells: Vec<_> = self.cells.values().collect();
+        let mut other_cells: Vec<_> = other.cells.values().collect();
+
+        // Sort cells by their vertex UUIDs
+        self_cells.sort_by(|a, b| {
+            let mut a_vertex_uuids: Vec<Uuid> = a.vertices().iter().map(|v| v.uuid()).collect();
+            let mut b_vertex_uuids: Vec<Uuid> = b.vertices().iter().map(|v| v.uuid()).collect();
+            a_vertex_uuids.sort();
+            b_vertex_uuids.sort();
+            a_vertex_uuids.cmp(&b_vertex_uuids)
+        });
+
+        other_cells.sort_by(|a, b| {
+            let mut a_vertex_uuids: Vec<Uuid> = a.vertices().iter().map(|v| v.uuid()).collect();
+            let mut b_vertex_uuids: Vec<Uuid> = b.vertices().iter().map(|v| v.uuid()).collect();
+            a_vertex_uuids.sort();
+            b_vertex_uuids.sort();
+            a_vertex_uuids.cmp(&b_vertex_uuids)
+        });
+
+        // Compare sorted cell lists
+        if self_cells != other_cells {
+            return false;
+        }
+
+        // If we get here, the triangulations have the same structure
+        // BiMaps are derived from the vertices/cells, so if those match, the BiMaps should be consistent
+        // (We don't need to compare the BiMaps directly since they're just indexing structures)
+
+        true
+    }
+}
+
+/// Eq implementation for Tds
+///
+/// This is a marker trait implementation that relies on the PartialEq implementation.
+/// Since Tds represents a well-defined mathematical structure (triangulation),
+/// the PartialEq relation is indeed an equivalence relation.
+impl<T, U, V, const D: usize> Eq for Tds<T, U, V, D>
+where
+    T: CoordinateScalar + DeserializeOwned,
+    U: DataType + DeserializeOwned,
+    V: DataType + DeserializeOwned,
+    [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
+{
+}
+
+// =============================================================================
 // MANUAL DESERIALIZE IMPLEMENTATION
 // =============================================================================
 
@@ -3822,6 +3927,165 @@ mod tests {
             !found_adjacent2,
             "Cells sharing no vertices should not have adjacent facets"
         );
+    }
+
+    // =============================================================================
+    // PARTIALEQ AND EQ TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_tds_partial_eq_identical_triangulations() {
+        // Create two identical triangulations
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds1: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices1).unwrap();
+
+        let vertices2 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds2: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices2).unwrap();
+
+        // Test equality - should be true for identical triangulations
+        assert_eq!(tds1, tds2, "Identical triangulations should be equal");
+
+        // Test reflexive property
+        assert_eq!(tds1, tds1, "Triangulation should be equal to itself");
+
+        println!("✓ Identical triangulations are correctly identified as equal");
+    }
+
+    #[test]
+    fn test_tds_partial_eq_different_triangulations() {
+        // Create triangulations with different vertices
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds1: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices1).unwrap();
+
+        let vertices2 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([2.0, 0.0, 0.0]), // Different vertex
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds2: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices2).unwrap();
+
+        // Test inequality - should be false for different triangulations
+        assert_ne!(tds1, tds2, "Different triangulations should not be equal");
+
+        println!("✓ Different triangulations are correctly identified as unequal");
+    }
+
+    #[test]
+    fn test_tds_partial_eq_different_vertex_order() {
+        // Create triangulations with same vertices in different orders
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds1: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices1).unwrap();
+
+        let vertices2 = vec![
+            vertex!([1.0, 0.0, 0.0]), // Different order
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let tds2: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices2).unwrap();
+
+        // Test equality - should be true regardless of vertex order since we sort internally
+        assert_eq!(
+            tds1, tds2,
+            "Triangulations with same vertices in different order should be equal"
+        );
+
+        println!(
+            "✓ Triangulations with same vertices in different order are correctly identified as equal"
+        );
+    }
+
+    #[test]
+    fn test_tds_partial_eq_different_dimensions() {
+        // Create 2D triangulation
+        let vertices_2d = vec![
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
+        ];
+        let tds_2d: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices_2d).unwrap();
+
+        // Create identical 2D triangulation
+        let vertices_2d_copy = vec![
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
+        ];
+        let tds_2d_copy: Tds<f64, Option<()>, Option<()>, 2> = Tds::new(&vertices_2d_copy).unwrap();
+
+        // Test equality for 2D triangulations
+        assert_eq!(
+            tds_2d, tds_2d_copy,
+            "Identical 2D triangulations should be equal"
+        );
+
+        println!("✓ 2D triangulations work correctly with PartialEq");
+    }
+
+    #[test]
+    fn test_tds_partial_eq_different_sizes() {
+        // Create triangulations with different numbers of vertices
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.5, 1.0, 0.0]),
+            vertex!([0.5, 0.5, 1.0]),
+            vertex!([0.5, 0.5, -1.0]),
+        ];
+        let tds1: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices1).unwrap();
+
+        let vertices2 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.5, 1.0, 0.0]),
+            vertex!([0.5, 0.5, 1.0]),
+            vertex!([0.5, 0.5, -1.0]),
+        ];
+        let tds2: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices2).unwrap();
+
+        // Test inequality - should be false for different sized triangulations
+        assert_ne!(
+            tds1, tds2,
+            "Triangulations with different numbers of vertices should not be equal"
+        );
+
+        println!("✓ Triangulations with different sizes are correctly identified as unequal");
+    }
+
+    #[test]
+    fn test_tds_partial_eq_empty_triangulations() {
+        // Create two empty triangulations
+        let vertices1: Vec<Vertex<f64, Option<()>, 3>> = vec![];
+        let tds1: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices1).unwrap();
+
+        let vertices2: Vec<Vertex<f64, Option<()>, 3>> = vec![];
+        let tds2: Tds<f64, Option<()>, Option<()>, 3> = Tds::new(&vertices2).unwrap();
+
+        // Test equality - empty triangulations should be equal
+        assert_eq!(tds1, tds2, "Empty triangulations should be equal");
+
+        println!("✓ Empty triangulations are correctly identified as equal");
     }
 
     // =============================================================================

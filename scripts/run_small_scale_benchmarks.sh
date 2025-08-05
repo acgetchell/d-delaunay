@@ -24,6 +24,16 @@ cargo bench --bench small_scale_triangulation 2>&1 | tee "${PROJECT_ROOT}/benche
 # Also save Criterion's JSON output if it exists
 if [[ -d "${PROJECT_ROOT}/target/criterion" ]]; then
     echo "Extracting Criterion JSON results..."
+    
+    # Check if extract_benchmarks.sh exists and is executable
+    if [[ ! -f "${PROJECT_ROOT}/scripts/extract_benchmarks.sh" ]]; then
+        error_exit "extract_benchmarks.sh not found at ${PROJECT_ROOT}/scripts/extract_benchmarks.sh"
+    fi
+    
+    if [[ ! -x "${PROJECT_ROOT}/scripts/extract_benchmarks.sh" ]]; then
+        error_exit "extract_benchmarks.sh is not executable. Run: chmod +x ${PROJECT_ROOT}/scripts/extract_benchmarks.sh"
+    fi
+    
     "${PROJECT_ROOT}/scripts/extract_benchmarks.sh" "${PROJECT_ROOT}/target/criterion" > "${PROJECT_ROOT}/benches/results/small_scale_benchmarks.json"
     echo "Benchmark JSON results saved to ${PROJECT_ROOT}/benches/results/small_scale_benchmarks.json"
 fi

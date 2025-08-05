@@ -871,7 +871,13 @@ where
 {
 }
 
-/// Custom Hash implementation for Cell
+/// Custom Hash implementation for Cell using only sorted vertices for consistency with `PartialEq`.
+///
+/// This ensures that cells with the same vertices have the same hash,
+/// maintaining the Eq/Hash contract: if a == b, then hash(a) == hash(b).
+///
+/// Note: UUID, neighbors, and data are excluded from hashing to match
+/// the `PartialEq` implementation which only compares sorted vertices.
 impl<T, U, V, const D: usize> Hash for Cell<T, U, V, D>
 where
     T: CoordinateScalar,
@@ -881,17 +887,12 @@ where
     Point<T, D>: Hash, // Add this bound to ensure Point implements Hash
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Hash the UUID first
-        self.uuid.hash(state);
-
-        // Hash sorted vertices for consistent ordering
+        // Hash sorted vertices for consistent ordering - this matches PartialEq behavior
         for vertex in &sorted_vertices::<T, U, D>(&self.vertices) {
             vertex.hash(state);
         }
-
-        // Hash neighbors and data
-        self.neighbors.hash(state);
-        self.data.hash(state);
+        // Intentionally exclude UUID, neighbors, and data to maintain
+        // consistency with PartialEq implementation which only compares vertices
     }
 }
 
@@ -1147,8 +1148,11 @@ mod tests {
         cell1.hash(&mut hasher1);
         cell2.hash(&mut hasher2);
 
-        // Different UUIDs mean different hashes even with same vertices
-        assert_ne!(hasher1.finish(), hasher2.finish());
+        // Same vertices should produce same hash (Eq/Hash contract)
+        assert_eq!(cell1, cell2); // They are equal by vertices
+        assert_eq!(hasher1.finish(), hasher2.finish()); // Therefore hashes must be equal
+        // Note: UUIDs are different but excluded from hashing to maintain Eq/Hash contract
+        assert_ne!(cell1.uuid(), cell2.uuid());
     }
 
     #[test]
@@ -1165,7 +1169,7 @@ mod tests {
         let mut cell1: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42);
         let mut cell2: Cell<f64, Option<()>, i32, 3> = cell!(vec![vertex1, vertex2, vertex3], 42);
 
-        // Set different neighbors to ensure different hashes
+        // Set different neighbors - Hash implementation ignores neighbors for Eq/Hash contract
         let neighbor_id1 = Uuid::new_v4();
         let neighbor_id2 = Uuid::new_v4();
         cell1.neighbors = Some(vec![neighbor_id1]);
@@ -1177,8 +1181,11 @@ mod tests {
         cell1.hash(&mut hasher1);
         cell2.hash(&mut hasher2);
 
-        // Different neighbors should result in different hashes
-        assert_ne!(hasher1.finish(), hasher2.finish());
+        // Same vertices should produce same hash despite different neighbors (Eq/Hash contract)
+        assert_eq!(cell1, cell2); // They are equal by vertices
+        assert_eq!(hasher1.finish(), hasher2.finish()); // Therefore hashes must be equal
+        // Note: Neighbors are different but excluded from hashing to maintain Eq/Hash contract
+        assert_ne!(cell1.neighbors, cell2.neighbors);
     }
 
     #[test]
@@ -1208,8 +1215,11 @@ mod tests {
         cell1.hash(&mut hasher1);
         cell2.hash(&mut hasher2);
 
-        // Even with same vertices and UUID, different neighbors should produce different hashes
-        assert_ne!(hasher1.finish(), hasher2.finish());
+        // Same vertices should produce same hash despite different neighbors (Eq/Hash contract)
+        assert_eq!(cell1, cell2); // They are equal by vertices
+        assert_eq!(hasher1.finish(), hasher2.finish()); // Therefore hashes must be equal
+        // Note: Neighbors are different but excluded from hashing to maintain Eq/Hash contract
+        assert_ne!(cell1.neighbors, cell2.neighbors);
     }
 
     #[test]
@@ -1230,8 +1240,35 @@ mod tests {
         cell1.hash(&mut hasher1);
         cell2.hash(&mut hasher2);
 
-        // Different data should result in different hashes
-        assert_ne!(hasher1.finish(), hasher2.finish());
+        // Same vertices should produce same hash despite different data (Eq/Hash contract)
+        assert_eq!(cell1, cell2); // They are equal by vertices
+        assert_eq!(hasher1.finish(), hasher2.finish()); // Therefore hashes must be equal
+        // Note: Data is different but excluded from hashing to maintain Eq/Hash contract
+        assert_ne!(cell1.data, cell2.data);
+    }
+
+    #[test]
+    fn cell_hash_different_vertices() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let vertex1 = vertex!([0.0, 0.0, 1.0]);
+        let vertex2 = vertex!([0.0, 1.0, 0.0]);
+        let vertex3 = vertex!([1.0, 0.0, 0.0]);
+        let vertex4 = vertex!([2.0, 2.0, 2.0]);
+
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex3]);
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vec![vertex1, vertex2, vertex4]);
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        cell1.hash(&mut hasher1);
+        cell2.hash(&mut hasher2);
+
+        // Different vertices should produce different results for both equality and hash
+        assert_ne!(cell1, cell2); // They are not equal by vertices
+        assert_ne!(hasher1.finish(), hasher2.finish()); // Therefore hashes should be different
     }
 
     #[test]
@@ -2114,5 +2151,292 @@ mod tests {
                 panic!("Expected error for insufficient vertices, but validation passed");
             }
         }
+    }
+
+    // =============================================================================
+    // CELL PARTIALEQ AND EQ TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_cell_partial_eq_identical_cells() {
+        // Test that cells with identical vertices are equal
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1.clone());
+
+        let vertices2 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+
+        // Test equality - should be true for identical cells
+        assert_eq!(
+            cell1, cell2,
+            "Cells with identical vertices should be equal"
+        );
+
+        // Test reflexive property
+        assert_eq!(cell1, cell1, "Cell should be equal to itself");
+
+        println!("✓ Identical cells are correctly identified as equal");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_different_vertex_order() {
+        // Test that cells with same vertices in different order are equal
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
+
+        let vertices2 = vec![
+            vertex!([1.0, 0.0, 0.0]), // Different order
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+            vertex!([0.0, 1.0, 0.0]),
+        ];
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+
+        // Test equality - should be true regardless of vertex order since we sort internally
+        assert_eq!(
+            cell1, cell2,
+            "Cells with same vertices in different order should be equal"
+        );
+
+        println!("✓ Cells with same vertices in different order are correctly identified as equal");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_different_vertices() {
+        // Test that cells with different vertices are not equal
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
+
+        let vertices2 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([2.0, 0.0, 0.0]), // Different vertex
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+
+        // Test inequality - should be false for different cells
+        assert_ne!(
+            cell1, cell2,
+            "Cells with different vertices should not be equal"
+        );
+
+        println!("✓ Cells with different vertices are correctly identified as unequal");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_different_dimensions() {
+        // Test equality for cells of different dimensions
+        let vertices_2d = vec![
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
+        ];
+        let cell_2d: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices_2d.clone());
+        let cell_2d_copy: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices_2d);
+
+        // Test equality for 2D cells
+        assert_eq!(cell_2d, cell_2d_copy, "Identical 2D cells should be equal");
+
+        println!("✓ 2D cells work correctly with PartialEq");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_with_data() {
+        // Test that cells with same vertices but different cell data are still equal
+        // (since PartialEq only compares vertices, not data)
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell1: Cell<f64, Option<()>, i32, 3> = cell!(vertices.clone(), 42);
+        let cell2: Cell<f64, Option<()>, i32, 3> = cell!(vertices, 99); // Different data
+
+        // Test equality - should be true since PartialEq only compares vertices
+        assert_eq!(
+            cell1, cell2,
+            "Cells with same vertices but different data should be equal"
+        );
+
+        println!("✓ Cell equality correctly ignores data field");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_with_vertex_data() {
+        // Test cells where vertices have different data but same coordinates
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0], 1),
+            vertex!([1.0, 0.0, 0.0], 2),
+            vertex!([0.0, 1.0, 0.0], 3),
+            vertex!([0.0, 0.0, 1.0], 4),
+        ];
+        let cell1: Cell<f64, i32, Option<()>, 3> = cell!(vertices1);
+
+        let vertices2 = vec![
+            vertex!([0.0, 0.0, 0.0], 10), // Different vertex data
+            vertex!([1.0, 0.0, 0.0], 20),
+            vertex!([0.0, 1.0, 0.0], 30),
+            vertex!([0.0, 0.0, 1.0], 40),
+        ];
+        let cell2: Cell<f64, i32, Option<()>, 3> = cell!(vertices2);
+
+        // Test equality - should be true since vertex PartialEq compares coordinates,
+        // and cell PartialEq uses vertex PartialEq
+        assert_eq!(
+            cell1, cell2,
+            "Cells with same vertex coordinates but different vertex data should be equal"
+        );
+
+        println!("✓ Cell equality correctly ignores vertex data field");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_different_vertex_count() {
+        // Test cells with different numbers of vertices (different dimensions)
+        let vertices_3d = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell_3d: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices_3d);
+
+        let vertices_2d = vec![
+            vertex!([0.0, 0.0]),
+            vertex!([1.0, 0.0]),
+            vertex!([0.0, 1.0]),
+        ];
+        let cell_2d: Cell<f64, Option<()>, Option<()>, 2> = cell!(vertices_2d);
+
+        // Note: We can't directly compare cells of different dimensions with ==
+        // since they are different types, but this test documents the expected behavior
+        assert_eq!(cell_3d.vertices().len(), 4);
+        assert_eq!(cell_2d.vertices().len(), 3);
+
+        println!("✓ Cells of different dimensions have different vertex counts as expected");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_uuid_neighbors_ignored() {
+        // Test that UUID and neighbors are ignored in equality comparison
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let mut cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices.clone());
+        let mut cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices);
+
+        // Add different neighbors to the cells
+        cell1.neighbors = Some(vec![uuid::Uuid::new_v4(), uuid::Uuid::new_v4()]);
+        cell2.neighbors = Some(vec![uuid::Uuid::new_v4()]); // Different neighbors
+
+        // Cells should still be equal since PartialEq only compares vertices
+        assert_eq!(
+            cell1, cell2,
+            "Cells with same vertices but different neighbors should be equal"
+        );
+
+        // UUIDs are different but cells should still be equal
+        assert_ne!(
+            cell1.uuid(),
+            cell2.uuid(),
+            "Cells should have different UUIDs"
+        );
+        assert_eq!(
+            cell1, cell2,
+            "Cells with different UUIDs but same vertices should be equal"
+        );
+
+        println!("✓ Cell equality correctly ignores UUID and neighbors fields");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_symmetry() {
+        // Test that equality is symmetric: if a == b, then b == a
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
+
+        let vertices2 = vec![
+            vertex!([1.0, 0.0, 0.0]), // Different order
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+            vertex!([0.0, 1.0, 0.0]),
+        ];
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+
+        // Test symmetry
+        assert_eq!(
+            cell1 == cell2,
+            cell2 == cell1,
+            "Equality should be symmetric"
+        );
+        assert!(cell1 == cell2, "Cells should be equal");
+        assert!(cell2 == cell1, "Equality should be symmetric");
+
+        println!("✓ Cell equality is symmetric");
+    }
+
+    #[test]
+    fn test_cell_partial_eq_transitivity() {
+        // Test that equality is transitive: if a == b and b == c, then a == c
+        let vertices1 = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell1: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices1);
+
+        let vertices2 = vec![
+            vertex!([1.0, 0.0, 0.0]), // Different order
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+        let cell2: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices2);
+
+        let vertices3 = vec![
+            vertex!([0.0, 1.0, 0.0]), // Another different order
+            vertex!([0.0, 0.0, 1.0]),
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+        ];
+        let cell3: Cell<f64, Option<()>, Option<()>, 3> = cell!(vertices3);
+
+        // Test transitivity
+        assert!(cell1 == cell2, "cell1 should equal cell2");
+        assert!(cell2 == cell3, "cell2 should equal cell3");
+        assert!(cell1 == cell3, "cell1 should equal cell3 (transitivity)");
+
+        println!("✓ Cell equality is transitive");
     }
 }
