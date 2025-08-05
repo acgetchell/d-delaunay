@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Enable strict mode: exit on error, undefined variables, pipe failures
 set -euo pipefail
@@ -13,27 +13,28 @@ error_exit() {
 
 # Dependency checking function
 check_dependencies() {
+    # Function to get package name for a command
+    get_package_name() {
+        case "$1" in
+            "jq") echo "jq" ;;
+            "find") echo "findutils" ;;
+            "sort") echo "coreutils" ;;
+            *) echo "$1" ;;
+        esac
+    }
+    
     # Array of required commands
     local required_commands=("jq" "find" "sort")
-    
-    # Map commands to Homebrew package names
-    declare -A package_map
-    package_map["jq"]="jq"
-    package_map["find"]="findutils"
-    package_map["sort"]="coreutils"
     
     # Check each required command
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
+            local package_name
+            package_name=$(get_package_name "$cmd")
             error_exit "$cmd is required but not found.
-Install on macOS with brew: brew install ${package_map[$cmd]}"
+Install on macOS with brew: brew install $package_name"
         fi
     done
-    
-    # Check for Cargo.toml in current directory
-    if [[ ! -f "Cargo.toml" ]]; then
-        error_exit "Cargo.toml not found; please run from a Rust project root."
-    fi
 }
 
 # Print usage information
@@ -57,8 +58,9 @@ usage() {
     exit 0
 }
 
-# Default values
-result_dir="target/criterion"
+# Find project root and set default values
+PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd)
+result_dir="${PROJECT_ROOT}/target/criterion"
 
 # Check for help option and parse directory argument
 while [[ $# -gt 0 ]]; do
@@ -83,19 +85,43 @@ TARGET_DIR=${result_dir}
 [[ -d "$TARGET_DIR" ]] || error_exit "Directory '$TARGET_DIR' not found" 3
 [[ -r "$TARGET_DIR" ]] || error_exit "Directory '$TARGET_DIR' is not readable" 3
 
+# Convert to absolute path for consistent processing
+TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
+
 # Trap to catch unexpected errors
 trap 'error_exit "Unexpected error at line $LINENO"' ERR
 
 # Script to extract benchmark results from Criterion JSON files
 echo '{"benchmarks": ['
 
+# Find all estimates.json files and process them
+estimate_files=()
+while IFS= read -r -d '' file; do
+    estimate_files+=("$file")
+done < <(find "$TARGET_DIR" -path "*/new/estimates.json" -print0 | sort -z)
+
+# Check if any benchmark files were found
+if [[ ${#estimate_files[@]} -eq 0 ]]; then
+    echo ']}'
+    error_exit "No benchmark results found in $TARGET_DIR. Run benchmarks first with 'cargo bench'."
+fi
+
 first=true
-for estimates_file in $(find "./$result_dir" -path "*/new/estimates.json" | sort); do
+for estimates_file in "${estimate_files[@]}"; do
     # Extract the benchmark path (e.g., tds_new_2d/tds_new/50)
-    benchmark_path=$(echo "$estimates_file" | sed "s|./$result_dir/||" | sed 's|/new/estimates.json||')
+    benchmark_path=$(echo "$estimates_file" | sed "s|$TARGET_DIR/||" | sed 's|/new/estimates.json||')
     
-    # Extract mean point estimate from JSON
-    mean=$(jq -r '.mean.point_estimate' "$estimates_file")
+    # Extract mean point estimate from JSON, handle potential errors
+    if ! mean=$(jq -r '.mean.point_estimate' "$estimates_file" 2>/dev/null); then
+        echo "Warning: Failed to extract mean from $estimates_file" >&2
+        continue
+    fi
+    
+    # Skip if mean is null or not a valid number
+    if [[ "$mean" == "null" ]] || ! [[ "$mean" =~ ^[0-9]+\.?[0-9]*([eE][+-]?[0-9]+)?$ ]]; then
+        echo "Warning: Invalid mean value '$mean' in $estimates_file" >&2
+        continue
+    fi
     
     if [ "$first" = true ]; then
         first=false

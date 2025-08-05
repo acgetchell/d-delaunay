@@ -21,7 +21,7 @@ usage() {
     echo "  -h, --help      Show this help message and exit"
     echo
     echo "Arguments:"
-    echo "  directory       Optional directory containing results (default: target/criterion)"
+    echo "  directory       Optional directory containing results (default: benches/results)"
     echo
     echo "Exit Codes:"
     echo "  0  Success"
@@ -29,8 +29,9 @@ usage() {
     exit 0
 }
 
-# Default values
-result_dir="target/criterion"
+# Find project root and set default values
+PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd)
+result_dir="${PROJECT_ROOT}/benches/results"
 
 # Check for help option and parse directory argument
 while [[ $# -gt 0 ]]; do
@@ -48,8 +49,21 @@ done
 # Trap to catch unexpected errors
 trap 'error_exit "Unexpected error at line $LINENO"' ERR
 
+# Check dependencies first
+command -v jq >/dev/null 2>&1 || error_exit "jq is required but not found. Install with: brew install jq"
+command -v bc >/dev/null 2>&1 || error_exit "bc is required but not found. Install with: brew install bc"
+
 # Script to compare extracted benchmark results with baseline
-summary_file="$result_dir/results_dim2_summary.json"
+# Look for the most likely benchmark results file
+if [[ -f "$result_dir/small_scale_benchmarks.json" ]]; then
+    summary_file="$result_dir/small_scale_benchmarks.json"
+elif [[ -f "$result_dir/results_dim2_summary.json" ]]; then
+    summary_file="$result_dir/results_dim2_summary.json"
+else
+    error_exit "No benchmark results file found in $result_dir. Expected small_scale_benchmarks.json or results_dim2_summary.json"
+fi
+
+echo "Using benchmark results file: $summary_file"
 
 echo "Benchmark Results Summary:"
 echo "========================"
@@ -73,8 +87,12 @@ echo ""
 echo "Regression Analysis (>5% threshold):"
 echo "====================================="
 
+# Verify the file exists and is readable
+[[ -f "$summary_file" ]] || error_exit "Benchmark results file not found: $summary_file"
+[[ -r "$summary_file" ]] || error_exit "Benchmark results file not readable: $summary_file"
+
 # Check specific benchmarks that might match baseline
-jq -c '.benchmarks[]' "$summary_file" | while read benchmark; do
+jq -c '.benchmarks[]' "$summary_file" 2>/dev/null | while read -r benchmark; do
   id=$(echo "$benchmark" | jq -r '.id')
   mean=$(echo "$benchmark" | jq -r '.mean')
   

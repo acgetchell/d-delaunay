@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Error handling function
@@ -10,6 +10,31 @@ error_exit() {
 }
 
 # Script to run all examples in the d-delaunay project
+
+# Dependency checking function
+check_dependencies() {
+    # Array of required commands
+    local required_commands=("cargo")
+
+    # Check each required command
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            error_exit "$cmd is required but not found. Please install it to proceed."
+        fi
+    done
+}
+
+# Run dependency checks
+check_dependencies
+
+# Find project root (directory containing Cargo.toml)
+PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd)
+
+# Create results directory for future use
+mkdir -p "${PROJECT_ROOT}/benches/results"
+
+# Ensure we're executing from the project root
+cd "${PROJECT_ROOT}"
 
 echo "Running all examples for d-delaunay project..."
 echo "=============================================="
