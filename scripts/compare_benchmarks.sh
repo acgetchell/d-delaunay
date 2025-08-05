@@ -76,8 +76,8 @@ done
 trap 'error_exit "Unexpected error at line $LINENO"' ERR
 
 # Check dependencies first
-command -v jq >/dev/null 2>&1 || error_exit "jq is required but not found. Install with: brew install jq"
-command -v bc >/dev/null 2>&1 || error_exit "bc is required but not found. Install with: brew install bc"
+command -v jq >/dev/null 2>&1 || error_exit "jq is required but not found. Please install via your system package manager (e.g., apt, brew, winget)"
+command -v bc >/dev/null 2>&1 || error_exit "bc is required but not found. Please install via your system package manager (e.g., apt, brew, winget)"
 
 # Script to compare extracted benchmark results with baseline
 # Look for the most likely benchmark results file
@@ -101,9 +101,9 @@ baseline_3d_10=26.255  # µs -> ns conversion: * 1000
 baseline_3d_20=103.84  # µs -> ns conversion: * 1000
 
 # Convert µs to ns for comparison
-baseline_2d_10_ns=$(echo "$baseline_2d_10 * 1000" | bc)
-baseline_3d_10_ns=$(echo "$baseline_3d_10 * 1000" | bc)
-baseline_3d_20_ns=$(echo "$baseline_3d_20 * 1000" | bc)
+baseline_2d_10_ns=$(echo "scale=0; $baseline_2d_10 * 1000" | bc)
+baseline_3d_10_ns=$(echo "scale=0; $baseline_3d_10 * 1000" | bc)
+baseline_3d_20_ns=$(echo "scale=0; $baseline_3d_20 * 1000" | bc)
 
 echo "Current Benchmark Results:"
 echo "--------------------------"

@@ -143,7 +143,7 @@ mod tests {
     // ALLOCATION COUNTING TESTS
     // =============================================================================
 
-    /// Run these with cargo test `allocation_counting` --features count-allocations
+    /// Run these with `cargo test allocation_counting --features count-allocations`
     #[cfg(feature = "count-allocations")]
     #[test]
     fn test_basic_allocation_counting() {
