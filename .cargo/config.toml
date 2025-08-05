@@ -1,0 +1,2 @@
+[env]
+CRITERION_OUTPUT_FORMAT = "json, html"

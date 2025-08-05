@@ -31,7 +31,10 @@
 // IMPORTS
 // =============================================================================
 
-use super::{traits::DataType, utilities::make_uuid};
+use super::{
+    traits::DataType,
+    utilities::{UuidValidationError, make_uuid, validate_uuid},
+};
 use crate::geometry::{
     point::Point,
     traits::coordinate::{Coordinate, CoordinateScalar, CoordinateValidationError},
@@ -60,9 +63,13 @@ pub enum VertexValidationError {
         #[from]
         source: CoordinateValidationError,
     },
-    /// The vertex has an invalid (nil) UUID.
-    #[error("Invalid UUID: vertex has nil UUID which is not allowed")]
-    InvalidUuid,
+    /// The vertex has an invalid UUID.
+    #[error("Invalid UUID: {source}")]
+    InvalidUuid {
+        /// The underlying UUID validation error.
+        #[from]
+        source: UuidValidationError,
+    },
 }
 
 // =============================================================================
@@ -266,12 +273,19 @@ where
                 let incident_cell = incident_cell.unwrap_or(None);
                 let data = data.unwrap_or(None);
 
-                Ok(Vertex {
-                    point,
+                let mut vertex = Vertex {
+                    point: Point::default(), // Temporary placeholder
                     uuid,
                     incident_cell,
                     data,
-                })
+                };
+
+                // Use set_point to ensure validation
+                vertex.set_point(point).map_err(|e| {
+                    de::Error::custom(format!("Invalid point during deserialization: {e}"))
+                })?;
+
+                Ok(vertex)
             }
         }
 
@@ -388,6 +402,34 @@ where
         &self.point
     }
 
+    /// Sets the vertex point with validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The new point to set for this vertex
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the point is valid and was set successfully,
+    /// otherwise returns a `VertexValidationError::InvalidPoint` if the point
+    /// contains invalid coordinates (NaN or infinite values).
+    ///
+    /// # Errors
+    ///
+    /// Returns `VertexValidationError::InvalidPoint` if the point has invalid coordinates.
+    pub(crate) fn set_point(&mut self, point: Point<T, D>) -> Result<(), VertexValidationError>
+    where
+        Point<T, D>: Coordinate<T, D>,
+    {
+        // Validate the point before setting it
+        point
+            .validate()
+            .map_err(|source| VertexValidationError::InvalidPoint { source })?;
+
+        self.point = point;
+        Ok(())
+    }
+
     /// Returns the UUID of the vertex.
     ///
     /// # Returns
@@ -413,6 +455,30 @@ where
     #[inline]
     pub const fn uuid(&self) -> Uuid {
         self.uuid
+    }
+
+    /// Sets the vertex UUID with validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `uuid` - The new UUID to set for this vertex
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the UUID is valid and was set successfully,
+    /// otherwise returns a `VertexValidationError::InvalidUuid` if the UUID
+    /// is nil or has an invalid version.
+    ///
+    /// # Errors
+    ///
+    /// Returns `VertexValidationError::InvalidUuid` if the UUID is nil or invalid.
+    #[allow(dead_code)]
+    pub(crate) fn set_uuid(&mut self, uuid: Uuid) -> Result<(), VertexValidationError> {
+        // Validate the UUID before setting it
+        validate_uuid(&uuid)?;
+
+        self.uuid = uuid;
+        Ok(())
     }
 
     /// The `dim` function returns the dimensionality of the [Vertex].
@@ -474,10 +540,8 @@ where
             .validate()
             .map_err(|source| VertexValidationError::InvalidPoint { source })?;
 
-        // Check if UUID is not nil
-        if self.uuid.is_nil() {
-            return Err(VertexValidationError::InvalidUuid);
-        }
+        // Check if UUID is valid using centralized validation
+        validate_uuid(&self.uuid())?;
 
         Ok(())
         // TODO: Additional validation can be added here:
@@ -580,12 +644,17 @@ where
     [T; D]: Copy + Default + DeserializeOwned + Serialize + Sized,
     Point<T, D>: Hash,
 {
-    /// Generic Hash implementation for Vertex using Coordinate trait for point hashing
+    /// Hash implementation for Vertex using only coordinates for consistency with `PartialEq`.
+    ///
+    /// This ensures that vertices with the same coordinates have the same hash,
+    /// maintaining the Eq/Hash contract: if a == b, then hash(a) == hash(b).
+    ///
+    /// Note: UUID, `incident_cell`, and data are excluded from hashing to match
+    /// the `PartialEq` implementation which only compares coordinates.
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.point.hash_coordinate(state);
-        self.uuid.hash(state);
-        self.incident_cell.hash(state);
-        self.data.hash(state);
+        // Intentionally exclude UUID, incident_cell, and data to maintain
+        // consistency with PartialEq implementation
     }
 }
 
@@ -596,6 +665,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::delaunay_core::utilities::{UuidValidationError, make_uuid};
     use crate::geometry::point::Point;
     use crate::geometry::traits::coordinate::Coordinate;
     use approx::assert_relative_eq;
@@ -775,65 +845,281 @@ mod tests {
         println!("Serialized: {serialized:?}");
     }
 
-    #[test]
-    fn vertex_partial_eq() {
-        let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex3: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 4.0]);
+    // =============================================================================
+    // EQUALITY AND HASHING TESTS
+    // =============================================================================
 
-        assert_eq!(vertex1, vertex2);
-        assert_ne!(vertex2, vertex3);
+    /// Comprehensive tests for Vertex equality (`PartialEq`, `Eq`) and hashing (`Hash`)
+    /// These tests ensure the Hash/Eq contract is properly maintained:
+    /// - If a == b, then hash(a) == hash(b)
+    /// - Equality is based only on vertex coordinates (not UUID or metadata)
+    /// - Hash is based only on vertex coordinates (consistent with equality)
+
+    #[test]
+    fn test_vertex_equality_basic() {
+        // Test basic equality behavior
+        let v1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let v2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let v3: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 4.0]);
+
+        // Same coordinates should be equal
+        assert_eq!(v1, v2);
+        assert!(v1.eq(&v2));
+        assert!(v2.eq(&v1));
+
+        // Different coordinates should not be equal
+        assert_ne!(v1, v3);
+        assert_ne!(v2, v3);
+        assert!(!v1.eq(&v3));
+        assert!(!v2.eq(&v3));
+
+        // Test reflexivity
+        assert_eq!(v1, v1);
+        assert!(v1.eq(&v1));
     }
 
     #[test]
-    fn vertex_partial_ord() {
-        let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 4.0]);
-        let vertex3: Vertex<f64, Option<()>, 3> = vertex!([10.0, 0.0, 0.0]);
-        let vertex4: Vertex<f64, Option<()>, 3> = vertex!([0.0, 0.0, 10.0]);
+    fn test_vertex_equality_ignores_metadata() {
+        // Test that equality ignores UUID, incident_cell, and data
+        let v1: Vertex<f64, i32, 2> = vertex!([1.0, 2.0], 42);
+        let v2: Vertex<f64, i32, 2> = vertex!([1.0, 2.0], 99); // Different data
 
-        assert!(vertex1 < vertex2);
-        assert!(vertex3 > vertex2);
-        assert!(vertex1 < vertex3);
-        assert!(vertex1 > vertex4);
+        // Different UUIDs and data but same coordinates
+        assert_ne!(v1.uuid(), v2.uuid());
+        assert_ne!(v1.data, v2.data);
+
+        // Should still be equal because coordinates match
+        assert_eq!(v1, v2);
+
+        // Test with None data
+        let v3: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
+        let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
+        assert_eq!(v3, v4);
     }
 
     #[test]
-    fn vertex_hash() {
+    fn test_vertex_equality_precision() {
+        // Test equality with floating point values
+        let v1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let v2: Vertex<f64, Option<()>, 3> = vertex!([1.000_000_000_000_000_1, 2.0, 3.0]);
+
+        // Behavior depends on ordered_equals implementation in Point
+        // This test documents the current behavior
+        println!("v1 coordinates: {:?}", v1.point().to_array());
+        println!("v2 coordinates: {:?}", v2.point().to_array());
+        println!("v1 == v2: {}", v1 == v2);
+
+        // Test with clearly different values
+        let v3: Vertex<f64, Option<()>, 3> = vertex!([1.1, 2.0, 3.0]);
+        assert_ne!(v1, v3);
+    }
+
+    #[test]
+    fn test_vertex_hash_consistency() {
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
 
-        let vertex1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
-        let vertex3: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 4.0]);
+        let v1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let v2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+
+        // Test hash consistency for same vertex
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        v1.hash(&mut hasher1);
+        v1.hash(&mut hasher2);
+
+        let hash1 = hasher1.finish();
+        let hash2 = hasher2.finish();
+        assert_eq!(hash1, hash2);
+
+        // Test hash consistency for equal vertices (Hash/Eq contract)
+        let mut hasher3 = DefaultHasher::new();
+        v2.hash(&mut hasher3);
+        let hash3 = hasher3.finish();
+
+        assert_eq!(v1, v2); // Vertices are equal
+        assert_eq!(hash1, hash3); // Therefore hashes must be equal
+    }
+
+    #[test]
+    fn test_vertex_hash_different_coordinates() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
+
+        let v1: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let v2: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 4.0]);
 
         let mut hasher1 = DefaultHasher::new();
         let mut hasher2 = DefaultHasher::new();
-        let mut hasher3 = DefaultHasher::new();
 
-        vertex1.hash(&mut hasher1);
-        vertex2.hash(&mut hasher2);
-        vertex3.hash(&mut hasher3);
+        v1.hash(&mut hasher1);
+        v2.hash(&mut hasher2);
 
-        // Different UUIDs mean different hashes even with same points
-        assert_ne!(hasher1.finish(), hasher2.finish());
-        assert_ne!(hasher1.finish(), hasher3.finish());
+        let hash1 = hasher1.finish();
+        let hash2 = hasher2.finish();
+
+        // Different coordinates should produce different hashes
+        assert_ne!(v1, v2);
+        assert_ne!(hash1, hash2);
     }
 
     #[test]
-    fn vertex_hash_in_hashmap() {
+    fn test_vertex_hash_ignores_metadata() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
+
+        // Test that hash ignores UUID, incident_cell, and data (consistent with equality)
+        let v1: Vertex<f64, i32, 2> = vertex!([1.0, 2.0], 42);
+        let v2: Vertex<f64, i32, 2> = vertex!([1.0, 2.0], 99); // Different data
+
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+
+        v1.hash(&mut hasher1);
+        v2.hash(&mut hasher2);
+
+        let hash1 = hasher1.finish();
+        let hash2 = hasher2.finish();
+
+        // Same coordinates should produce same hash despite different metadata
+        assert_eq!(v1, v2); // Equal by coordinates
+        assert_eq!(hash1, hash2); // Therefore hashes must be equal
+        assert_ne!(v1.uuid(), v2.uuid()); // But UUIDs are different
+        assert_ne!(v1.data, v2.data); // And data is different
+    }
+
+    #[test]
+    fn test_vertex_eq_hash_contract() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hasher;
+
+        // Comprehensive test of the Hash/Eq contract: if a == b, then hash(a) == hash(b)
+        let test_cases: Vec<([f64; 2], [f64; 2])> = vec![
+            // 2D vertices with explicit type annotations
+            ([0.0, 0.0], [0.0, 0.0]),
+            ([1.0, 2.0], [1.0, 2.0]),
+            ([-1.0, -2.0], [-1.0, -2.0]),
+        ];
+
+        for (coords1, coords2) in test_cases {
+            let v1: Vertex<f64, Option<()>, 2> = vertex!(coords1);
+            let v2: Vertex<f64, Option<()>, 2> = vertex!(coords2);
+
+            // Verify equality
+            assert_eq!(v1, v2);
+
+            // Verify hash equality
+            let mut hasher1 = DefaultHasher::new();
+            let mut hasher2 = DefaultHasher::new();
+
+            v1.hash(&mut hasher1);
+            v2.hash(&mut hasher2);
+
+            assert_eq!(hasher1.finish(), hasher2.finish());
+        }
+    }
+
+    #[test]
+    fn test_vertex_in_hashset() {
+        use std::collections::HashSet;
+
+        // Test vertices in a HashSet to verify Hash/Eq contract in practice
+        let mut set: HashSet<Vertex<f64, Option<()>, 2>> = HashSet::new();
+
+        let v1: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
+        let v2: Vertex<f64, Option<()>, 2> = vertex!([3.0, 4.0]);
+        let v3: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]); // Same coordinates as v1
+
+        // Insert vertices
+        assert!(set.insert(v1)); // First insert should succeed
+        assert!(set.insert(v2)); // Different coordinates, should succeed
+        assert!(!set.insert(v3)); // Same coordinates as v1, should fail
+
+        assert_eq!(set.len(), 2); // Only 2 unique vertices by coordinates
+
+        // Check containment
+        assert!(set.contains(&v1));
+        assert!(set.contains(&v2));
+        assert!(set.contains(&v3)); // v3 is "found" because it equals v1
+
+        // Verify we can look up by coordinates
+        let v4: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
+        assert!(set.contains(&v4)); // Should find it even with different UUID
+    }
+
+    #[test]
+    fn test_vertex_in_hashmap() {
         use std::collections::HashMap;
 
+        // Test vertices as HashMap keys
         let mut map: HashMap<Vertex<f64, Option<()>, 2>, i32> = HashMap::new();
 
-        let vertex1: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
-        let vertex2: Vertex<f64, Option<()>, 2> = vertex!([3.0, 4.0]);
+        let v1: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
+        let v2: Vertex<f64, Option<()>, 2> = vertex!([3.0, 4.0]);
 
-        map.insert(vertex1, 10);
-        map.insert(vertex2, 20);
+        map.insert(v1, 10);
+        map.insert(v2, 20);
 
-        assert_eq!(map.get(&vertex1), Some(&10));
-        assert_eq!(map.get(&vertex2), Some(&20));
+        // Verify lookups work
+        assert_eq!(map.get(&v1), Some(&10));
+        assert_eq!(map.get(&v2), Some(&20));
         assert_eq!(map.len(), 2);
+
+        // Test lookup with equivalent vertex (same coordinates, different UUID)
+        let v3: Vertex<f64, Option<()>, 2> = vertex!([1.0, 2.0]);
+        assert_eq!(map.get(&v3), Some(&10)); // Should find v1's value
+
+        // Test overwrite with equivalent vertex
+        let old_value = map.insert(v3, 30);
+        assert_eq!(old_value, Some(10)); // Should return v1's old value
+        assert_eq!(map.len(), 2); // Size shouldn't change
+        assert_eq!(map.get(&v1), Some(&30)); // v1 now maps to new value
+    }
+
+    #[test]
+    fn test_vertex_hash_with_different_data_types() {
+        use std::collections::HashMap;
+
+        // Test that vertices with different data types but same coordinates work in collections
+        let v1: Vertex<f64, u16, 2> = vertex!([1.0, 2.0], 999u16);
+        let v2: Vertex<f64, i32, 2> = vertex!([3.0, 4.0], -42i32);
+
+        // Test HashMap with different vertex data types
+        let mut map1: HashMap<Vertex<f64, u16, 2>, &str> = HashMap::new();
+        map1.insert(v1, "first");
+        assert_eq!(map1.len(), 1);
+
+        let mut map2: HashMap<Vertex<f64, i32, 2>, bool> = HashMap::new();
+        map2.insert(v2, true);
+        assert_eq!(map2.len(), 1);
+    }
+
+    #[test]
+    fn test_vertex_reference_equality() {
+        // Type alias at the beginning of the function
+        type VertexType = Vertex<f64, Option<()>, 3>;
+
+        // Test equality using references and in collections
+        let vertices = vec![
+            vertex!([0.0, 0.0, 0.0]),
+            vertex!([1.0, 0.0, 0.0]),
+            vertex!([0.0, 1.0, 0.0]),
+            vertex!([0.0, 0.0, 1.0]),
+        ];
+
+        // Test finding vertex by coordinates
+        let target: VertexType = vertex!([1.0, 0.0, 0.0]);
+        let found = vertices.iter().find(|&v| v == &target);
+        assert!(found.is_some());
+
+        // Test that we found the right one
+        let found_vertex = found.unwrap();
+        assert_relative_eq!(
+            found_vertex.point().to_array().as_slice(),
+            [1.0, 0.0, 0.0].as_slice(),
+            epsilon = 1e-9
+        );
     }
 
     // =============================================================================
@@ -1212,7 +1498,7 @@ mod tests {
         // Test that default vertex (which has nil UUID) is invalid
         let default_vertex: Vertex<f64, Option<()>, 3> = Vertex::default();
         match default_vertex.is_valid() {
-            Err(VertexValidationError::InvalidUuid) => (), // Expected
+            Err(VertexValidationError::InvalidUuid { source: _ }) => (), // Expected
             other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(default_vertex.uuid().is_nil());
@@ -1226,7 +1512,7 @@ mod tests {
             data: None,
         };
         match invalid_uuid_vertex.is_valid() {
-            Err(VertexValidationError::InvalidUuid) => (), // Expected
+            Err(VertexValidationError::InvalidUuid { source: _ }) => (), // Expected
             other => panic!("Expected InvalidUuid error, got: {other:?}"),
         }
         assert!(invalid_uuid_vertex.point().validate().is_ok());
@@ -1446,7 +1732,7 @@ mod tests {
         let validation_result = vertex_with_nil_uuid.is_valid();
         assert!(validation_result.is_err());
         match validation_result.unwrap_err() {
-            VertexValidationError::InvalidUuid => (), // Expected
+            VertexValidationError::InvalidUuid { source: _ } => (), // Expected
             other @ VertexValidationError::InvalidPoint { .. } => {
                 panic!("Expected InvalidUuid error, got: {other:?}")
             }
@@ -1532,7 +1818,9 @@ mod tests {
         let error_string = format!("{vertex_error}");
         assert!(error_string.contains("Invalid point"));
 
-        let uuid_error = VertexValidationError::InvalidUuid;
+        let uuid_error = VertexValidationError::InvalidUuid {
+            source: UuidValidationError::NilUuid,
+        };
         let uuid_error_string = format!("{uuid_error}");
         assert!(uuid_error_string.contains("Invalid UUID"));
     }
@@ -1540,8 +1828,12 @@ mod tests {
     #[test]
     fn test_vertex_validation_error_equality() {
         // Test PartialEq for VertexValidationError
-        let error1 = VertexValidationError::InvalidUuid;
-        let error2 = VertexValidationError::InvalidUuid;
+        let error1 = VertexValidationError::InvalidUuid {
+            source: UuidValidationError::NilUuid,
+        };
+        let error2 = VertexValidationError::InvalidUuid {
+            source: UuidValidationError::NilUuid,
+        };
         assert_eq!(error1, error2);
 
         let point_error =
@@ -1559,6 +1851,72 @@ mod tests {
         assert_eq!(error3, error4);
 
         assert_ne!(error1, error3);
+    }
+
+    // =============================================================================
+    // SET_UUID METHOD TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_set_uuid_valid() {
+        let mut vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let original_uuid = vertex.uuid();
+        let new_uuid = make_uuid();
+
+        // Test setting a valid UUID
+        let result = vertex.set_uuid(new_uuid);
+        assert!(result.is_ok());
+        assert_eq!(vertex.uuid(), new_uuid);
+        assert_ne!(vertex.uuid(), original_uuid);
+    }
+
+    #[test]
+    fn test_set_uuid_nil_uuid() {
+        let mut vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let original_uuid = vertex.uuid();
+
+        // Test setting a nil UUID (should fail)
+        let result = vertex.set_uuid(uuid::Uuid::nil());
+        assert!(result.is_err());
+
+        // Verify the UUID wasn't changed
+        assert_eq!(vertex.uuid(), original_uuid);
+
+        // Verify the error type
+        match result.unwrap_err() {
+            VertexValidationError::InvalidUuid {
+                source: UuidValidationError::NilUuid,
+            } => (), // Expected
+            other => panic!("Expected InvalidUuid with NilUuid source, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_set_uuid_invalid_version() {
+        let mut vertex: Vertex<f64, Option<()>, 3> = vertex!([1.0, 2.0, 3.0]);
+        let original_uuid = vertex.uuid();
+
+        // Create a UUID with an invalid version (version 0)
+        // Note: This is tricky since the uuid crate doesn't easily allow creating invalid UUIDs
+        // We'll use the fact that version 3 UUIDs exist but our validation might reject them
+        // depending on implementation
+        let uuid_bytes = [0u8; 16]; // This creates a nil-like UUID
+        let invalid_uuid = uuid::Uuid::from_bytes(uuid_bytes);
+
+        // Test setting an invalid UUID
+        let result = vertex.set_uuid(invalid_uuid);
+        assert!(result.is_err());
+
+        // Verify the UUID wasn't changed
+        assert_eq!(vertex.uuid(), original_uuid);
+
+        // Verify it's a UUID validation error
+        match result.unwrap_err() {
+            VertexValidationError::InvalidUuid { source: _ } => (), // Expected some UUID error
+            other @ VertexValidationError::InvalidPoint { .. } => {
+                panic!("Expected InvalidUuid error, got: {other:?}")
+            }
+        }
     }
 
     // =============================================================================

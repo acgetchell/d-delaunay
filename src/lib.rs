@@ -22,6 +22,7 @@ extern crate derive_builder;
 /// It includes the `Tds` struct, which represents the triangulation, as well as `Cell`, `Facet`, and `Vertex` components.
 /// This module also provides traits for customizing vertex and cell data, and a `prelude` for convenient access to commonly used types.
 pub mod delaunay_core {
+    pub mod boundary;
     pub mod cell;
     pub mod facet;
     pub mod triangulation_data_structure;
@@ -29,8 +30,10 @@ pub mod delaunay_core {
     pub mod vertex;
     /// Traits for Delaunay triangulation data structures.
     pub mod traits {
-        pub mod data;
-        pub use data::*;
+        pub mod boundary_analysis;
+        pub mod data_type;
+        pub use boundary_analysis::*;
+        pub use data_type::*;
     }
     // Re-export the `delaunay_core` modules.
     pub use cell::*;
@@ -79,7 +82,11 @@ pub mod geometry {
 pub mod prelude {
     // Re-export from delaunay_core
     pub use crate::delaunay_core::{
-        cell::*, facet::*, traits::data::*, triangulation_data_structure::*, utilities::*,
+        cell::*,
+        facet::*,
+        traits::{boundary_analysis::*, data_type::*},
+        triangulation_data_structure::*,
+        utilities::*,
         vertex::*,
     };
 
@@ -104,8 +111,12 @@ pub const fn is_normal<T: Sized + Send + Sync + Unpin>() -> bool {
     true
 }
 
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
-mod lib_tests {
+mod tests {
     use crate::{
         delaunay_core::{
             cell::Cell, facet::Facet, triangulation_data_structure::Tds, vertex::Vertex,
@@ -113,6 +124,10 @@ mod lib_tests {
         geometry::Point,
         is_normal,
     };
+
+    // =============================================================================
+    // TYPE SAFETY TESTS
+    // =============================================================================
 
     #[test]
     fn normal_types() {
@@ -122,5 +137,93 @@ mod lib_tests {
         assert!(is_normal::<Facet<f64, Option<()>, Option<()>, 3>>());
         assert!(is_normal::<Cell<f64, Option<()>, Option<()>, 4>>());
         assert!(is_normal::<Tds<f64, Option<()>, Option<()>, 4>>());
+    }
+
+    // =============================================================================
+    // ALLOCATION COUNTING TESTS
+    // =============================================================================
+
+    /// Run these with `cargo test allocation_counting --features count-allocations`
+    #[cfg(feature = "count-allocations")]
+    #[test]
+    fn test_basic_allocation_counting() {
+        use allocation_counter::measure;
+
+        // Test a trivial operation that should not allocate
+        let result = measure(|| {
+            let x = 1 + 1;
+            assert_eq!(x, 2);
+        });
+
+        // Assert that the returned struct has the expected fields
+        // Available fields: count_total, count_current, count_max, bytes_total, bytes_current, bytes_max
+        // For a trivial operation, we expect zero allocations
+        assert_eq!(
+            result.count_total, 0,
+            "Expected zero total allocations for trivial operation, found: {}",
+            result.count_total
+        );
+        assert_eq!(
+            result.bytes_total, 0,
+            "Expected zero total bytes allocated for trivial operation, found: {}",
+            result.bytes_total
+        );
+
+        // Also check that current allocations are zero (no leaked allocations)
+        assert_eq!(
+            result.count_current, 0,
+            "Expected zero current allocations after trivial operation, found: {}",
+            result.count_current
+        );
+        assert_eq!(
+            result.bytes_current, 0,
+            "Expected zero current bytes allocated after trivial operation, found: {}",
+            result.bytes_current
+        );
+    }
+
+    #[cfg(feature = "count-allocations")]
+    #[test]
+    fn test_allocation_counting_with_allocating_operation() {
+        use allocation_counter::measure;
+
+        // Test an operation that does allocate memory
+        let result = measure(|| {
+            let _vec: Vec<i32> = vec![1, 2, 3, 4, 5];
+        });
+
+        // For this operation, we expect some allocations
+        assert!(
+            result.count_total > 0,
+            "Expected some allocations for Vec creation, found: {}",
+            result.count_total
+        );
+        assert!(
+            result.bytes_total > 0,
+            "Expected some bytes allocated for Vec creation, found: {}",
+            result.bytes_total
+        );
+
+        // After the operation, current allocations should be zero (Vec was dropped)
+        assert_eq!(
+            result.count_current, 0,
+            "Expected zero current allocations after Vec drop, found: {}",
+            result.count_current
+        );
+        assert_eq!(
+            result.bytes_current, 0,
+            "Expected zero current bytes after Vec drop, found: {}",
+            result.bytes_current
+        );
+
+        // Max values should be at least as large as total (they track peak usage)
+        assert!(
+            result.count_max >= result.count_total,
+            "Max count should be >= total count"
+        );
+        assert!(
+            result.bytes_max >= result.bytes_total,
+            "Max bytes should be >= total bytes"
+        );
     }
 }
