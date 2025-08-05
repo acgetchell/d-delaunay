@@ -36,6 +36,15 @@ if [[ -d "${PROJECT_ROOT}/target/criterion" ]]; then
     
     "${PROJECT_ROOT}/scripts/extract_benchmarks.sh" "${PROJECT_ROOT}/target/criterion" > "${PROJECT_ROOT}/benches/results/small_scale_benchmarks.json"
     echo "Benchmark JSON results saved to ${PROJECT_ROOT}/benches/results/small_scale_benchmarks.json"
+    
+    # Generate baseline results file
+    if [[ -f "${PROJECT_ROOT}/scripts/generate_baseline.sh" ]] && [[ -x "${PROJECT_ROOT}/scripts/generate_baseline.sh" ]]; then
+        echo "Generating baseline results..."
+        "${PROJECT_ROOT}/scripts/generate_baseline.sh"
+        echo "Baseline results saved to ${PROJECT_ROOT}/benches/baseline_results.txt"
+    else
+        echo "Warning: generate_baseline.sh not found or not executable. Baseline results not generated."
+    fi
 fi
 
 echo "Benchmark text output saved to ${PROJECT_ROOT}/benches/results/small_scale_benchmarks.txt"

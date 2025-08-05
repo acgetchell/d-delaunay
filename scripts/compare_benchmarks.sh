@@ -94,16 +94,55 @@ echo "Using benchmark results file: $summary_file"
 echo "Benchmark Results Summary:"
 echo "========================"
 
-# Extract baseline values from baseline_results.txt for comparison
-# The baseline contains: 10 points (2D) -> 7.3600 µs, 10 points (3D) -> 26.255 µs, 20 points (3D) -> 103.84 µs
-baseline_2d_10=7.3600  # µs -> ns conversion: * 1000
-baseline_3d_10=26.255  # µs -> ns conversion: * 1000  
-baseline_3d_20=103.84  # µs -> ns conversion: * 1000
+# Extract baseline values from benches/baseline_results.txt for comparison
+BASELINE_FILE="${PROJECT_ROOT}/benches/baseline_results.txt"
 
-# Convert µs to ns for comparison
-baseline_2d_10_ns=$(echo "scale=0; $baseline_2d_10 * 1000" | bc)
-baseline_3d_10_ns=$(echo "scale=0; $baseline_3d_10 * 1000" | bc)
-baseline_3d_20_ns=$(echo "scale=0; $baseline_3d_20 * 1000" | bc)
+if [[ ! -f "$BASELINE_FILE" ]]; then
+    error_exit "Baseline results file not found: $BASELINE_FILE. Run scripts/run_small_scale_benchmarks.sh to generate it."
+fi
+
+echo "Using baseline file: $BASELINE_FILE"
+
+# Parse baseline values from the file
+# Function to extract time value from baseline (converts to nanoseconds)
+extract_baseline_time() {
+    local points="$1"
+    local dimension="$2"
+    
+    # Look for the section header and extract the mean time value
+    local time_line=$(grep -A 1 "=== $points Points (${dimension}D) ===" "$BASELINE_FILE" | grep "Time:" | head -1)
+    
+    if [[ -z "$time_line" ]]; then
+        # Try alternate format for 4D (lowercase points)
+        time_line=$(grep -A 1 "=== $points points (${dimension}D) ===" "$BASELINE_FILE" | grep "time:" | head -1)
+    fi
+    
+    if [[ -n "$time_line" ]]; then
+        # Extract the middle value from [low, mean, high] and convert to nanoseconds
+        local time_value=$(echo "$time_line" | sed -E 's/.*\[([^,]+),\s*([^,]+),\s*([^\]]+)\].*/\2/' | tr -d ' ')
+        
+        # Convert to nanoseconds based on unit
+        if [[ "$time_value" == *"µs"* ]]; then
+            time_value=$(echo "$time_value" | sed 's/µs//')
+            echo "scale=0; $time_value * 1000" | bc
+        elif [[ "$time_value" == *"ms"* ]]; then
+            time_value=$(echo "$time_value" | sed 's/ms//')
+            echo "scale=0; $time_value * 1000000" | bc
+        elif [[ "$time_value" == *"s"* ]]; then
+            time_value=$(echo "$time_value" | sed 's/s//')
+            echo "scale=0; $time_value * 1000000000" | bc
+        else
+            echo "$time_value"
+        fi
+    else
+        echo "0"  # Default if not found
+    fi
+}
+
+# Extract key baseline values
+baseline_2d_10_ns=$(extract_baseline_time "10" "2")
+baseline_3d_10_ns=$(extract_baseline_time "10" "3")
+baseline_3d_20_ns=$(extract_baseline_time "20" "3")
 
 echo "Current Benchmark Results:"
 echo "--------------------------"

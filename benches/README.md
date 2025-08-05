@@ -1,8 +1,11 @@
-# Circumsphere Containment Performance Benchmarks
+# Performance Benchmarks
 
-This directory contains performance benchmarks for the d-delaunay library's circumsphere containment algorithms.
+This directory contains performance benchmarks for the d-delaunay library, including circumsphere containment algorithms,
+triangulation data structure operations, and small-scale triangulation performance testing.
 
 ## Running Benchmarks
+
+### Circumsphere Containment Benchmarks
 
 ```bash
 # Run all benchmarks
@@ -10,6 +13,23 @@ cargo bench --bench circumsphere_containment
 
 # Run with test mode (faster, no actual benchmarking)
 cargo bench --bench circumsphere_containment -- --test
+```
+
+### Small-Scale Triangulation Benchmarks
+
+```bash
+# Run small-scale triangulation benchmarks for 2D, 3D, and 4D
+cargo bench --bench small_scale_triangulation
+
+# Run benchmarks and generate baseline results
+scripts/run_small_scale_benchmarks.sh
+```
+
+### All Benchmarks
+
+```bash
+# Run all available benchmarks
+cargo bench
 ```
 
 ## Methods Compared
@@ -154,6 +174,109 @@ The `insphere_lifted` method provides the best performance while maintaining rea
 For most applications requiring high-performance circumsphere containment tests, it should be the preferred choice.
 
 The standard `insphere` method remains the most numerically stable option when correctness is prioritized over performance.
+
+## Triangulation Data Structure Performance
+
+### Baseline Results (Version 0.3.3 - 2025-08-05)
+
+The following performance metrics are from `benches/baseline_results.txt` (git commit: a2acfec) and represent the current
+baseline for triangulation data structure operations using the optimized SlotMap implementation.
+
+#### 2D Triangulation Performance
+
+| Points | Time (mean) | Throughput (mean) | Scaling |
+|--------|-------------|-------------------|----------|
+| 10 | 349.77 µs | 28.590 Kelem/s | 1.0x |
+| 20 | 1.4758 ms | 13.552 Kelem/s | 4.2x |
+| 30 | 3.5264 ms | 8.5072 Kelem/s | 10.1x |
+| 40 | 6.5196 ms | 6.1353 Kelem/s | 18.6x |
+| 50 | 11.039 ms | 4.5294 Kelem/s | 31.6x |
+
+#### 3D Triangulation Performance
+
+| Points | Time (mean) | Throughput (mean) | Scaling |
+|--------|-------------|-------------------|----------|
+| 10 | 3.7033 ms | 2.7003 Kelem/s | 1.0x |
+| 20 | 38.532 ms | 519.05 elem/s | 10.4x |
+| 30 | 181.31 ms | 165.46 elem/s | 49.0x |
+| 40 | 858.30 ms | 46.604 elem/s | 231.7x |
+| 50 | 3.0394 s | 16.451 elem/s | 820.8x |
+
+#### 4D Triangulation Performance
+
+| Points | Time (mean) | Throughput (mean) | Scaling |
+|--------|-------------|-------------------|----------|
+| 10 | 10.310 ms | 969.95 elem/s | 1.0x |
+| 20 | 56.779 ms | 352.24 elem/s | 5.5x |
+| 30 | 135.33 ms | 221.69 elem/s | 13.1x |
+| 40 | 716.99 ms | 55.789 elem/s | 69.5x |
+| 50 | 1.4178 s | 35.265 elem/s | 137.5x |
+
+### Performance Characteristics
+
+#### Dimensional Complexity
+
+**2D Triangulations:**
+
+- Excellent performance for small to medium point sets
+- Sub-millisecond performance for ≤10 points
+- Linear scaling up to ~30 points, then polynomial growth
+- Suitable for real-time applications with moderate point counts
+
+**3D Triangulations:**
+
+- Significant complexity increase compared to 2D
+- ~10x slower than 2D for equivalent point counts
+- Exponential scaling becomes apparent beyond 30 points
+- Performance degrades rapidly for large point sets (50+ points)
+
+**4D Triangulations:**
+
+- Highest computational complexity
+- Similar scaling pattern to 3D but with higher base cost
+- Performance suitable for small-scale problems (≤30 points)
+- Exponential growth in computation time with point count
+
+#### Throughput Analysis
+
+**High Throughput (>1 Kelem/s):**
+
+- 2D: All point counts maintain good throughput
+- 3D: Only 10-point triangulations achieve high throughput
+- 4D: Only 10-point triangulations achieve high throughput
+
+**Medium Throughput (100-1000 elem/s):**
+
+- 3D: 20-30 point triangulations
+- 4D: 20-30 point triangulations
+
+**Low Throughput (<100 elem/s):**
+
+- 3D: 40+ point triangulations
+- 4D: 40+ point triangulations
+
+### Performance Regression Testing
+
+The `benches/baseline_results.txt` serves as a reference for performance regression testing. Use the following scripts to compare performance:
+
+```bash
+# Generate new benchmark results
+scripts/run_small_scale_benchmarks.sh
+
+# Extract and compare results
+scripts/extract_benchmarks.sh target/criterion > new_results.json
+scripts/compare_benchmarks.sh
+```
+
+### Optimization Recommendations
+
+Based on the baseline results:
+
+1. **2D Applications**: Excellent performance across all tested scales
+2. **3D Applications**: Consider algorithmic optimizations for >30 points
+3. **4D Applications**: Limit to small-scale problems or investigate specialized algorithms
+4. **Memory Optimization**: The SlotMap implementation provides stable performance characteristics
+5. **Parallel Processing**: Large triangulations may benefit from parallel algorithms
 
 ## Performance Analysis: Boundary Facets Optimization
 
