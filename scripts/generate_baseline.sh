@@ -57,11 +57,12 @@ else
 fi
 echo "Output file: $OUTPUT_FILE"
 
-# Check if jq is available
-if ! command -v jq >/dev/null 2>&1; then
-    echo "Error: jq is required but not installed. Please install jq to parse JSON data."
-    exit 1
-fi
+# Check mandatory tools
+for cmd in jq bc; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        error_exit "Required command '$cmd' is not installed. Please install it to proceed."
+    fi
+done
 
 #==============================================================================
 # STEP 1: Clean previous benchmark results

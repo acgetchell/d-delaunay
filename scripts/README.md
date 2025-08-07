@@ -26,7 +26,6 @@ Install equivalent packages for `jq`, `find`, `sort`, and `bc` using your system
 
 ### Benchmarking Scripts
 
-
 #### `compare_benchmarks.sh`
 
 **Purpose**: Runs fresh benchmark and compares results against baseline performance metrics.
@@ -213,6 +212,7 @@ git commit -m "Update performance baseline after optimization"
 ```
 
 **Development Mode Benefits**:
+
 - **10x faster**: Reduces sample size and measurement time
 - **Quick feedback**: Ideal for iterative development
 - **Same accuracy**: Still detects significant performance changes

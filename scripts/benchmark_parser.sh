@@ -4,6 +4,19 @@
 # This script provides reusable functions for parsing benchmark results across different scripts
 
 #==============================================================================
+# DEPENDENCY CHECKS
+#==============================================================================
+
+# Function to check if required dependencies are available
+# Usage: check_benchmark_parser_dependencies
+check_benchmark_parser_dependencies() {
+    if ! command -v bc >/dev/null 2>&1; then
+        echo "ERROR: bc is required but not found. Please install via your system package manager (e.g., apt, brew, winget)" >&2
+        return 1
+    fi
+}
+
+#==============================================================================
 # BENCHMARK PARSING FUNCTIONS
 #==============================================================================
 
@@ -184,12 +197,18 @@ extract_baseline_time() {
     local baseline_file="$3"
     
     # Look for the section header and extract the mean time value
+    # Handle dimension parameter that may or may not already include 'D' suffix
+    local dimension_with_d="$dimension"
+    if [[ "$dimension" != *"D" ]]; then
+        dimension_with_d="${dimension}D"
+    fi
+    
     local time_line
-    time_line=$(grep -A 1 "=== $points Points (${dimension}D) ===" "$baseline_file" | grep "Time:" | head -1)
+    time_line=$(grep -A 1 "=== $points Points ($dimension_with_d) ===" "$baseline_file" | grep "Time:" | head -1)
     
     if [[ -z "$time_line" ]]; then
         # Try alternate format for lowercase points
-        time_line=$(grep -A 1 "=== $points points (${dimension}D) ===" "$baseline_file" | grep -i "time:" | head -1)
+        time_line=$(grep -A 1 "=== $points points ($dimension_with_d) ===" "$baseline_file" | grep -i "time:" | head -1)
     fi
     
     if [[ -n "$time_line" ]]; then
@@ -218,6 +237,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "This script is meant to be sourced by other scripts, not executed directly."
     echo ""
     echo "Available functions:"
+    echo "  - check_benchmark_parser_dependencies"
     echo "  - parse_benchmark_start"
     echo "  - extract_timing_data"
     echo "  - parse_benchmark_identifier"
