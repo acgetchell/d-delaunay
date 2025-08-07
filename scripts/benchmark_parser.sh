@@ -196,6 +196,9 @@ extract_baseline_time() {
     local dimension="$2"
     local baseline_file="$3"
     
+    # Check dependencies before proceeding
+    check_benchmark_parser_dependencies || return 1
+    
     # Look for the section header and extract the mean time value
     # Handle dimension parameter that may or may not already include 'D' suffix
     local dimension_with_d="$dimension"
