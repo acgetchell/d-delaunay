@@ -153,8 +153,8 @@ current_time_change=""
 current_thrpt_change=""
 
 while IFS= read -r line; do
-    # Detect benchmark result lines - handle both μ (U+03BC) and µ (U+00B5) micro symbols
-    if [[ "$line" =~ ^(tds_new_([0-9])d/tds_new/([0-9]+))[[:space:]]+time:[[:space:]]+\[([0-9.]+)[[:space:]]([μµ]?s|ms|s)[[:space:]]([0-9.]+)[[:space:]]([μµ]?s|ms|s)[[:space:]]([0-9.]+)[[:space:]]([μµ]?s|ms|s)\] ]]; then
+    # Detect benchmark result lines - handle both μ (U+03BC) and µ (U+00B5) micro symbols and nanoseconds
+    if [[ "$line" =~ ^(tds_new_([0-9]+)d/tds_new/([0-9]+))[[:space:]]+time:[[:space:]]+\[([0-9.]+)[[:space:]](ns|[μµ]s|ms|s)[[:space:]]([0-9.]+)[[:space:]](ns|[μµ]s|ms|s)[[:space:]]([0-9.]+)[[:space:]](ns|[μµ]s|ms|s)\] ]]; then
         current_benchmark="${BASH_REMATCH[1]}"
         current_dimension="${BASH_REMATCH[2]}D"
         current_points="${BASH_REMATCH[3]}"
@@ -196,7 +196,7 @@ while IFS= read -r line; do
         thrpt_change_mean="${BASH_REMATCH[2]}"
         thrpt_change_high="${BASH_REMATCH[3]}"
         
-        current_thrpt_change="[+$thrpt_change_low%, +$thrpt_change_mean%, +$thrpt_change_high%]"
+        current_thrpt_change="[$thrpt_change_low%, $thrpt_change_mean%, $thrpt_change_high%]"
         
     # When we encounter trigger to output results
     elif { [[ "$line" =~ ^Benchmarking ]] && [[ -n "$current_benchmark" ]]; } || { [[ "$line" =~ ^Found.*outliers ]] && [[ -n "$current_time_change" ]] && [[ -n "$current_benchmark" ]]; }; then

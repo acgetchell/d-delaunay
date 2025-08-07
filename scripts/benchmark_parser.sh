@@ -50,12 +50,14 @@ extract_timing_data() {
         local timing_values
         timing_values=$(echo "$line" | grep -o '\[[^]]*\]' | grep -o '[0-9.]\+' | head -3 | tr '\n' ' ')
         
-        # Extract unit (ns, μs, µs, ms, s) from the line
+        # Extract unit (ns, us, μs, µs, ms, s) from the line
         local unit
-        if [[ "$line" =~ [[:space:]](ns|[μµ]s|ms|s)[[:space:]] ]]; then
+        if [[ "$line" =~ [[:space:]](ns|us|[μµ]s|ms|s)[[:space:]] ]]; then
             unit="${BASH_REMATCH[1]}"
-            # Normalize µ to μ for consistency
+            # Normalize µ and us to μ for consistency
             if [[ "$unit" == "µs" ]]; then
+                unit="μs"
+            elif [[ "$unit" == "us" ]]; then
                 unit="μs"
             fi
         else
@@ -119,6 +121,9 @@ parse_benchmarks_with_while_read() {
     local input_file="$1"
     local output_file="$2"
     
+    # Truncate the output file at the beginning
+    true > "$output_file"
+    
     # Initialize variables for tracking current benchmark
     local current_points=""
     local current_dimension=""
@@ -155,6 +160,9 @@ parse_benchmarks_with_awk() {
     local input_file="$1"
     local output_file="$2"
     
+    # Truncate the output file at the beginning
+    true > "$output_file"
+    
     awk '
     # Detect benchmark result lines with timing data
     /^tds_new_[0-9]+d\/tds_new\/[0-9]+[ 	]+time:/ {
@@ -170,12 +178,14 @@ parse_benchmarks_with_awk() {
         # Extract points from third part
         points = id_parts[3]
         
-        # Extract unit from the line (ns, μs, µs, ms, s)
+        # Extract unit from the line (ns, us, μs, µs, ms, s)
         unit = "μs"  # Default fallback
-        if (match($0, /[[:space:]](ns|[μµ]s|ms|s)[[:space:]]/)) {
+        if (match($0, /[[:space:]](ns|us|[μµ]s|ms|s)[[:space:]]/)) {
             unit = substr($0, RSTART+1, RLENGTH-2)
-            # Normalize µ to μ for consistency
+            # Normalize µ and us to μ for consistency
             if (unit == "µs") {
+                unit = "μs"
+            } else if (unit == "us") {
                 unit = "μs"
             }
         }
@@ -247,7 +257,7 @@ extract_baseline_time() {
         # Convert to nanoseconds based on unit (check original line for unit)
         if [[ "$time_line" == *"ns"* ]]; then
             printf "%.0f\n" "$(echo "$time_value * 1" | bc -l)"
-        elif [[ "$time_line" == *"μs"* ]] || [[ "$time_line" == *"µs"* ]]; then
+        elif [[ "$time_line" == *"μs"* ]] || [[ "$time_line" == *"µs"* ]] || [[ "$time_line" == *"us"* ]]; then
             printf "%.0f\n" "$(echo "$time_value * 1000" | bc -l)"
         elif [[ "$time_line" == *"ms"* ]]; then
             printf "%.0f\n" "$(echo "$time_value * 1000000" | bc -l)"
