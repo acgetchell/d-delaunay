@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # benchmark_parser.sh - Shared utility functions for parsing benchmark data
 # This script provides reusable functions for parsing benchmark results across different scripts
@@ -27,7 +28,7 @@ parse_benchmark_start() {
     local line="$1"
     
     # Detect "Benchmarking tds_new_2d/tds_new/10" format
-    if [[ "$line" =~ ^Benchmarking[[:space:]]+tds_new_([0-9])d/tds_new/([0-9]+)$ ]]; then
+    if [[ "$line" =~ ^Benchmarking[[:space:]]+tds_new_([0-9]+)d/tds_new/([0-9]+)$ ]]; then
         local dimension="${BASH_REMATCH[1]}D"
         local point_count="${BASH_REMATCH[2]}"
         echo "$point_count,$dimension"
@@ -39,21 +40,33 @@ parse_benchmark_start() {
 
 # Function to extract timing data from benchmark result lines
 # Usage: extract_timing_data "timing_line"
-# Returns: "low,mean,high" timing values or empty string if not found
+# Returns: "low,mean,high,unit" timing values and unit or empty string if not found
 extract_timing_data() {
     local line="$1"
     
     # Match lines like: "tds_new_2d/tds_new/10   time:   [354.30 µs 356.10 µs 357.91 µs]"
-    if [[ "$line" =~ ^tds_new_[0-9]d/tds_new/[0-9]+[[:space:]]+time:[[:space:]]+\[ ]]; then
+    if [[ "$line" =~ ^tds_new_[0-9]+d/tds_new/[0-9]+[[:space:]]+time:[[:space:]]+\[ ]]; then
         # Extract timing values from within brackets
         local timing_values
         timing_values=$(echo "$line" | grep -o '\[[^]]*\]' | grep -o '[0-9.]\+' | head -3)
         
+        # Extract unit (μs, µs, ms, s) from the line
+        local unit
+        if [[ "$line" =~ [[:space:]]([μµ]s|ms|s)[[:space:]] ]]; then
+            unit="${BASH_REMATCH[1]}"
+            # Normalize µ to μ for consistency
+            if [[ "$unit" == "µs" ]]; then
+                unit="μs"
+            fi
+        else
+            unit="μs"  # Default fallback
+        fi
+        
         # Convert to array and validate we have 3 values
         local timing_array
-        read -ra timing_array <<< "$timing_values"
+        read -ra timing_array <<<"$timing_values"
         if [[ ${#timing_array[@]} -eq 3 ]]; then
-            echo "${timing_array[0]},${timing_array[1]},${timing_array[2]}"
+            echo "${timing_array[0]},${timing_array[1]},${timing_array[2]},$unit"
             return 0
         fi
     fi
@@ -67,7 +80,7 @@ extract_timing_data() {
 parse_benchmark_identifier() {
     local line="$1"
     
-    if [[ "$line" =~ ^tds_new_([0-9])d/tds_new/([0-9]+) ]]; then
+    if [[ "$line" =~ ^tds_new_([0-9]+)d/tds_new/([0-9]+) ]]; then
         local dimension="${BASH_REMATCH[1]}D"
         local point_count="${BASH_REMATCH[2]}"
         echo "$point_count,$dimension"
@@ -78,19 +91,20 @@ parse_benchmark_identifier() {
 }
 
 # Function to format benchmark output with consistent spacing
-# Usage: format_benchmark_result "points" "dimension" "low" "mean" "high" "output_file"
+# Usage: format_benchmark_result "points" "dimension" "low" "mean" "high" "unit" "output_file"
 format_benchmark_result() {
     local points="$1"
     local dimension="$2"
     local low="$3"
     local mean="$4"
     local high="$5"
-    local output_file="$6"
+    local unit="$6"
+    local output_file="$7"
     
     # Print the header and timing line using printf for consistent spacing
     {
         printf "=== %s Points (%s) ===\n" "$points" "$dimension"
-        printf "Time: [%s, %s, %s] μs\n" "$low" "$mean" "$high"
+        printf "Time: [%s, %s, %s] %s\n" "$low" "$mean" "$high" "$unit"
         printf "\n"
     } >> "$output_file"
 }
@@ -120,8 +134,8 @@ parse_benchmarks_with_while_read() {
         elif timing_data=$(extract_timing_data "$line"); then
             # If we have timing data and current metadata, format output
             if [[ -n "$timing_data" && -n "$current_points" && -n "$current_dimension" ]]; then
-                IFS=',' read -r low mean high <<< "$timing_data"
-                format_benchmark_result "$current_points" "$current_dimension" "$low" "$mean" "$high" "$output_file"
+                IFS=',' read -r low mean high unit <<<"$timing_data"
+                format_benchmark_result "$current_points" "$current_dimension" "$low" "$mean" "$high" "$unit" "$output_file"
                 
                 # Reset current benchmark tracking
                 current_points=""
@@ -143,17 +157,28 @@ parse_benchmarks_with_awk() {
     
     awk '
     # Detect benchmark result lines with timing data
-    /^tds_new_[0-9]d\/tds_new\/[0-9]+[ 	]+time:/ {
+    /^tds_new_[0-9]+d\/tds_new\/[0-9]+[ 	]+time:/ {
         # Use simple field splitting to extract data
         split($1, id_parts, "/")
         
         # Extract dimension from "tds_new_2d" format
-        if (match(id_parts[1], /tds_new_([0-9])d/)) {
-            dimension = substr(id_parts[1], RSTART+8, 1) "D"
+        if (match(id_parts[1], /tds_new_([0-9]+)d/)) {
+            dim_match = substr(id_parts[1], RSTART+8, RLENGTH-9)
+            dimension = dim_match "D"
         }
         
         # Extract points from third part
         points = id_parts[3]
+        
+        # Extract unit from the line (μs, µs, ms, s)
+        unit = "μs"  # Default fallback
+        if (match($0, /[[:space:]]([μµ]s|ms|s)[[:space:]]/)) {
+            unit = substr($0, RSTART+1, RLENGTH-2)
+            # Normalize µ to μ for consistency
+            if (unit == "µs") {
+                unit = "μs"
+            }
+        }
         
         # Find timing values in brackets
         bracket_start = index($0, "[")
@@ -176,7 +201,7 @@ parse_benchmarks_with_awk() {
             # Print if we have all required values
             if (time_values_count >= 3 && points != "" && dimension != "") {
                 printf "=== %s Points (%s) ===\n", points, dimension
-                printf "Time: [%s, %s, %s] μs\n", time_low, time_mean, time_high
+                printf "Time: [%s, %s, %s] %s\n", time_low, time_mean, time_high, unit
                 printf "\n"
             }
         }
