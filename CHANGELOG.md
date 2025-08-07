@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-08-04
+
 ### Added
 
+- SlotMap integration for vertices and cells in the triangulation data structure
+  - Introduces `VertexKey` and `CellKey` types for stable key access
+  - Maintains HashMap for UUID-to-key mappings to preserve external UUID-based access
+  - Enhances memory management and overall efficiency of triangulation process
+- New `vertex` module with `VertexBuilder` for simplified vertex creation
+- Comprehensive benchmarking infrastructure
+  - Small-scale triangulation benchmarks for 2D, 3D, and 4D implementations
+  - Allocation tracking using `allocation-counter` crate
+  - Performance regression analysis scripts
+  - Baseline performance metrics recording
+- BoundaryAnalysis trait for modular boundary facet identification
 - Prelude module for simplified imports
   - Consolidates commonly used types and macros
   - Reduces boilerplate in examples and user code
@@ -20,6 +33,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Major triangulation data structure refactoring with SlotMap
+  - Replaced HashMap with SlotMap for vertices and cells storage
+  - Implemented BiMaps for efficient UUID-to-key bidirectional lookup
+  - Custom serialization/deserialization logic for BiMap integration
+- Improved Bowyer-Watson triangulation algorithm
+  - Renamed `bowyer_watson_logic` to `bowyer_watson` for consistency
+  - Added reusable buffers for intermediate data to reduce memory allocations
+  - Enhanced performance with pre-allocation and early-exit strategies
+- Enhanced vertex and cell implementations
+  - Vertex equality and hashing now only consider coordinates for consistency
+  - Cell hashing based on sorted vertices for proper Eq/Hash contract compliance
+  - Improved facet adjacency detection using HashSet for vertex comparison
+- Streamlined imports with prelude module
+- Error handling improvements in supercell creation and neighbor assignments
 - Streamlined supercell removal process
   - Simplified `remove_cells_containing_supercell_vertices` method signature
   - Removed redundant supercell parameter for cleaner API
@@ -28,13 +55,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced unwrap() calls with proper error propagation
   - Added informative error messages for triangulation failures
   - Enhanced robustness during triangulation initialization
-- Triangulation data structure refactoring
-  - Cleaner separation of concerns in Bowyer-Watson algorithm
-  - Improved code organization and maintainability
-  - Enhanced documentation with algorithmic complexity analysis
+- Code organization and structure improvements
+  - Standardized organizational patterns across modules
+  - Enhanced readability and maintainability
+  - Improved documentation and naming conventions
 
 ### Performance
 
+- Significant performance enhancements in key triangulation methods
+  - Optimized Bowyer-Watson algorithm with buffer reuse
+  - Enhanced neighbor assignment with facet-based identification
+  - Improved memory allocation patterns with pre-allocation strategies
+- Allocation tracking and optimization
+  - Integration of `allocation-counter` crate for memory usage measurement
+  - Performance regression analysis and baseline establishment
+- Boundary facet detection optimization
+  - Utilizes precomputed facet-to-cells mapping for faster boundary identification
+  - Avoids iterating through all cells for boundary determination
 - Optimized supercell removal logic
   - Reduced redundant operations in cleanup phase
   - Streamlined cell filtering and removal process
@@ -45,9 +82,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- UUID collision prevention in vertex creation
+- Regression in neighbor assignment logic preventing proper neighbor relationships
+- Vertex equality and hashing consistency issues
+- Scientific notation handling in benchmark comparison scripts
+- Test code refactoring and maintainability improvements
 - Eliminated unnecessary cloning in supercell insertion
 - Corrected method signatures for consistency
 - Improved memory efficiency in cell removal operations
+
+### Technical Details
+
+- SlotMap provides stable keys and efficient access for large triangulations
+- BiMap integration enables bidirectional UUID-to-key lookup with improved performance
+- Custom serialization ensures data integrity during serialization/deserialization
+- Benchmark infrastructure includes 2D, 3D, and 4D triangulation performance testing
+- BoundaryAnalysis trait promotes modularity and testability of boundary algorithms
 
 ## [0.3.2] - 2025-07-29
 
@@ -173,7 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Serialization/Deserialization capabilities
 - CGAL-inspired API design
 
-[Unreleased]: https://github.com/acgetchell/d-delaunay/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/acgetchell/d-delaunay/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/acgetchell/d-delaunay/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/acgetchell/d-delaunay/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/acgetchell/d-delaunay/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/acgetchell/d-delaunay/compare/v0.2.0...v0.3.0

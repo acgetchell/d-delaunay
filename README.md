@@ -19,31 +19,34 @@ the [Rust] ecosystem.
 
 ## Features
 
-- [x]  d-dimensional [Delaunay triangulations]
-- [x]  Tested for 3-, 4-, and 5-dimensional triangulations
 - [x]  Arbitrary data types associated with vertices and cells
+- [x]  d-dimensional [Delaunay triangulations]
 - [x]  Serialization/Deserialization of all data structures to/from [JSON]
+- [x]  Tested for 3-, 4-, and 5-dimensional triangulations
 
 At some point I may merge into another library, such as [Spade] or [delaunay],
 but for now I am developing this to use in my [research] without trying to
 figure out how to mesh with other libraries and coding conventions, and with
 the minimum number of [traits] to do generic computational geometry.
 
-## Benchmarks
+## Development Tools
 
-The library includes comprehensive performance benchmarks for circumsphere containment algorithms. Key findings:
+The repository includes utility scripts for development, testing, and performance analysis:
 
-- **insphere_lifted**: Fastest method (~50% better than standard)
-- **insphere**: Best balance of performance and numerical stability
-- **insphere_distance**: Slowest but most transparent for educational use
+### Benchmarking and Performance
 
-Run benchmarks with:
+- **Automated benchmark execution**: Run triangulation benchmarks across multiple dimensions with GitHub Actions
+- **Baseline generation**: Create performance baselines for regression detection
+- **Performance regression testing**: Compare benchmark results against baseline metrics
 
-```bash
-cargo bench --bench circumsphere_containment
-```
+See [benches/README.md](benches/README.md) for detailed performance results, baseline metrics, and analysis.
 
-See [benches/README.md](benches/README.md) for detailed performance results and analysis.
+### Testing and Validation
+
+- **Example execution**: Run all example programs to verify functionality
+- **Comprehensive testing**: Automated discovery and execution of test suites
+
+See [scripts/README.md](scripts/README.md) for detailed documentation on available development scripts and their usage.
 
 ## References
 
