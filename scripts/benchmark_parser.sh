@@ -48,11 +48,11 @@ extract_timing_data() {
     if [[ "$line" =~ ^tds_new_[0-9]+d/tds_new/[0-9]+[[:space:]]+time:[[:space:]]+\[ ]]; then
         # Extract timing values from within brackets
         local timing_values
-        timing_values=$(echo "$line" | grep -o '\[[^]]*\]' | grep -o '[0-9.]\+' | head -3)
+        timing_values=$(echo "$line" | grep -o '\[[^]]*\]' | grep -o '[0-9.]\+' | head -3 | tr '\n' ' ')
         
-        # Extract unit (μs, µs, ms, s) from the line
+        # Extract unit (ns, μs, µs, ms, s) from the line
         local unit
-        if [[ "$line" =~ [[:space:]]([μµ]s|ms|s)[[:space:]] ]]; then
+        if [[ "$line" =~ [[:space:]](ns|[μµ]s|ms|s)[[:space:]] ]]; then
             unit="${BASH_REMATCH[1]}"
             # Normalize µ to μ for consistency
             if [[ "$unit" == "µs" ]]; then
@@ -65,7 +65,7 @@ extract_timing_data() {
         # Convert to array and validate we have 3 values
         local timing_array
         read -ra timing_array <<<"$timing_values"
-        if [[ ${#timing_array[@]} -eq 3 ]]; then
+        if [[ ${#timing_array[@]} -ge 3 ]]; then
             echo "${timing_array[0]},${timing_array[1]},${timing_array[2]},$unit"
             return 0
         fi
@@ -170,9 +170,9 @@ parse_benchmarks_with_awk() {
         # Extract points from third part
         points = id_parts[3]
         
-        # Extract unit from the line (μs, µs, ms, s)
+        # Extract unit from the line (ns, μs, µs, ms, s)
         unit = "μs"  # Default fallback
-        if (match($0, /[[:space:]]([μµ]s|ms|s)[[:space:]]/)) {
+        if (match($0, /[[:space:]](ns|[μµ]s|ms|s)[[:space:]]/)) {
             unit = substr($0, RSTART+1, RLENGTH-2)
             # Normalize µ to μ for consistency
             if (unit == "µs") {
@@ -245,11 +245,13 @@ extract_baseline_time() {
         time_value=$(echo "$time_line" | grep -o '\[[^]]*\]' | tr -d '[]' | cut -d',' -f2 | tr -d ' ')
         
         # Convert to nanoseconds based on unit (check original line for unit)
-        if [[ "$time_line" == *"μs"* ]] || [[ "$time_line" == *"µs"* ]]; then
+        if [[ "$time_line" == *"ns"* ]]; then
+            printf "%.0f\n" "$(echo "$time_value * 1" | bc -l)"
+        elif [[ "$time_line" == *"μs"* ]] || [[ "$time_line" == *"µs"* ]]; then
             printf "%.0f\n" "$(echo "$time_value * 1000" | bc -l)"
         elif [[ "$time_line" == *"ms"* ]]; then
             printf "%.0f\n" "$(echo "$time_value * 1000000" | bc -l)"
-        elif [[ "$time_line" == *" s"* ]] && [[ "$time_line" != *"μs"* ]] && [[ "$time_line" != *"ms"* ]]; then
+        elif [[ "$time_line" == *" s"* ]] && [[ "$time_line" != *"μs"* ]] && [[ "$time_line" != *"ms"* ]] && [[ "$time_line" != *"ns"* ]]; then
             printf "%.0f\n" "$(echo "$time_value * 1000000000" | bc -l)"
         else
             echo "$time_value"

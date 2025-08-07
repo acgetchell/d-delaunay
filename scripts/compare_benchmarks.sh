@@ -56,7 +56,14 @@ usage() {
 # Find project root and set default values
 PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd)
 
+# Check if benchmark_parser.sh dependency exists
+BENCHMARK_PARSER_PATH="${PROJECT_ROOT}/scripts/benchmark_parser.sh"
+if [[ ! -f "$BENCHMARK_PARSER_PATH" ]]; then
+    error_exit "Required dependency not found: $BENCHMARK_PARSER_PATH. This script depends on benchmark_parser.sh for parsing functions."
+fi
+
 # Source the shared benchmark parsing utilities
+# Note: We explicitly check file existence above, so disable shellcheck warning
 # shellcheck disable=SC1091
 source "${PROJECT_ROOT}/scripts/benchmark_parser.sh"
 

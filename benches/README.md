@@ -21,8 +21,8 @@ cargo bench --bench circumsphere_containment -- --test
 # Run small-scale triangulation benchmarks for 2D, 3D, and 4D
 cargo bench --bench small_scale_triangulation
 
-# Run benchmarks and generate baseline results
-scripts/run_small_scale_benchmarks.sh
+# Generate baseline results
+scripts/generate_baseline.sh
 ```
 
 ### All Benchmarks
@@ -261,10 +261,9 @@ The `benches/baseline_results.txt` serves as a reference for performance regress
 
 ```bash
 # Generate new benchmark results
-scripts/run_small_scale_benchmarks.sh
+scripts/generate_baseline.sh
 
-# Extract and compare results
-scripts/extract_benchmarks.sh target/criterion > new_results.json
+# Compare against existing baseline
 scripts/compare_benchmarks.sh
 ```
 
