@@ -19,36 +19,15 @@ the [Rust] ecosystem.
 
 ## Features
 
-- [x]  d-dimensional [Delaunay triangulations]
-- [x]  Tested for 3-, 4-, and 5-dimensional triangulations
 - [x]  Arbitrary data types associated with vertices and cells
+- [x]  d-dimensional [Delaunay triangulations]
 - [x]  Serialization/Deserialization of all data structures to/from [JSON]
+- [x]  Tested for 3-, 4-, and 5-dimensional triangulations
 
 At some point I may merge into another library, such as [Spade] or [delaunay],
 but for now I am developing this to use in my [research] without trying to
 figure out how to mesh with other libraries and coding conventions, and with
 the minimum number of [traits] to do generic computational geometry.
-
-## Benchmarks
-
-The library includes comprehensive performance benchmarks for circumsphere containment algorithms and triangulation data structure operations. Key findings:
-
-- **insphere_lifted**: Fastest method (~50% better than standard)
-- **insphere**: Best balance of performance and numerical stability
-- **insphere_distance**: Slowest but most transparent for educational use
-
-Run benchmarks with:
-
-```bash
-# Run all benchmarks
-cargo bench
-
-# Run specific benchmark suites
-cargo bench --bench circumsphere_containment
-cargo bench --bench small_scale_triangulation
-```
-
-See [benches/README.md](benches/README.md) for detailed performance results, baseline metrics, and analysis.
 
 ## Development Tools
 
@@ -56,9 +35,11 @@ The repository includes utility scripts for development, testing, and performanc
 
 ### Benchmarking and Performance
 
-- **Performance regression testing**: Compare benchmark results against baseline metrics
-- **Automated benchmark execution**: Run triangulation benchmarks across multiple dimensions
+- **Automated benchmark execution**: Run triangulation benchmarks across multiple dimensions with GitHub Actions
 - **Baseline generation**: Create performance baselines for regression detection
+- **Performance regression testing**: Compare benchmark results against baseline metrics
+
+See [benches/README.md](benches/README.md) for detailed performance results, baseline metrics, and analysis.
 
 ### Testing and Validation
 

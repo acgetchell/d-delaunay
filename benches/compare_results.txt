@@ -1,0 +1,134 @@
+Comparison Results
+==================
+Current Date: Thu Aug  7 00:39:42 PDT 2025
+Current Git commit: b0aa61f52d74ae3a380f8cae8d92a29290554362
+
+Baseline Date: Thu Aug  7 00:37:43 PDT 2025
+Baseline Git commit: b0aa61f52d74ae3a380f8cae8d92a29290554362
+
+=== 10 Points (2D) ===
+Current Time: [364.04, 365.58, 368.12] μs
+Current Throughput: [27.165, 27.354, 27.469] Kelem/s
+Baseline Time: [366.41, 371.35, 376.01] μs
+Baseline Throughput: [26.595, 26.928, 27.291] Kelem/s
+Time Change: [−2.3907%, −0.8835%, +0.7011%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−0.6962%, ++0.8914%, ++2.4492%]
+
+=== 20 Points (2D) ===
+Current Time: [1.5126, 1.5239, 1.5376] ms
+Current Throughput: [13.007, 13.124, 13.222] Kelem/s
+Baseline Time: [1499.41, 1527.61, 1554.32] μs
+Baseline Throughput: [12.867, 13.092, 13.338] Kelem/s
+Time Change: [−1.6873%, +0.2682%, +2.3407%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−2.2871%, +−0.2675%, ++1.7163%]
+
+=== 30 Points (2D) ===
+Current Time: [3.5336, 3.6201, 3.6955] ms
+Current Throughput: [8.1179, 8.2871, 8.4899] Kelem/s
+Baseline Time: [3537.75, 3642.64, 3728.38] μs
+Baseline Throughput: [8.046, 8.235, 8.479] Kelem/s
+Time Change: [−5.1588%, −2.4581%, +0.9129%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−0.9046%, ++2.5201%, ++5.4394%]
+
+=== 40 Points (2D) ===
+Current Time: [6.5358, 6.6708, 6.8231] ms
+Current Throughput: [5.8624, 5.9963, 6.1201] Kelem/s
+Baseline Time: [6479.55, 6809.24, 7303.89] μs
+Baseline Throughput: [5.476, 5.874, 6.173] Kelem/s
+Time Change: [−7.7639%, −0.0759%, +7.2638%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−6.7719%, ++0.0759%, ++8.4174%]
+
+=== 50 Points (2D) ===
+Current Time: [10.353, 11.231, 12.419] ms
+Current Throughput: [4.0262, 4.4520, 4.8296] Kelem/s
+Baseline Time: [10376.21, 11048.60, 11756.99] μs
+Baseline Throughput: [4.252, 4.525, 4.818] Kelem/s
+Time Change: [−6.7598%, +2.1937%, +11.818%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−10.569%, +−2.1466%, ++7.2499%]
+
+=== 10 Points (3D) ===
+Current Time: [3.6316, 3.7977, 3.9835] ms
+Current Throughput: [2.5103, 2.6332, 2.7536] Kelem/s
+Baseline Time: [3499.90, 3708.66, 3925.25] μs
+Baseline Throughput: [2.547, 2.696, 2.857] Kelem/s
+Time Change: [−3.2708%, +4.0368%, +11.964%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−10.686%, +−3.8801%, ++3.3814%]
+
+=== 20 Points (3D) ===
+Current Time: [33.523, 37.178, 40.533] ms
+Baseline Time: [32067.63, 37243.78, 42571.03] μs
+Baseline Throughput: [0.469, 0.537, 0.623] Kelem/s
+Time Change: [−21.758%, −6.6360%, +12.620%]
+✅ IMPROVEMENT: Time decreased by 6.6360% (faster performance)
+Throughput Change: [+−11.206%, ++7.1077%, ++27.809%]
+
+=== 30 Points (3D) ===
+Current Time: [191.57, 241.69, 309.68] ms
+Baseline Time: [116475.09, 176900.70, 246565.82] μs
+Baseline Throughput: [0.121, 0.169, 0.257] Kelem/s
+Time Change: [−10.808%, +36.623%, +118.33%]
+⚠️  REGRESSION: Time increased by 36.623% (slower performance)
+Throughput Change: [+−54.198%, +−26.806%, ++12.117%]
+
+=== 40 Points (3D) ===
+Current Time: [342.56, 573.65, 903.45] ms
+Baseline Time: [543576.45, 1373256.38, 2415407.21] μs
+Baseline Throughput: [0.016, 0.029, 0.073] Kelem/s
+Time Change: [−81.237%, −58.227%, +15.133%]
+✅ IMPROVEMENT: Time decreased by 58.227% (faster performance)
+Throughput Change: [+−13.144%, ++139.39%, ++432.98%]
+
+=== 50 Points (3D) ===
+Current Time: [1.8776, 2.6896, 3.5070] s
+Baseline Time: [1992077.01, 2635812.56, 3326898.26] μs
+Baseline Throughput: [0.015, 0.018, 0.025] Kelem/s
+Time Change: [−34.257%, +2.0414%, +51.495%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−33.991%, +−2.0006%, ++52.108%]
+
+=== 10 Points (4D) ===
+Current Time: [9.5762, 11.312, 13.538] ms
+Baseline Time: [11006.70, 11905.80, 13063.72] μs
+Baseline Throughput: [0.765, 0.839, 0.908] Kelem/s
+Time Change: [−16.223%, −1.5687%, +15.562%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−13.466%, ++1.5937%, ++19.365%]
+
+=== 20 Points (4D) ===
+Current Time: [39.179, 46.019, 55.538] ms
+Baseline Time: [52930.91, 69835.08, 89801.99] μs
+Baseline Throughput: [0.222, 0.286, 0.377] Kelem/s
+Time Change: [−45.617%, −24.463%, +8.7146%]
+✅ IMPROVEMENT: Time decreased by 24.463% (faster performance)
+Throughput Change: [+−8.0161%, ++32.386%, ++83.880%]
+
+=== 30 Points (4D) ===
+Current Time: [89.592, 157.37, 236.27] ms
+Baseline Time: [71700.90, 147021.06, 247541.57] μs
+Baseline Throughput: [0.121, 0.204, 0.418] Kelem/s
+Time Change: [−50.171%, +7.0404%, +140.05%]
+⚠️  REGRESSION: Time increased by 7.0404% (slower performance)
+Throughput Change: [+−58.342%, +−6.5773%, ++100.69%]
+
+=== 40 Points (4D) ===
+Current Time: [167.91, 292.86, 437.60] ms
+Baseline Time: [199285.77, 297271.33, 394036.16] μs
+Baseline Throughput: [0.101, 0.134, 0.200] Kelem/s
+Time Change: [−45.368%, −1.4847%, +76.307%]
+✅ OK: Time change within acceptable range
+Throughput Change: [+−43.281%, ++1.5070%, ++83.043%]
+
+=== 50 Points (4D) ===
+Current Time: [236.14, 548.05, 1.0346] ms
+Baseline Time: [205655.90, 440797.53, 807460.28] μs
+Baseline Throughput: [0.061, 0.113, 0.243] Kelem/s
+Time Change: [−57.894%, +24.331%, +268.51%]
+⚠️  REGRESSION: Time increased by 24.331% (slower performance)
+Throughput Change: [+−72.864%, +−19.570%, ++137.50%]
+

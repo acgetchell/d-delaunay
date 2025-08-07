@@ -1,0 +1,102 @@
+name: Performance Regression Testing
+
+# Run performance regression testing on important changes
+on:
+  # Manual trigger
+  workflow_dispatch:
+  
+  # On pushes to main branch (not PRs to avoid CI environment noise)
+  push:
+    branches:
+      - main
+    # Only run on changes that could affect performance
+    paths:
+      - 'src/**'
+      - 'benches/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  performance-regression:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: true
+
+      - name: Install benchmark dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc
+
+      - name: Check for performance baseline
+        run: |
+          if [[ -f "benches/baseline_results.txt" ]]; then
+            echo "✅ Found performance baseline, proceeding with regression testing"
+            echo "BASELINE_EXISTS=true" >> $GITHUB_ENV
+            
+            # Show baseline metadata
+            echo "=== Baseline Information ==="
+            head -n 3 benches/baseline_results.txt
+          else
+            echo "⚠️ No performance baseline found at benches/baseline_results.txt"
+            echo "   To enable performance regression testing:"
+            echo "   1. Run locally: ./scripts/generate_baseline.sh"
+            echo "   2. Commit the generated benches/baseline_results.txt file"
+            echo "   3. Future CI runs will test for performance regressions"
+            echo ""
+            echo "   Skipping benchmark regression testing for now."
+            echo "BASELINE_EXISTS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Extract baseline commit SHA
+        if: env.BASELINE_EXISTS == 'true'
+        run: |
+          echo "BASELINE_COMMIT=$(grep "^Git commit:" benches/baseline_results.txt | cut -d' ' -f3)" >> $GITHUB_ENV
+
+      - name: Determine if benchmarks should run
+        if: env.BASELINE_EXISTS == 'true'
+        run: |
+          if [[ "$BASELINE_COMMIT" == "${{ github.sha }}" ]]; then
+            echo "SKIP_BENCHMARKS=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_BENCHMARKS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Skip benchmarks if no code change
+        if: env.SKIP_BENCHMARKS == 'true'
+        run: |
+          echo "🔍 Current commit matches baseline (${BASELINE_COMMIT}), skipping benchmarks."
+
+      - name: Run performance regression test
+        if: env.BASELINE_EXISTS == 'true' && env.SKIP_BENCHMARKS == 'false'
+        run: |
+          echo "🚀 Running performance regression test..."
+          
+          # This will exit with code 1 if significant regressions are found
+          ./scripts/compare_benchmarks.sh
+
+      - name: Display regression test results
+        if: env.BASELINE_EXISTS == 'true' && env.SKIP_BENCHMARKS == 'false' && always()
+        run: |
+          if [[ -f "benches/compare_results.txt" ]]; then
+            echo "=== Performance Regression Test Results ==="
+            cat benches/compare_results.txt
+          fi
+
+      - name: Upload regression test results
+        if: env.BASELINE_EXISTS == 'true' && env.SKIP_BENCHMARKS == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-regression-results
+          path: benches/compare_results.txt
+          retention-days: 30

@@ -1,94 +1,63 @@
-Date: Tue Aug  5 00:35:55 PDT 2025
-Git commit: a2acfec53c7a3c6210cd44519d8810c137cf89ee
+Date: Thu Aug  7 00:37:43 PDT 2025
+Git commit: b0aa61f52d74ae3a380f8cae8d92a29290554362
 
 === 10 Points (2D) ===
-Time:   [347.59 µs, 349.77 µs, 352.15 µs]
-Throughput:  [28.397 Kelem/s, 28.590 Kelem/s, 28.770 Kelem/s]
-Time Change:   [−2.8229%, −1.9381%, −1.0286%] (p = 0.00 < 0.05)
-Throughput Change:  [+1.0393%, +1.9764%, +2.9049%]
+Time: [366.41, 371.35, 376.01] μs
+Throughput: [26.595, 26.928, 27.291] Kelem/s
 
 === 20 Points (2D) ===
-Time:   [1.4645 ms, 1.4758 ms, 1.4869 ms]
-Throughput:  [13.450 Kelem/s, 13.552 Kelem/s, 13.656 Kelem/s]
-Time Change:   [−3.9577%, −2.3794%, −0.6152%] (p = 0.00 < 0.05)
-Throughput Change:  [+0.6190%, +2.4374%, +4.1208%]
+Time: [1499.41, 1527.61, 1554.32] μs
+Throughput: [12.867, 13.092, 13.338] Kelem/s
 
 === 30 Points (2D) ===
-Time:   [3.4808 ms, 3.5264 ms, 3.5730 ms]
-Throughput:  [8.3962 Kelem/s, 8.5072 Kelem/s, 8.6187 Kelem/s]
-Time Change:   [−1.5467%, +0.3904%, +2.3882%] (p = 0.70 > 0.05)
-Throughput Change:  [−2.3325%, −0.3889%, +1.5710%]
+Time: [3537.75, 3642.64, 3728.38] μs
+Throughput: [8.046, 8.235, 8.479] Kelem/s
 
 === 40 Points (2D) ===
-Time:   [6.3897 ms, 6.5196 ms, 6.6550 ms]
-Throughput:  [6.0105 Kelem/s, 6.1353 Kelem/s, 6.2600 Kelem/s]
-Time Change:   [−5.2587%, −2.5015%, +0.5740%] (p = 0.10 > 0.05)
-Throughput Change:  [−0.5708%, +2.5657%, +5.5506%]
+Time: [6479.55, 6809.24, 7303.89] μs
+Throughput: [5.476, 5.874, 6.173] Kelem/s
 
 === 50 Points (2D) ===
-Time:   [10.723 ms, 11.039 ms, 11.363 ms]
-Throughput:  [4.4003 Kelem/s, 4.5294 Kelem/s, 4.6629 Kelem/s]
-Time Change:   [−3.6511%, +0.6030%, +4.8318%] (p = 0.79 > 0.05)
-Throughput Change:  [−4.6091%, −0.5993%, +3.7895%]
+Time: [10376.21, 11048.60, 11756.99] μs
+Throughput: [4.252, 4.525, 4.818] Kelem/s
 
 === 10 Points (3D) ===
-Time:   [3.6201 ms, 3.7033 ms, 3.7873 ms]
-Throughput:  [2.6404 Kelem/s, 2.7003 Kelem/s, 2.7623 Kelem/s]
-Time Change:   [−4.3848%, −1.2092%, +1.9441%] (p = 0.45 > 0.05)
-Throughput Change:  [−1.9070%, +1.2240%, +4.5859%]
+Time: [3499.90, 3708.66, 3925.25] μs
+Throughput: [2.547, 2.696, 2.857] Kelem/s
 
 === 20 Points (3D) ===
-Time:   [35.984 ms, 38.532 ms, 41.183 ms]
-Throughput:  [485.64 elem/s, 519.05 elem/s, 555.80 elem/s]
-Time Change:   [−1.4374%, +8.6451%, +19.237%] (p = 0.08 > 0.05)
-Throughput Change:  [−16.133%, −7.9572%, +1.4583%]
+Time: [32067.63, 37243.78, 42571.03] μs
+Throughput: [0.469, 0.537, 0.623] Kelem/s
 
 === 30 Points (3D) ===
-Time:   [165.90 ms, 181.31 ms, 198.14 ms]
-Throughput:  [151.41 elem/s, 165.46 elem/s, 180.83 elem/s]
-Time Change:   [−16.671%, −7.0024%, +4.8046%] (p = 0.19 > 0.05)
-Throughput Change:  [−4.5849%, +7.5441%, +20.029%]
+Time: [116475.09, 176900.70, 246565.82] μs
+Throughput: [0.121, 0.169, 0.257] Kelem/s
 
 === 40 Points (3D) ===
-Time:   [743.26 ms, 858.30 ms, 986.73 ms]
-Throughput:  [40.538 elem/s, 46.604 elem/s, 53.817 elem/s]
-Time Change:   [−16.515%, +4.0839%, +29.304%] (p = 0.73 > 0.05)
-Throughput Change:  [−22.663%, −3.9237%, +19.782%]
+Time: [543576.45, 1373256.38, 2415407.21] μs
+Throughput: [0.016, 0.029, 0.073] Kelem/s
 
 === 50 Points (3D) ===
-Time:   [2.6173 s, 3.0394 s, 3.4949 s]
-Throughput:  [14.306 elem/s, 16.451 elem/s, 19.104 elem/s]
-Time Change:   [−36.924%, −20.205%, +1.1878%] (p = 0.07 > 0.05)
-Throughput Change:  [−1.1739%, +25.321%, +58.540%]
+Time: [1992077.01, 2635812.56, 3326898.26] μs
+Throughput: [0.015, 0.018, 0.025] Kelem/s
 
-=== 10 points (4D) ===
-                        time:   [9.4863 ms 10.310 ms 11.175 ms]
-                        thrpt:  [894.85  elem/s 969.95  elem/s 1.0542 Kelem/s]
-                        time:   [−7.5177% +4.1487% +17.736%] (p = 0.50 > 0.05)
-                        thrpt:  [−15.064% −3.9834% +8.1288%]
+=== 10 Points (4D) ===
+Time: [11006.70, 11905.80, 13063.72] μs
+Throughput: [0.765, 0.839, 0.908] Kelem/s
 
-=== 20 points (4D) ===
-                        time:   [48.964 ms 56.779 ms 65.023 ms]
-                        thrpt:  [307.58  elem/s 352.24  elem/s 408.46  elem/s]
-                        time:   [−20.988% −1.3505% +24.382%] (p = 0.91 > 0.05)
-                        thrpt:  [−19.603% +1.3690% +26.563%]
+=== 20 Points (4D) ===
+Time: [52930.91, 69835.08, 89801.99] μs
+Throughput: [0.222, 0.286, 0.377] Kelem/s
 
-=== 30 points (4D) ===
-                        time:   [113.61 ms 135.33 ms 159.60 ms]
-                        thrpt:  [187.97  elem/s 221.69  elem/s 264.06  elem/s]
-                        time:   [−33.324% −15.182% +7.5680%] (p = 0.19 > 0.05)
-                        thrpt:  [−7.0355% +17.900% +49.980%]
+=== 30 Points (4D) ===
+Time: [71700.90, 147021.06, 247541.57] μs
+Throughput: [0.121, 0.204, 0.418] Kelem/s
 
-=== 40 points (4D) ===
-                        time:   [309.46 ms 716.99 ms 1.4612 s]
-                        thrpt:  [27.374  elem/s 55.789  elem/s 129.26  elem/s]
-                        time:   [−69.065% −5.0891% +184.63%] (p = 0.95 > 0.05)
-                        thrpt:  [−64.866% +5.3620% +223.26%]
+=== 40 Points (4D) ===
+Time: [199285.77, 297271.33, 394036.16] μs
+Throughput: [0.101, 0.134, 0.200] Kelem/s
 
-=== 50 points (4D) ===
-                        time:   [478.40 ms 1.4178 s 3.1134 s]
-                        thrpt:  [16.059  elem/s 35.265  elem/s 104.52  elem/s]
-                        time:   [−98.502% −91.782% +104.86%] (p = 0.32 > 0.05)
-                        thrpt:  [−51.185% +1116.8% +6576.8%]
+=== 50 Points (4D) ===
+Time: [205655.90, 440797.53, 807460.28] μs
+Throughput: [0.061, 0.113, 0.243] Kelem/s
 
-=== Original microbenchmark comparison ===
